@@ -128,3 +128,34 @@
 1. R8 规则文件最初放在工程根目录，AGP 只读取模块目录的 `proguard-rules.pro`，导致第一版 APK 把 `R$*`、`LuaDialog`、`LuaMaterialDialog` 全部裁掉；已迁移到 `app/proguard-rules.pro`。
 2. 复核确认 jar 内硬编码资源 ID `0x7f010000` 在当前资源表中指向 `anim/abc_fade_in`，并非图标资源；说明上游的快捷方式图标引用本身就是错位的，属于继承缺陷，待后续替换创建快捷方式实现。
 3. `:androlua` 与 `:app` 各自带了一份 `lua/import.lua` 等同名资源，打包时以 app 侧为准，构建有重复路径告警；后续需合并去重。
+
+## 十二、补充发现：内置签名材料
+
+`app/src/main/assets/keys/` 随包携带 7 个签名材料：
+
+- `platform.pk8` / `platform.x509.pem` / `platform.sbt`
+- `testkey.pk8` / `testkey.x509.pem` / `testkey.sbt`
+- `keystore.ks`
+
+这是 AOSP 公开的 platform / testkey 测试密钥，用于“打包 APK 并签名”功能中的系统级签名选项。风险与处置：
+
+1. 这些密钥随 APK 分发，任何人可直接提取，不符合“密钥不得入库/随包”的安全要求。
+2. 但它们属于公开的 AOSP 测试密钥，本身不构成私密信息泄露；真正风险在于被用于在信任 platform 证书的设备上伪造系统签名。
+3. 处置建议：从 assets 移除 `platform.*`、`testkey.*`，打包功能仅保留用户自备密钥；若必须保留该能力，改为首次使用时由用户导入，不随包分发。
+4. 本次未移除，因为会直接切断“平台签名打包”功能，需要产品层面确认后再动。
+
+## 十三、四项处置结果（第二轮）
+
+| 项 | 采纳方案 | 实施 | 验证 |
+| --- | --- | --- | --- |
+| 应用图标 | 重绘新品牌图标 | `design/icon.svg` 源文件 + 自适应图标 + 5 档密度切图 + 暗色打包图标 | 构建后 `aapt2 dump badging` 图标指向 `mipmap/ic_launcher` |
+| 启动页 | 自建 Welcome 替换 | 新增 `com.mini.luaxplus.Welcome`，展示标识与标语后进入编辑器，保留版本变更提示 | 清单启动项已切换，jar 内置 Welcome 不再被引用 |
+| 外部目录 | 运行时常量等长替换 | `LuaApplication.class` 中 `/AndroLua`→`/LuaXPlus`、`AndroLua`→`LuaXPlus`，字节长度不变（7971 字节），条目 1011 个完整保留 | `javap` 复核常量已变更，zip 结构重建后 961 个 class 全部在 |
+| 内置平台密钥 | 移除随包 AOSP 密钥 | 删除 `platform.*`、`testkey.*` 共 6 个文件，保留 `keystore.ks` 作为默认打包签名 | `assets/keys` 仅剩 `keystore.ks` |
+
+补充说明：
+
+1. 目录改名只动了常量字符串，没有改类结构、方法签名或偏移，风险面最小；旧目录 `/storage/emulated/0/AndroLua` 不再被创建。
+2. 因新包名本身是全新安装，不存在旧目录数据迁移问题。
+3. `sign.dex` 仍保留 `platform` / `testkey` 的名称分支，缺少密钥时该模式会报错，常规打包不受影响。
+4. 启动页替换后，jar 内 `Welcome` 的权限批申请与版本检查逻辑同时失效，权限改由 `main.lua` 自检接管，版本变更提示由自有启动页写入 extras 后交给 `Main`。

@@ -106,9 +106,20 @@ keyPassword=****
 
 ## 已知限制
 
-- 外部工程目录名固定为 `/storage/emulated/0/AndroLua`，硬编码在运行时 jar 的 `LuaApplication.onCreate()` 中，改目录名需要重编运行时
-- 启动页 “Powered by AndroLua+”、快捷方式图标资源 ID 等品牌与资源引用同样固化在 jar 内
+- 运行时外部目录已由 `/storage/emulated/0/AndroLua` 改为 `/storage/emulated/0/LuaXPlus`：在 jar 的 `LuaApplication.class` 常量池中做等长字符串替换实现，未重编运行时
+- `LuaApplication` 内的备用数据目录名同步为 `LuaXPlus`，属于应用私有目录，不影响用户可见路径
+- 快捷方式图标资源 ID 在 jar 内仍是硬编码数字且与当前资源表错位，快捷方式功能需后续重写
 - 部分第三方宿主兼容逻辑（`import "jesse205"`）是上游 Aide Lua 的模块契约，属于第三方 API 名称，予以保留
+- 已移除随包的 AOSP `platform` / `testkey` 密钥，“平台签名打包”选项不再可用；常规打包使用应用内 `keystore.ks` 的调试签名
+
+## 品牌资源
+
+- `design/icon.svg`：图标矢量源文件（纸感底 + 墨蓝月牙 + 青色轨道）
+- `app/src/main/res/drawable/icon.png`：供 Lua 侧 `R.drawable.icon` 与打包默认图标使用
+- `app/src/main/res/mipmap-*`：桌面图标各密度切图与自适应图标前景
+- `app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`：自适应图标声明
+- `ic_launcher-aidelua.png` / `ic_launcher_night-aidelua.png`：Aide Lua 打包用的日间/夜间图标
+- 启动页由 `app/src/main/java/com/mini/luaxplus/Welcome.java` 实现，展示品牌标识后进入编辑器，并保留版本变更提示
 
 ## 上游与许可
 

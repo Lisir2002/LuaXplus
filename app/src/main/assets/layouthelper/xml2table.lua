@@ -20,7 +20,7 @@ t={
   {
     LuaEditor,
     id="edit",
-    --hint= "XML布局代码转换AndroLua布局表",
+    --hint= "XML布局代码转换Mini-LuaXPLUS布局表",
     layout_width="fill",
     layout_height="fill",
     layout_weight=1,

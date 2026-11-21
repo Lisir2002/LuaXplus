@@ -12,4 +12,5 @@
     <color name="color_surface_light">@android:color/white</color>
     <color name="color_surface_dark">@color/google_grey_900</color>
     <color name="color_surface">@color/color_surface_light</color>
+    <color name="ic_launcher_background">#F5EEE1</color>
 </resources>

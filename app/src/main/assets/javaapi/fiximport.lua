@@ -88,7 +88,7 @@ function fiximport(path)
 
   return String(ret)
 end
---path="/storage/emulated/0/AndroLua/draw2.lua"
+--path="/storage/emulated/0/LuaXPlus/draw2.lua"
 --path=luajava.luapath
 dir,path=...
 --path=luajava.luapath

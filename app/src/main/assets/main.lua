@@ -755,7 +755,7 @@ activity.getWindow().setSoftInputMode(0x10)
 --activity.getSupportActionBar().show()
 
 luahist = luajava.luadir .. "/lua.hist"
-luadir = luajava.luaextdir .. "/" or "/sdcard/androlua/"
+luadir = luajava.luaextdir .. "/" or "/sdcard/LuaXPlus/"
 luaconf = luajava.luadir .. "/lua.conf"
 luaproj = luajava.luadir .. "/lua.proj"
 pcall(dofile, luaconf)
