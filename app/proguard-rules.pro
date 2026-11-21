@@ -16,6 +16,12 @@
 -keep class com.google.android.material.** { *; }
 -keep class com.google.common.** { *; }
 
+# ---- 运行时 jar 内自带的 android 包扩展类 ----
+# 这些类不在系统框架里，是运行时随包提供的组件，脚本按原始类名加载
+-keep class android.widget.** { *; }
+-keep class android.app.** { *; }
+-keep class android.content.** { *; }
+
 # ---- 本应用自有类 ----
 -keep class com.mini.luaxplus.** { *; }
 
@@ -30,6 +36,9 @@
 
 # ---- 资源表禁止混淆，供脚本按 R 名称访问 ----
 -keep class **.R$* { *; }
+
+# 脚本通过字符串按原始类名、方法名访问对象，关闭改名避免运行时找不到成员
+-dontobfuscate
 
 -dontwarn **
 -ignorewarnings

@@ -188,3 +188,17 @@
 | Lua 侧 | `assets/luaxplus/log.lua` | `print` 与控制台输出、`import` 调用、主动上报、错误堆栈落 `luaerror` 文件 |
 
 日志目录：外部 `LuaXPlus/logs`；未授权时 `files/logs`。命名规则见 README。
+
+## 十五、R8 改名导致的运行时类找不到
+
+首次进入编辑器时报 `Class not found: android.widget.ArrayListAdapter`，日志定位到 `import.lua` 的 `import_require`。
+
+原因：`android.widget.ArrayListAdapter` 等类由运行时 jar 自带（不在系统框架内），R8 将其保留但改了名（`mapping.txt` 显示映射为 `d.b`），而脚本按原始类名反射加载，改名后必然找不到。
+
+处置：
+
+1. 补充保留规则 `android.widget.**`、`android.app.**`、`android.content.**`，覆盖 jar 自带扩展类。
+2. 增加 `-dontobfuscate`。该工程几乎全部界面与业务由 Lua 脚本按字符串调用 Java，改名会持续制造同类问题；关闭改名后保留代码压缩与资源裁剪能力。
+3. 复核 961 个 jar 类全部进入 dex，仅 23 个第三方聚合类被压缩移除，均无脚本引用。
+
+体积维持 11MB，签名与版本不变。
