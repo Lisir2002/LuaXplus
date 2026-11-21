@@ -159,3 +159,32 @@
 2. 因新包名本身是全新安装，不存在旧目录数据迁移问题。
 3. `sign.dex` 仍保留 `platform` / `testkey` 的名称分支，缺少密钥时该模式会报错，常规打包不受影响。
 4. 启动页替换后，jar 内 `Welcome` 的权限批申请与版本检查逻辑同时失效，权限改由 `main.lua` 自检接管，版本变更提示由自有启动页写入 extras 后交给 `Main`。
+
+## 十四、启动失败根因与日志体系
+
+### 根因
+
+首次启动报 `Unknown error 7: cannot open /data/user/0/com.mini.luaxplus/files/main.lua`。反查运行时字节码确认：
+
+1. `com.androlua.Main.getLuaPath()` 返回 `getLocalDir() + "/main.lua"`，`getLocalDir()` 即应用私有目录 `files`。
+2. `LuaActivity.onCreate` 直接用 `doFile(path)` 走 `LuaState.LloadFile`，没有 assets 回退逻辑。
+3. `LuaApplication.onCreate` 只创建外部目录与计算搜索路径，不铺设 assets。
+4. 原启动页 `com.androlua.Welcome` 只读取 assets 里的 `init.lua` 取应用配置，同样不铺设。
+
+结论：这套运行时假定“入口脚本已在私有目录”，而 Gradle 构建的 APK 从未提供该步骤，因此新装必失败。
+
+### 处置
+
+- 新增 `AssetBootstrap`：启动页在后台线程把 assets 递归复制到私有目录，跳过 `keys` 与 `*.dex`；写入 `.luaxplus_bootstrap` 版本标记，版本变化或入口缺失时重铺。
+- `app/build.gradle` 与 `androlua/build.gradle` 增加 `assets.srcDirs += ['src/main/resources']`，让 `resources/lua` 下的 `import.lua`、`console.lua` 等运行时模块真正进入 assets，铺设后可由 `luadir/lua/?.lua` 命中。
+- 入口脚本改为两层：`main.lua` 负责接管日志与统一捕获错误，原主体迁移为 `mainbody.lua` 由 `require` 加载。
+
+### 日志体系
+
+| 层 | 实现 | 覆盖 |
+| --- | --- | --- |
+| Java 落盘 | `LogCore` | 统一行格式、按天切分、2MB 滚动、7 天/40 文件保留、外部不可写回退私有目录并在授权后切换 |
+| Java 监控 | `RuntimeWatcher` | 默认未捕获异常处理、Activity 生命周期与 Intent |
+| Lua 侧 | `assets/luaxplus/log.lua` | `print` 与控制台输出、`import` 调用、主动上报、错误堆栈落 `luaerror` 文件 |
+
+日志目录：外部 `LuaXPlus/logs`；未授权时 `files/logs`。命名规则见 README。

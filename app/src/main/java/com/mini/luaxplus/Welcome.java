@@ -4,8 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
+import android.os.SystemClock;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -17,7 +16,8 @@ import android.widget.TextView;
 import com.androlua.Main;
 
 /**
- * 品牌启动页：展示应用标识后进入编辑器主界面，并记录版本变更以触发更新提示。
+ * 品牌启动页：初始化日志与运行监控，铺设运行时脚本后进入编辑器主界面，
+ * 并记录版本变更以触发更新提示。
  */
 public class Welcome extends Activity {
 
@@ -28,13 +28,34 @@ public class Welcome extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        LogCore.init(this);
+        RuntimeWatcher.install(this);
+        LogCore.i("Welcome", "启动页创建 version=" + readVersionName()
+                + " 日志目录=" + LogCore.dir());
         setContentView(createSplashView());
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+        prepareAndStartEditor();
+    }
+
+    private void prepareAndStartEditor() {
+        final long startedAt = SystemClock.elapsedRealtime();
+        new Thread(new Runnable() {
             @Override
             public void run() {
-                startEditor();
+                boolean ready = AssetBootstrap.ensure(Welcome.this);
+                long cost = SystemClock.elapsedRealtime() - startedAt;
+                LogCore.i("Welcome", "脚本准备结果=" + ready + " 耗时=" + cost + "ms");
+                long remain = SPLASH_DELAY_MS - cost;
+                if (remain > 0) {
+                    SystemClock.sleep(remain);
+                }
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        startEditor();
+                    }
+                });
             }
-        }, SPLASH_DELAY_MS);
+        }, "luaxplus-bootstrap").start();
     }
 
     private View createSplashView() {
@@ -77,19 +98,27 @@ public class Welcome extends Activity {
 
     private void startEditor() {
         if (isFinishing()) {
+            LogCore.w("Welcome", "页面已结束，跳过进入编辑器");
             return;
         }
         Intent intent = new Intent(this, Main.class);
         String currentVersion = readVersionName();
         SharedPreferences preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         String lastVersion = preferences.getString(KEY_LAST_VERSION, "");
+        LogCore.i("Welcome", "进入编辑器 当前=" + currentVersion + " 上次=" + lastVersion);
         if (!currentVersion.equals(lastVersion)) {
             intent.putExtra("isVersionChanged", true);
             intent.putExtra("newVersionName", currentVersion);
             intent.putExtra("oldVersionName", lastVersion);
             preferences.edit().putString(KEY_LAST_VERSION, currentVersion).apply();
+            LogCore.i("Welcome", "标记版本变更提示 " + lastVersion + " -> " + currentVersion);
         }
-        startActivity(intent);
+        try {
+            startActivity(intent);
+        } catch (Exception exception) {
+            LogCore.crash(exception, Thread.currentThread());
+            throw new RuntimeException("打开编辑器失败", exception);
+        }
         finish();
     }
 

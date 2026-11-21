@@ -30,6 +30,13 @@ android {
         abortOnError false
         checkReleaseBuilds false
     }
+
+    sourceSets {
+        main {
+            // 基础 Lua 库同样需要作为 assets 提供给运行时
+            assets.srcDirs += ['src/main/resources']
+        }
+    }
 }
 
 dependencies {

@@ -112,6 +112,13 @@ android {
         checkReleaseBuilds false
     }
 
+    sourceSets {
+        main {
+            // 运行时脚本放在 resources/lua，需并入 assets，安装后由启动期铺设到私有目录
+            assets.srcDirs += ['src/main/resources']
+        }
+    }
+
 }
 
 dependencies {

@@ -112,6 +112,32 @@ keyPassword=****
 - 部分第三方宿主兼容逻辑（`import "jesse205"`）是上游 Aide Lua 的模块契约，属于第三方 API 名称，予以保留
 - 已移除随包的 AOSP `platform` / `testkey` 密钥，“平台签名打包”选项不再可用；常规打包使用应用内 `keystore.ks` 的调试签名
 
+## 启动引导与日志
+
+启动流程：`Welcome` 先初始化日志与运行监控，再把 assets 内的脚本铺设到应用私有目录，最后进入 `Main`。铺设带版本标记 `.luaxplus_bootstrap`，版本变化或入口脚本缺失时自动重铺，避免出现“找不到 main.lua”。
+
+日志统一写入外部存储的 `LuaXPlus/logs`，未获得存储授权时先写应用私有目录 `files/logs`，授权后自动切回外部目录。
+
+| 文件 | 用途 |
+| --- | --- |
+| `app_yyyyMMdd.log` | 运行日志，按天切分，单文件超过 2MB 转为 `app_yyyyMMdd_2.log` |
+| `crash_yyyyMMdd_HHmmss_进程号.log` | Java 层未捕获崩溃，含完整堆栈与设备信息 |
+| `luaerror_yyyyMMdd_HHmmss.log` | Lua 层错误，含 traceback |
+
+日志行格式：`2026-11-22 07:12:33.123 I/Main(1234) 内容`，字段依次为时间、级别、来源、进程号、正文。级别为 `D/I/W/E`。
+
+保留策略：超过 7 天的文件在启动时清理，目录内最多保留 40 个文件。
+
+覆盖范围：启动与页面生命周期、Activity 跳转意图、脚本铺设、模块与类导入、`print` 控制台输出、存储权限检查、版本变更提示、Java 崩溃、Lua 错误。
+
+在脚本里写日志：
+
+```lua
+local log = require "luaxplus.log"
+log.i("demo", "启动完成")
+log.e("demo", "出错了", err)
+```
+
 ## 品牌资源
 
 - `design/icon.svg`：图标矢量源文件（纸感底 + 墨蓝月牙 + 青色轨道）
