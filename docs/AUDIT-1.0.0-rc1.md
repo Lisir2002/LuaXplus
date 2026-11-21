@@ -218,3 +218,11 @@
 
 - 铺设指纹改为 `versionName + lastUpdateTime`，同版本重装也会重新铺设并覆盖旧脚本。
 - 选择监听改为反射取 setter 参数类型，再用 `luajava.new(接口, {回调})` 创建代理，通过 `editor.setOnSelectionChangedListener(代理)` 绑定；整个过程仍在 `pcall` 内，失败只记警告不阻断启动。
+
+## 十七、用户脚本运行缺少基础模块
+
+点击运行后报 `/storage/emulated/0/LuaXPlus/new.lua:1: module 'import' not found`，搜索路径里出现 `/data/user/0/com.mini.luaxplus/app_lua/import.lua`。
+
+原因：`LuaApplication.getLuaLpath()` 由 `getDir("lua")`（即 `app_lua`）构造，用户脚本的 `package.path` 只包含工程目录与 `app_lua`，不含主界面使用的 `files` 目录。铺设逻辑只把脚本复制到 `files`，`app_lua` 是空的。
+
+处置：启动铺设时额外把 `assets/lua` 复制到 `context.getDir("lua")`，使 `import`、`loadlayout`、`console` 等基础模块在用户工程运行时也能被 `require` 命中。

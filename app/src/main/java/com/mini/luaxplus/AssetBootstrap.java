@@ -43,6 +43,13 @@ public final class AssetBootstrap {
         boolean ok;
         try {
             copyDir(context.getAssets(), "", target, files, bytes);
+            // 用户脚本运行时按 app_lua 目录查找 import、loadlayout 等基础模块
+            File luaHome = context.getDir("lua", Context.MODE_PRIVATE);
+            int[] luaFiles = new int[1];
+            long[] luaBytes = new long[1];
+            copyDir(context.getAssets(), "lua", luaHome, luaFiles, luaBytes);
+            LogCore.i(TAG, "基础模块铺设完成 " + luaHome.getAbsolutePath()
+                    + " 文件=" + luaFiles[0] + " 字节=" + luaBytes[0]);
             ok = new File(target, "main.lua").isFile();
             writeMarker(marker, stamp + "|" + files[0] + "|" + start);
         } catch (Exception exception) {
