@@ -9,6 +9,9 @@ local function record(err)
   local trace = debug.traceback(tostring(err), 2)
   if log then
     log.err("main", tostring(err), trace)
+    -- 同步写进运行日志，避免错误只落在单独文件里看不到
+    local where = string.match(trace, "mainbody%.lua:%d+") or string.match(trace, "main%.lua:%d+") or "未知位置"
+    log.e("boot", "入口脚本报错: " .. tostring(err) .. " @ " .. where)
   end
   return trace
 end
@@ -23,7 +26,7 @@ end, record)
 
 if not ok then
   if log then
-    log.e("boot", "入口脚本加载失败，已写入 luaerror 日志")
+    log.e("boot", "入口脚本加载失败: " .. string.sub(tostring(result), 1, 300))
   end
   error(tostring(result), 0)
 end

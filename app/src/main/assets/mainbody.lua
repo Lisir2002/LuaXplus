@@ -2226,7 +2226,9 @@ function onKeyShortcut(keyCode, event)
   return false;
 end
 
+pcall(function() require("luaxplus.log").i("load", "导入 ActionMode 前") end)
 import "androidx.appcompat.view.ActionMode"
+pcall(function() require("luaxplus.log").i("load", "导入 ActionMode 完成") end)
 local _clipboardActionMode=nil
 function onEditorSelectionChangedListener(view,status,start,end_)
 if not(_clipboardActionMode) and status then
@@ -2289,6 +2291,15 @@ if not(_clipboardActionMode) and status then
   end
 end
 
-editor.OnSelectionChangedListener=function(status,start,end_)
-  onEditorSelectionChangedListener(editor,status,start,end_)
+-- 编辑器只暴露 setOnSelectionChangedListener 方法，直接赋字段可能不被支持，这里容错处理
+local boundSelection, bindError = pcall(function()
+  editor.OnSelectionChangedListener=function(status,start,end_)
+    onEditorSelectionChangedListener(editor,status,start,end_)
+  end
+end)
+if not boundSelection then
+  pcall(function()
+    require("luaxplus.log").w("load", "选择监听绑定失败: " .. tostring(bindError))
+  end)
 end
+pcall(function() require("luaxplus.log").i("load", "主脚本加载完毕") end)

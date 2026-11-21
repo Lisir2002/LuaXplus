@@ -123,7 +123,12 @@ public final class LogCore {
             if (traceback != null && traceback.length() > 0) {
                 body.append("堆栈:\n").append(traceback).append('\n');
             }
-            appendToFile(target, body.toString());
+            try {
+                appendToFile(target, body.toString());
+            } catch (Exception exception) {
+                // 独立文件写不进去时退回主日志，保证错误不丢
+                write("E", "Lua", message + " (独立日志写入失败: " + exception + ")");
+            }
         }
     }
 
