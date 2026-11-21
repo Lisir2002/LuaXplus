@@ -202,3 +202,19 @@
 3. 复核 961 个 jar 类全部进入 dex，仅 23 个第三方聚合类被压缩移除，均无脚本引用。
 
 体积维持 11MB，签名与版本不变。
+
+## 十六、脚本残留与选择监听绑定
+
+### 现象
+
+重装同版本号 APK 后，运行日志报 `mainbody.lua:2294: com.androlua.LuaEditor@OnSelectionChangedListener is not a field`，但安装包内同一行已加保护。
+
+### 原因
+
+1. 铺设标记只用 `versionName` 判断，同版本重装时命中“已就绪”分支，私有目录继续使用首次安装铺进去的旧脚本，新包里的脚本没生效。
+2. `LuaEditor` 只暴露 `setOnSelectionChangedListener(b.b.a.a.e)`，没有 `OnSelectionChangedListener` 字段，脚本按字段赋值必然抛出 `is not a field`。
+
+### 处置
+
+- 铺设指纹改为 `versionName + lastUpdateTime`，同版本重装也会重新铺设并覆盖旧脚本。
+- 选择监听改为反射取 setter 参数类型，再用 `luajava.new(接口, {回调})` 创建代理，通过 `editor.setOnSelectionChangedListener(代理)` 绑定；整个过程仍在 `pcall` 内，失败只记警告不阻断启动。

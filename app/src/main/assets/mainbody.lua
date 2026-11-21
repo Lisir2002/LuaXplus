@@ -2291,11 +2291,25 @@ if not(_clipboardActionMode) and status then
   end
 end
 
--- 编辑器只暴露 setOnSelectionChangedListener 方法，直接赋字段可能不被支持，这里容错处理
+-- 编辑器通过 setOnSelectionChangedListener 接收接口回调，字段赋值不被支持，这里用接口代理绑定
 local boundSelection, bindError = pcall(function()
-  editor.OnSelectionChangedListener=function(status,start,end_)
-    onEditorSelectionChangedListener(editor,status,start,end_)
+  local setter
+  for _, method in ipairs(editor.getClass().getMethods()) do
+    if method.getName() == "setOnSelectionChangedListener" then
+      setter = method
+      break
+    end
   end
+  if not setter then
+    error("未找到 setOnSelectionChangedListener")
+  end
+  local listenerType = setter.getParameterTypes()[0]
+  local callbackName = listenerType.getMethods()[1].getName()
+  local callback = {}
+  callback[callbackName] = function(status, start, end_)
+    onEditorSelectionChangedListener(editor, status, start, end_)
+  end
+  editor.setOnSelectionChangedListener(luajava.new(listenerType, callback))
 end)
 if not boundSelection then
   pcall(function()

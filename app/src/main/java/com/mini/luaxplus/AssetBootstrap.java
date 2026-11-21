@@ -31,11 +31,12 @@ public final class AssetBootstrap {
         File target = context.getFilesDir();
         File marker = new File(target, MARKER);
         File entry = new File(target, "main.lua");
-        String version = versionName(context);
-        if (entry.isFile() && marker.isFile() && readMarker(marker).startsWith(version)) {
-            LogCore.i(TAG, "脚本已就绪，版本 " + version + "，跳过铺设");
+        String stamp = stamp(context);
+        if (entry.isFile() && marker.isFile() && readMarker(marker).startsWith(stamp)) {
+            LogCore.i(TAG, "脚本已就绪 " + stamp + "，跳过铺设");
             return true;
         }
+        LogCore.i(TAG, "开始铺设脚本 " + stamp + " 旧标记=" + readMarker(marker));
         long start = System.currentTimeMillis();
         int[] files = new int[1];
         long[] bytes = new long[1];
@@ -43,7 +44,7 @@ public final class AssetBootstrap {
         try {
             copyDir(context.getAssets(), "", target, files, bytes);
             ok = new File(target, "main.lua").isFile();
-            writeMarker(marker, version + "|" + files[0] + "|" + start);
+            writeMarker(marker, stamp + "|" + files[0] + "|" + start);
         } catch (Exception exception) {
             LogCore.e(TAG, "脚本铺设失败: " + exception);
             return false;
@@ -148,11 +149,15 @@ public final class AssetBootstrap {
         }
     }
 
-    private static String versionName(Context context) {
+    /**
+     * 铺设指纹：版本名 + 安装时间。同版本号重装也会刷新脚本，避免残留旧文件。
+     */
+    private static String stamp(Context context) {
         try {
             PackageInfo info = context.getPackageManager()
                     .getPackageInfo(context.getPackageName(), 0);
-            return info.versionName == null ? "" : info.versionName;
+            String version = info.versionName == null ? "" : info.versionName;
+            return version + "|" + info.lastUpdateTime;
         } catch (Exception exception) {
             return "";
         }
