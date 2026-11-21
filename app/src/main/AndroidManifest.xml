@@ -39,6 +39,10 @@
     <!-- 读取存储卡中的内容 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 
+    <!-- Android 11 起的分区存储下，保留对传统工程目录的完整读写能力 -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
     <!-- 在后台使用位置信息 -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
@@ -182,13 +186,12 @@
         android:name="com.androlua.LuaApplication"
         android:allowBackup="true"
         android:icon="@drawable/icon"
-        android:label="AndroLuaX"
+        android:label="Mini-LuaXPLUS"
         android:largeHeap="true"
-        android:persistent="true"
         android:requestLegacyExternalStorage="true"
         android:resizeableActivity="true"
         android:supportsPictureInPicture="true"
-        android:theme="@style/Theme.AndroLuaX.Material3"
+        android:theme="@style/Theme.MiniLuaXPLUS.Material3"
         android:usesCleartextTraffic="true"
         tools:targetApi="n">
 
@@ -252,7 +255,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:scheme="androlua" />
-                <data android:host="com.Jesse205.androlua.androidX1_0_0.material1_5"
+                <data android:host="com.mini.luaxplus"
                     tools:ignore="AppLinkUrlError" />
             </intent-filter>
             <intent-filter>
@@ -292,7 +295,7 @@
         <activity
             android:name="com.androlua.Welcome"
             android:exported="true"
-            android:theme="@style/Theme.AndroLuaX.Material3.Welcome"
+            android:theme="@style/Theme.MiniLuaXPLUS.Material3.Welcome"
             android:windowSoftInputMode="adjustResize|stateHidden">
 
             <intent-filter>
@@ -314,7 +317,7 @@
             android:name="com.androlua.LuaAccessibilityService"
             android:enabled="true"
             android:exported="true"
-            android:label="AndroLuaX"
+            android:label="Mini-LuaXPLUS"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
 
             <meta-data

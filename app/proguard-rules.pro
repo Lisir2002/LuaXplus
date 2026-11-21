@@ -1,23 +1,35 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Mini-LuaXPLUS 混淆与压缩规则
+# 运行时会按类名动态加载 AndroidX / Material 组件，反射边界必须整体保留，
+# 否则 Lua 脚本运行时会找不到类。
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# ---- 运行时与脚本引擎 ----
+-keep class com.androlua.** { *; }
+-keep class com.luajava.** { *; }
+-keep class com.nirenr.** { *; }
+-keep class com.baidu.** { *; }
+-keep class bsh.** { *; }
+-keep class com.android.cglib.** { *; }
+-keep class org.luaj.** { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# ---- 供 Lua 动态引用的框架组件 ----
+-keep class androidx.** { *; }
+-keep class com.google.android.material.** { *; }
+-keep class com.google.common.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
--keep class com.baidu.bottom.** { *; }
--keep class com.baidu.mobstat.** { *; }
+# ---- 本应用自有类 ----
+-keep class com.mini.luaxplus.** { *; }
+
+# ---- 反射、JNI 与脚本桥接 ----
+-keepclasseswithmembernames class * { native <methods>; }
+-keepclassmembers enum * { *; }
+-keepclassmembers class * { @android.webkit.JavascriptInterface <methods>; }
+-keepclassmembers class * implements android.os.Parcelable { public static final ** CREATOR; }
+
+# ---- 元数据（脚本反射依赖签名、注解与内部类信息） ----
+-keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod,Exceptions,SourceFile,LineNumberTable
+
+# ---- 资源表禁止混淆，供脚本按 R 名称访问 ----
+-keep class **.R$* { *; }
+
+-dontwarn **
+-ignorewarnings

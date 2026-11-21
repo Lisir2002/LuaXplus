@@ -1,0 +1,130 @@
+# Mini-LuaXPLUS 基线审计报告（1.0.0-rc1）
+
+审计日期：2026-11-22　审计对象：AndroLuaX（main 分支，29 commits）
+
+## 一、结论摘要
+
+1. 这是一个「薄壳 + 二进制运行时」的工程：界面与业务逻辑全部在 Lua 脚本里，Lua 引擎与 LuaJava 绑定在预编译 jar 中，没有对应源码。可改边界清晰，但底层能力无法直接修改。
+2. 品牌并不只出现在配置里，而是分布在 5 个层次：Gradle 配置、Android 清单、Java 包路径、资源样式名、Lua 脚本文案，需要逐层替换，其中资源样式名被 Lua 通过 `R.style.*` 直接引用，改名必须同步。
+3. 原工程无法在非作者机器上构建：签名指向作者本机 Windows 盘符路径，密码明文写死。
+4. 原工程在 Android 12+ 上必然踩坑：`targetSdk=29`、依赖传统外部存储目录、启动时一次性申请清单内全部权限。
+5. 该工程对 R8 非常敏感：Lua 脚本按类名动态加载组件，资源 ID 还被 jar 以硬编码数字引用，压缩规则必须覆盖这些边界。
+
+## 二、工程构成
+
+| 模块 | 内容 | 规模 |
+| --- | --- | --- |
+| `:app` | 编辑器外壳 | AGP 8.1.1 / Gradle 8.3，compileSdk 34，minSdk 21，targetSdk 29 |
+| `:androlua` | 运行时库 | `libs/AndroLua+5.0.18_AndroidX.jar`（961 个 class，2.1MB 解压后）+ `libluajava.so`（arm64-v8a、armeabi-v7a） |
+| `app/src/main/assets` | 编辑器全部逻辑 | 53 个文件，Lua 13,373 行；`main.lua` 55KB 为界面主入口 |
+| Java 源码 | 仅 3 个类 | `LuaMaterialDialog`、`LuaDialog`、`AlertControllerBridge` |
+
+运行时 jar 内含：`com.androlua.*`（Activity/Context/引擎/打包）、`com.luajava.*`（Lua 桥接）、`com.nirenr.*`（截屏）、`bsh.*`（BeanShell）、`com.android.cglib.*`（dex 生成）、`com.baidu.mobstat.*`（统计）。
+
+## 三、运行时二进制边界（不可直接修改的部分）
+
+反编译核验到的行为：
+
+1. `LuaApplication.onCreate()` 将外部目录写死为 `Environment.getExternalStorageDirectory()/AndroLua`，全应用的工程、插件、备份、字体、临时目录都基于它。
+2. `Welcome` 启动页把 `Powered by AndroLua+` 以逐字符常量形式写在字节码里，字符串替换无法消除。
+3. `LuaActivity.createShortcut()` 使用硬编码资源 ID `2130771968`，另有 `2130771969` 作为默认图；这类数字 ID 依赖资源表顺序，新增/删除资源有错位风险。
+4. `LuaActivity`、`LuaActivityX`、`Main`、`LuaService`、`LuaAccessibilityService` 都在 jar 内，清单只能引用，无法替换实现。
+
+## 四、品牌更迭映射
+
+| 位置 | 原值 | 新值 | 说明 |
+| --- | --- | --- | --- |
+| Gradle 工程名 | `AndroLuaX` | `Mini-LuaXPLUS` | `settings.gradle` |
+| applicationId / namespace | `com.jesse205.androlua.androidX.material3` | `com.mini.luaxplus` | 两者统一 |
+| 应用标签 | `AndroLuaX` | `Mini-LuaXPLUS` | 清单与无障碍服务标签 |
+| Java 包 | `com.jesse205.androluax` | `com.mini.luaxplus` | `LuaMaterialDialog` 迁移 |
+| 资源样式 | `Theme.AndroLuaX.Material3` 等 | `Theme.MiniLuaXPLUS.Material3` 等 | 资源名带连字符会非法，故去连字符 |
+| Lua 取主题 | `R.style.Theme_AndroLuaX_Material3` | `R.style.Theme_MiniLuaXPLUS_Material3` | `autotheme.lua` |
+| Lua 绑定 R | `com.jesse205...material3.R` | `com.mini.luaxplus.R` | `import.lua` |
+| 界面文案 | “AndroLua+ / AndroLuaX / Jesse205” | “Mini-LuaXPLUS” | `main.lua`、`help.lua`、工程模板 |
+| 华为平行视界配置 | 旧 client / 旧 Activity 名 | `com.mini.luaxplus` / `com.androlua.LuaActivityX` | `easygo.json` |
+
+保留未改（属于第三方契约或二进制内部标识）：
+
+- `import "com.androlua.*"`：jar 内类名，改则全崩
+- `import "jesse205"`：Aide Lua 宿主模块契约，属第三方 API
+- 外部目录名 `AndroLua`、启动页文案、jar 内其余字符串
+
+## 五、安全隐患
+
+| 等级 | 问题 | 处置 |
+| --- | --- | --- |
+| 高 | 签名密钥硬编码（Windows 路径 + 明文口令） | 改为 `keystore.properties` / 环境变量注入，密钥不入库 |
+| 高 | 清单申请 `INSTALL_PACKAGES`、`WRITE_SETTINGS`、`READ_SMS`、`SEND_SMS`、`READ_CALL_LOG`、`GET_TASKS` 等 60+ 项权限 | 本次先接管申请流程（不再首启批量弹窗），后续按功能裁剪清单 |
+| 中 | `usesCleartextTraffic=true`，允许明文 HTTP | 保留（脚本工具需访问任意站点），后续可加白名单 |
+| 中 | 运行时加载外部 dex（`mao.dex`、`sign.dex`、`loadDex`） | 属打包/签名能力，保留但需在文档标注风险 |
+| 中 | 内置百度统计 SDK | 保留现状，后续评估是否移除 |
+| 低 | `allowBackup=true`，备份可导出数据 | 后续按需关闭 |
+
+## 六、Android 12+ 适配
+
+| 风险点 | 结论 | 处置 |
+| --- | --- | --- |
+| 分区存储（Android 10+ 限制、11+ 强制） | 外部工程目录直接不可写 | 声明 `MANAGE_EXTERNAL_STORAGE`，首启引导授权；未授权时给出明确提示 |
+| 首启批量权限申请 | 体验灾难且多数被拒 | `assets/init.lua` 提供 `check_permissions()` 返回 true 接管，改由 `main.lua` 按需申请 |
+| PendingIntent 可变性（Android 12 强制） | 反编译未发现 `PendingIntent` 调用 | 无需处理 |
+| `android:exported`（Android 12 强制） | 清单中带 intent-filter 的组件已显式声明 | 保持 |
+| 通知权限（Android 13 起） | targetSdk 31 不触发 | 后续升 33 时需补 `POST_NOTIFICATIONS` |
+| 前台服务类型（Android 14 起） | targetSdk 31 不触发 | 后续升 34 时需补 `foregroundServiceType` |
+
+本次 `targetSdk` 定为 31（Android 12 基线），`compileSdk` 34。升 33/34 需要追加通知权限与前台服务类型适配，单独排期。
+
+## 七、R8 风险
+
+| 风险 | 说明 | 规则处置 |
+| --- | --- | --- |
+| 按类名动态加载 | Lua 用 `import "androidx.xxx.YYY"` 在运行时查找类 | `-keep class androidx.**`、`com.google.android.material.**`、`com.google.common.**` |
+| 反射调用 | LuaJava 通过反射调方法/字段 | 保留 `com.androlua.**`、`com.luajava.**`、`com.nirenr.**`、`bsh.**`、`com.android.cglib.**` |
+| 资源按名字访问 | 脚本用 `R.style.*`、`R.drawable.*` | `-keep class **.R$*` |
+| 资源 ID 硬编码 | jar 内 `2130771968/2130771969` | 关闭资源压缩（`shrinkResources=false`），避免资源被移除或错位 |
+| JNI | `libluajava.so` 绑定 Java 方法 | `-keepclasseswithmembernames class * { native <methods>; }` |
+
+## 八、版本与签名
+
+- 版本唯一来源：`version.properties`；`versionCode = (major*10000+minor*100+patch)*100 + stage`，rcN 取 N，final 取 99
+- 1.0.0-rc1 → `versionCode 1000001`，`versionName 1.0.0-rc1`
+- 正式版 1.0.0 → `versionCode 1000099`，需人工批准后修改 `VERSION_STAGE=final`
+- 签名：debug 与 release 共用正式签名；启用 v1/v2/v3；本地 `keystore.properties`，CI 环境变量
+
+## 九、验证清单
+
+- [ ] `:app:assembleRelease` 构建通过
+- [ ] APK 包名 `com.mini.luaxplus`、版本 `1.0.0-rc1` / `1000001`
+- [ ] `apksigner verify` 通过 v1/v2/v3
+- [ ] APK 体积与基线对比
+- [ ] 安装启动、编辑器可打开、打包功能可用（需真机）
+- [ ] Android 12 设备首启引导授权、工程目录可读写（需真机）
+- [ ] Android 12 以下设备权限申请正常（需真机）
+
+## 十、待办
+
+1. 应用图标仍为上游图标，需替换为新品牌视觉
+2. 启动页 “Powered by AndroLua+” 需自建 Welcome 或重编运行时才能消除
+3. 外部目录名 `AndroLua` 待重编运行时后改名
+4. 权限清单按功能裁剪，移除不需要的高危权限
+5. 如后续要改 Lua 引擎/布局装载，需要引入上游 Java 源码重建 jar
+
+## 十一、构建验证结果（2026-11-22）
+
+| 检查项 | 结果 |
+| --- | --- |
+| `:app:assembleRelease` | 通过（Gradle 8.3 / AGP 8.1.1 / JDK 17 / Platform 34） |
+| 包名 | `com.mini.luaxplus` |
+| 版本 | `1.0.0-rc1` / `versionCode 1000001` |
+| 应用标签 | `Mini-LuaXPLUS` |
+| minSdk / targetSdk | 21 / 31 |
+| 签名 | v1、v2、v3 全部通过，RSA 4096，证书 SHA-256 `22:E6:E8:A2:81:F4:05:B1:C6:87:F9:14:7D:CC:6D:AC:A1:69:1B:B0:9B:BF:DB:64:A9:1F:28:B6:10:2B:2D:F0` |
+| APK 体积 | 11MB（未压缩基线 6.1MB，增量来自 R8 保留规则） |
+| 关键类保留 | `LuaActivity`、`LuaApplication`、`LuaDialog`、`LuaState`、`com.mini.luaxplus.R$style`、`LuaMaterialDialog`、`ScreenCaptureActivity` 均在 |
+| 新增 Lua 代码 | `luac5.3 -p` 语法通过（`main.lua` 整体存在上游 `!=` 方言写法，非本次引入） |
+
+构建过程中发现并修复的问题：
+
+1. R8 规则文件最初放在工程根目录，AGP 只读取模块目录的 `proguard-rules.pro`，导致第一版 APK 把 `R$*`、`LuaDialog`、`LuaMaterialDialog` 全部裁掉；已迁移到 `app/proguard-rules.pro`。
+2. 复核确认 jar 内硬编码资源 ID `0x7f010000` 在当前资源表中指向 `anim/abc_fade_in`，并非图标资源；说明上游的快捷方式图标引用本身就是错位的，属于继承缺陷，待后续替换创建快捷方式实现。
+3. `:androlua` 与 `:app` 各自带了一份 `lua/import.lua` 等同名资源，打包时以 app 侧为准，构建有重复路径告警；后续需合并去重。

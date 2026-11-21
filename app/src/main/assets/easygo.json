@@ -1,6 +1,6 @@
 {
   "easyGoVersion": "1.0",
-  "client": "com.jesse205.androlua.androidX.material3",
+  "client": "com.mini.luaxplus",
   "logicEntities": [
     {
       "head": {
@@ -15,7 +15,7 @@
             "to": "*"
           },
           {
-            "from": "com.jesse205.superlua.LuaActivityX",
+            "from": "com.androlua.LuaActivityX",
             "to": "*"
           }
         ],

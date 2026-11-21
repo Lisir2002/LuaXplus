@@ -55,7 +55,7 @@ projectdir=...
 luaproject=projectdir.."/init.lua"
 app={}
 loadfile(luaproject,"bt",app)()
-appname.Text=app.appname or "AndroLua"
+appname.Text=app.appname or "Mini-LuaXPLUS"
 appver.Text=app.appver or "1.0"
 appcode.Text=app.appcode or "1"
 appsdk.Text=app.appsdk or "15"

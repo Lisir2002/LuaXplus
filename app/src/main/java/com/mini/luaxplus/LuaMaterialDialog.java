@@ -1,4 +1,4 @@
-package com.jesse205.androluax;
+package com.mini.luaxplus;
 
 import static com.google.android.material.theme.overlay.MaterialThemeOverlay.wrap;
 
@@ -29,7 +29,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.dialog.MaterialDialogs;
 import com.google.android.material.resources.MaterialAttributes;
 import com.google.android.material.shape.MaterialShapeDrawable;
-import com.jesse205.androlua.androidX.material3.R;
+import com.mini.luaxplus.R;
 
 /**
  * Lua 质感对话框

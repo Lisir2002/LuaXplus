@@ -11,7 +11,7 @@ help=[===[
 @关于@
 @本文档已整理成网页版： https://aidelua.github.io/AideLua/androluapro/ (非官方整理)，阅读更舒服（长按可复制）
 
-AndroLua是基于LuaJava开发的安卓平台轻量级脚本编程语言工具，既具有Lua简洁优雅的特质，又支持绝大部分安卓API，可以使你在手机上快速编写小型应用。
+Mini-LuaXPLUS 是基于 LuaJava 技术底座的安卓平台轻量级脚本编程工具，既具有Lua简洁优雅的特质，又支持绝大部分安卓API，可以使你在手机上快速编写小型应用。
 官方QQ群：236938279(已满)
 http://jq.qq.com/?_wv=1027&k=dcofRr
 官方QQ2群：148389676
@@ -108,7 +108,7 @@ layout.aly  工程默认创建的布局文件
   捐赠：使用支付宝捐赠作者，使软件更好的发展下去
 @
 @快速入门@
-@AndroLua是一个使用Lua语法编写可以使用安卓API的轻型脚本编程工具，使用它可以快速编写安卓应用。
+@Mini-LuaXPLUS 是一个使用 Lua 语法编写、可调用安卓 API 的轻型脚本编程工具，使用它可以快速编写安卓应用。
  第一次打开程序默认创建new.lua，并添加以下代码
 
  require "import"
@@ -445,7 +445,7 @@ layout={
   orientation="vertical",--属性与值
   {
     TextView,--子视图类名称
-    text="hello AndroLua+",--属性与值
+    text="hello Mini-LuaXPLUS",--属性与值
     layout_width="fill"--布局属性
   },
 }
@@ -475,7 +475,7 @@ import "android.os.*"
 import "android.widget.*"
 import "android.view.*"
 import "android.graphics.*"
-activity.setTitle('AndroLua')
+activity.setTitle('Mini-LuaXPLUS')
 
 paint=Paint()
 paint.setARGB(100,0,250,0)
@@ -524,7 +524,7 @@ import "android.os.*"
 import "android.widget.*"
 import "android.view.*"
 import "android.graphics.*"
-activity.setTitle('AndroLua')
+activity.setTitle('Mini-LuaXPLUS')
 
 paint=Paint()
 paint.setARGB(100,0,250,0)
@@ -558,7 +558,7 @@ import "android.os.*"
 import "android.widget.*"
 import "android.view.*"
 import "android.opengl.*"
-activity.setTitle('AndroLua')
+activity.setTitle('Mini-LuaXPLUS')
 --activity.setTheme( android.R.style.Theme_Holo_Light_NoActionBar_Fullscreen)
 
 mTriangleData ={
@@ -770,7 +770,7 @@ getFileSha1(path)
 
 @
 @15.2 LuaAdapter 适配器@
-@列表适配器就是沟通数据与视图的桥梁，在AndroLua+内置了两个适配器LuaArrayAdapter和LuaAdapter
+@列表适配器就是沟通数据与视图的桥梁，在内置了两个适配器LuaArrayAdapter和LuaAdapter
 
   LuaArrayAdapter相对比较简单，仅可以简单展示图片或文字列表
   adp=LuaArrayAdapter(activity,layout)
@@ -904,7 +904,7 @@ packagename="com.androlua.demo"
 @部分函数参考@
 @
 [a]表示参数a可选，(...)表示不定参数。函数调用在只有一个参数且参数为字符串或表时可以省略括号。
-AndroLua库函数在import模块，为便于使用都是全局变量。
+Mini-LuaXPLUS 库函数在 import 模块，为便于使用都是全局变量。
 s 表示string类型，i 表示整数类型，n 表示浮点数或整数类型，t 表示表类型，b 表示布尔类型，o 表示Java对象类型，f为Lua函数。
 --表示注释。
 

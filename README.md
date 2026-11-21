@@ -1,81 +1,117 @@
-# AndroLuaX
+# Mini-LuaXPLUS
 
-<img src="./logo.svg" alt="LOGO" width="300" />
+在 Android 上使用 Lua 语法编写应用的脚本编程工具：内置编辑器、布局表、LuaJava 桥接与打包安装能力。
 
-![license](https://img.shields.io/gitlab/license/Jesse205/androluax)
-[![发行版](https://img.shields.io/gitlab/v/release/Jesse205/androluax?label=发布&logo=gitlab)](https://gitlab.com/Jesse205/androluax/-/releases)
+- 应用名称：Mini-LuaXPLUS
+- 应用包名：`com.mini.luaxplus`
+- 运行平台：Android 5.0（API 21）及以上，目标版本 Android 12（API 31）
+- 当前版本：`1.0.0-rc1`
 
-## 简介
+## 技术架构
 
-AndroLuaX 是一款反编译 AndroLua+，为 AndroLua+ 添加 AndroidX 的 AndroLua+ 衍生产品
+| 模块 | 职责 | 形态 |
+| --- | --- | --- |
+| `:app` | 编辑器外壳、主题、图标、打包入口 | Java + Lua 脚本 |
+| `:androlua` | Lua 运行时（LuaActivity / LuaJava / 布局装载 / 打包） | 预编译 `libs/AndroLua+5.0.18_AndroidX.jar` + `libluajava.so` |
+| `app/src/main/assets` | 编辑器全部界面与业务逻辑 | Lua 脚本（13k+ 行，`main.lua` 为主入口） |
 
-AndroLuaX 还添加了 [AndroidFastScroll](https://github.com/zhanghai/AndroidFastScroll)
-与 [FullDraggableDrawer](https://github.com/PureWriter/FullDraggableDrawer)
+运行时的 Java 实现位于二进制 jar 中，本仓库只包含少量扩展类：
 
-## 构建项目
+- `app/src/main/java/com/mini/luaxplus/LuaMaterialDialog.java`：Material3 对话框桥接
+- `androlua/src/main/java/com/androlua/LuaDialog.java`：对话框基类
+- `androlua/src/main/java/androidx/appcompat/app/AlertControllerBridge.java`：AppCompat 对话框桥接
 
-1. 克隆本项目到本地：`git clone https://gitlab.com/Jesse205/androluax.git`  。
-2. 使用 Gradle 构建：`gradle build` 。
-3. 复制到 Android 设备的 `内部存储/AppProjects/<你的项目>` 。
-4. 下载 [Aide Lua 的发行版](https://gitee.com/AideLua/AideLua/releases/latest)，进入 Aide Lua 后选择刚才复制的工程，然后依次点击 `菜单-项目...-二次打包并安装` 。
+因此：Lua 层、资源层、少量 Java 扩展可以直接改；Lua 引擎、LuaJava 绑定、布局装载等底层能力需要拿到上游 Java 源码重新编译 jar 才能改。
 
-## 注意事项
+## 目录说明
 
-1. 因 AndroLua+ 本身的设计问题，**不建议**将 `targetSdk` 提升到 `29` 以上，否则存储权限没有被自动授予，造成用户体验不佳
-2. **已去除 `welcome.png` 启动图**，因为有更好的图标居中方案替代
-3. AndroidX 尽可能添加所有 AndroidX 依赖，但会排除一些无用的依赖和与 Kotlin 与 RxJava 有关的所有依赖。
-4. **部分依赖无法在较低版本的 Android 上使用**
+```
+app/                     编辑器应用模块
+  src/main/assets/       Lua 脚本、类库索引、帮助文档、插件与工程模板
+  src/main/java/         扩展 Java 类
+  src/main/res/          主题、颜色、图标
+  src/main/jniLibs/      LuaJava 原生库（armeabi-v7a / arm64-v8a）
+androlua/                 运行时封装模块（jar + 原生库 + 少量桥接类）
+version.properties        版本号唯一来源
+keystore.properties       本地签名配置（不入库）
+keystore/                 正式签名密钥库（不入库）
+app/proguard-rules.pro    R8 规则
+docs/                     审计与规范文档
+```
 
-依赖兼容性表格：
+## 版本号规范
 
-| 依赖                                                 | 最低 SDK |
-| ---------------------------------------------------- | -------- |
-| androidx.car.app.automotive                          | 29       |
-| androidx.core.uwb                                    | 31       |
-| androidx.draganddrop                                 | 24       |
-| androidx.glance.wear.tiles                           | 26       |
-| androidx.health.connect.client                       | 26       |
-| androidx.health.services.client                      | 30       |
-| androidx.heifwriter                                  | 28       |
-| androidx.javascriptengine                            | 26       |
-| androidx.security.identity.credential                | 24       |
-| androidx.wear.input.testing                          | 25       |
-| androidx.wear.ongoing                                | 25       |
-| androidx.wear.protolayout.expression                 | 26       |
-| androidx.wear.phone.interactions                     | 25       |
-| androidx.wear.remote.interactions                    | 23       |
-| androidx.wear.tiles                                  | 25       |
-| androidx.wear.watchface.complications.datasource.ktx | 26       |
-| androidx.wear.watchface.complications.rendering      | 26       |
-| androidx.wear.watchface.editor                       | 26       |
-| androidx.wear.watchface.client                       | 26       |
-| androidx.wear.watchface.style                        | 26       |
-| androidx.wear.watchface.data                         | 26       |
+版本号只允许在 `version.properties` 修改：
 
-## 感谢
+```
+VERSION_MAJOR=1
+VERSION_MINOR=0
+VERSION_PATCH=0
+VERSION_STAGE=rc1
+```
 
-没有他们，就没有 AndroLuaX
+- 开发迭代：`VERSION_STAGE=rc1`、`rc2`……，版本名 `1.0.0-rc1`、`1.0.0-rc2`
+- 正式版：`VERSION_STAGE=final`，版本名 `1.0.0`；**必须经项目负责人批准后才能改**
+- `versionCode` 自动计算：`(major*10000 + minor*100 + patch)*100 + stage`，rcN 取 N（1–49），final 取 99
+  - 例：`1.0.0-rc1` → `1000001`，`1.0.0` → `1000099`
+  - 这样正式版的 versionCode 永远高于同版本的所有 rc，升级不会被拒
+- Tag 命名：`v1.0.0-rc1`、`v1.0.0`，与 versionName 完全一致
+- 破坏性改动升 minor，修复升 patch
 
-- **[Aide Lua](https://gitee.com/AideLua/AideLua)**: 依赖 Aide ，使用 Lua 快速、高效开发的工。\
-  AndroLuaX 使用了此项目的模板。
-- **[Material Files](https://github.com/zhanghai/MaterialFiles)**: 一个开源的 Material Design 文件管理器。\
-  AndroLuaX 参考了此项目的代码风格、命名习惯以及实现方式。
-- **[AnimeonGo](https://github.com/frrrrrits/AnimonGo)**: Open Source Aplikasi web scraper Anime Ongoing.\
-  AndroLuaX 参考了此项目的代码。
-- **[Chromium](https://github.com/chromium/chromium)**: Chromium is an open-source browser project that aims to build a safer, faster, and more stable way for all users to experience the web.\
-  AndroLuaX 使用了此项目的配色。
-- **[AndroidFastScroll](https://github.com/zhanghai/AndroidFastScroll)**: Fast scroll for Android RecyclerView and more.\
-  AndroLuaX 使用了此项目并参考了此项目的代码风格、命名习惯以及实现方式。
-- **[FullDraggableDrawer](https://github.com/PureWriter/FullDraggableDrawer)**: Make the DrawerLayout can be dragged/pulled out in real-time within the range of fullscreen, like Pure Writer.\
-  AndroLuaX 使用了此项目。
-- **[Material Components for Android](https://github.com/material-components/material-components-android)**: Modular and customizable Material Design UI components for Android.\
-  AndroLuaX 使用了此项目和此项目的部分代码。
+## 签名规范
 
-## 开源许可
+签名信息不写入仓库，按以下优先级读取：
 
-- **[Material Components for Android](https://github.com/material-components/material-components-android)**: Apache-2.0 license
-- **[Android Jetpack](https://github.com/androidx/androidx)**: Apache-2.0 license
-- **[Chromium](https://github.com/chromium/chromium)**: Apache-2.0 license
-- **[AndroidFastScroll](https://github.com/zhanghai/AndroidFastScroll)**: Apache-2.0 license
-- **[FullDraggableDrawer](https://github.com/PureWriter/FullDraggableDrawer)**: Apache-2.0 license
-- **[Aide Lua](https://gitee.com/AideLua/AideLua)**: MIT license
+1. 根目录 `keystore.properties`（本地开发）
+2. 环境变量：`MINI_LUAXPLUS_KEYSTORE`、`MINI_LUAXPLUS_KEYSTORE_PASSWORD`、`MINI_LUAXPLUS_KEY_ALIAS`、`MINI_LUAXPLUS_KEY_PASSWORD`（CI）
+
+`keystore.properties` 格式：
+
+```
+storeFile=keystore/mini-luaxplus-release.jks
+storePassword=****
+keyAlias=miniluaxplus
+keyPassword=****
+```
+
+- debug 与 release 共用同一正式签名，避免安装覆盖冲突
+- 启用 v1 / v2 / v3 三代签名
+- 密钥库与密码必须离线备份，CI 侧使用 Secrets 注入
+
+## 构建
+
+```bash
+./gradlew :app:assembleRelease
+```
+
+- 产物：`app/build/outputs/apk/release/app-release.apk`
+- 需要 JDK 17 与 Android SDK Platform 34
+
+## Android 12 及以上适配
+
+- `targetSdkVersion = 31`，`compileSdk = 34`，`minSdk = 21`
+- Android 11 起分区存储生效，传统工程目录需要“所有文件访问”：
+  清单声明 `MANAGE_EXTERNAL_STORAGE`，首次启动由 `main.lua` 引导用户到系统设置授权
+- 启动权限不再批量申请：`assets/init.lua` 提供 `check_permissions()` 钩子接管运行时默认的全量权限申请
+- 所有组件显式设置 `android:exported`，避免 Android 12 安装期校验失败
+
+## R8 说明
+
+`app/proguard-rules.pro` 中保留运行时反射边界：
+
+- `com.androlua.**`、`com.luajava.**`、`com.nirenr.**`、`com.baidu.**`、`bsh.**`、`com.android.cglib.**`
+- `androidx.**`、`com.google.android.material.**`、`com.google.common.**`（Lua 脚本按类名动态加载）
+- 资源表 `**R$*` 保留，避免脚本按 R 名称访问失败
+- 资源压缩默认关闭：运行时 jar 以硬编码资源 ID 引用图片，开启后会缺资源
+
+## 已知限制
+
+- 外部工程目录名固定为 `/storage/emulated/0/AndroLua`，硬编码在运行时 jar 的 `LuaApplication.onCreate()` 中，改目录名需要重编运行时
+- 启动页 “Powered by AndroLua+”、快捷方式图标资源 ID 等品牌与资源引用同样固化在 jar 内
+- 部分第三方宿主兼容逻辑（`import "jesse205"`）是上游 Aide Lua 的模块契约，属于第三方 API 名称，予以保留
+
+## 上游与许可
+
+本项目在 AndroLuaX（MIT）基础上二次开发，技术底座来自 AndroLua / AndroLua+（作者 nirenr，基于 LuaJava）。相关版权与许可声明保留在 `LICENSE`。
+
+本项目代码采用 MIT 许可，见 [LICENSE](LICENSE)。

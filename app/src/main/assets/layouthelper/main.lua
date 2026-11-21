@@ -9,7 +9,7 @@ import "android.view.*"
 import "android.content.*"
 import "com.androlua.*"
 import "androidx.appcompat.app.AppCompatDialog"
-import "com.jesse205.androluax.LuaMaterialDialog"
+import "com.mini.luaxplus.LuaMaterialDialog"
 import "com.google.android.material.dialog.MaterialAlertDialogBuilder"
 import "autotheme"
 layout={

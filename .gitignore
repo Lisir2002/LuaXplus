@@ -9,3 +9,9 @@
 .cxx
 *.log
 local.properties
+
+# 签名与密钥（禁止入库）
+/keystore.properties
+/keystore/
+*.jks
+*.keystore

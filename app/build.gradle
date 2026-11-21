@@ -2,45 +2,94 @@ plugins {
     id 'com.android.application'
 }
 
-android {
-    signingConfigs {
-        debug {
-            storeFile file('F:\\my\\programming\\Android\\签名\\Jesse205.keystore')
-            keyAlias 'Jesse205 App 证书'
-            storePassword 'Jesse205'
-            keyPassword 'Jesse205'
-        }
-        release {
-            storeFile file('F:\\my\\programming\\Android\\签名\\Jesse205.keystore')
-            storePassword 'Jesse205'
-            keyPassword 'Jesse205'
-            keyAlias 'Jesse205 App 证书'
-        }
+// ===== 版本号：唯一来源是根目录 version.properties，与 tag 保持一致 =====
+def versionPropsFile = rootProject.file('version.properties')
+if (!versionPropsFile.exists()) {
+    throw new GradleException('缺少 version.properties，无法确定版本号')
+}
+def versionProps = new Properties()
+versionPropsFile.withInputStream { versionProps.load(it) }
+
+def vMajor = versionProps.getProperty('VERSION_MAJOR').trim().toInteger()
+def vMinor = versionProps.getProperty('VERSION_MINOR').trim().toInteger()
+def vPatch = versionProps.getProperty('VERSION_PATCH').trim().toInteger()
+def vStage = versionProps.getProperty('VERSION_STAGE').trim().toLowerCase()
+
+// rc1..rc49 为预发布迭代；final 记为 99，保证正式版 versionCode 始终高于所有 rc
+def isFinalVersion = (vStage == 'final')
+def stageNumber
+if (isFinalVersion) {
+    stageNumber = 99
+} else if (vStage ==~ /rc\d+/) {
+    stageNumber = vStage.substring(2).toInteger()
+    if (stageNumber < 1 || stageNumber > 49) {
+        throw new GradleException("VERSION_STAGE 超出范围：${vStage}，允许 rc1..rc49 或 final")
     }
+} else {
+    throw new GradleException("VERSION_STAGE 格式错误：${vStage}，允许 rc1..rc49 或 final")
+}
+def appVersionName = isFinalVersion ? "${vMajor}.${vMinor}.${vPatch}" : "${vMajor}.${vMinor}.${vPatch}-rc${stageNumber}"
+def appVersionCode = (vMajor * 10000 + vMinor * 100 + vPatch) * 100 + stageNumber
+
+// ===== 签名：keystore.properties 或环境变量注入，禁止把密钥写进仓库 =====
+def signingPropsFile = rootProject.file('keystore.properties')
+def signingProps = new Properties()
+if (signingPropsFile.exists()) {
+    signingPropsFile.withInputStream { signingProps.load(it) }
+}
+def signingStoreFile = signingProps.getProperty('storeFile') ?: System.getenv('MINI_LUAXPLUS_KEYSTORE')
+def signingStorePassword = signingProps.getProperty('storePassword') ?: System.getenv('MINI_LUAXPLUS_KEYSTORE_PASSWORD')
+def signingKeyAlias = signingProps.getProperty('keyAlias') ?: System.getenv('MINI_LUAXPLUS_KEY_ALIAS')
+def signingKeyPassword = signingProps.getProperty('keyPassword') ?: System.getenv('MINI_LUAXPLUS_KEY_PASSWORD')
+def hasSigningConfig = [signingStoreFile, signingStorePassword, signingKeyAlias, signingKeyPassword].every {
+    it != null && !it.toString().trim().isEmpty()
+}
+
+android {
+    namespace 'com.mini.luaxplus'
     compileSdk 34
-    namespace 'com.jesse205.androlua.androidX.material3'
 
     defaultConfig {
-        applicationId "com.jesse205.androlua.androidX.material3"
+        applicationId "com.mini.luaxplus"
         minSdkVersion 21
-        // noinspection ExpiredTargetSdkVersion
-        targetSdkVersion 29 // 新版本不会自动授予完整的存储权限
-        versionCode 3499
-        versionName "3.4(5.0.18)(Material3)"
-        signingConfig signingConfigs.release
+        // Android 12 起要求显式 exported、精确的存储访问模型，这里按 31 基线适配
+        targetSdkVersion 31
+        versionCode appVersionCode
+        versionName appVersionName
         multiDexEnabled true
+    }
+
+    signingConfigs {
+        release {
+            if (hasSigningConfig) {
+                storeFile rootProject.file(signingStoreFile)
+                storePassword signingStorePassword
+                keyAlias signingKeyAlias
+                keyPassword signingKeyPassword
+                enableV1Signing true
+                enableV2Signing true
+                enableV3Signing true
+            }
+        }
     }
 
     buildTypes {
         release {
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasSigningConfig) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled true
+            // 资源压缩会移除 jar 内以硬编码 ID 引用的资源，默认关闭以保证运行时不缺资源
             shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             // noinspection ChromeOsAbiSupport
             ndk { abiFilters 'armeabi-v7a', 'arm64-v8a' }
-            signingConfig signingConfigs.release
-            minifyEnabled false
         }
         debug {
+            // 调试包同样使用正式签名，保证安装覆盖与线上包一致
+            if (hasSigningConfig) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             shrinkResources false
             // noinspection ChromeOsAbiSupport

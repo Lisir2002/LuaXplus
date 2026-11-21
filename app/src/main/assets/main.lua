@@ -12,7 +12,7 @@ import "android.content.*"
 import "android.graphics.drawable.*"
 import "androidx.appcompat.app.AppCompatDialog"
 import "com.google.android.material.dialog.MaterialAlertDialogBuilder"
-import "com.jesse205.androluax.LuaMaterialDialog"
+import "com.mini.luaxplus.LuaMaterialDialog"
 import "com.google.android.material.textfield.TextInputEditText"
 import "com.google.android.material.textfield.TextInputLayout"
 import "bin"
@@ -26,7 +26,7 @@ local classesLength=#classes
 for key,value in ipairs(androidXAndMaterialClasses) do
   classes[key+classesLength]=value
 end
-activity.setTitle('AndroLua+')
+activity.setTitle('Mini-LuaXPLUS')
 
 activity.setTheme(autotheme())
 
@@ -39,7 +39,7 @@ function onVersionChanged(n, o)
   local title = "更新 " .. o .. " > " .. n
   local msg = [[
     3.4(5.0.18)(Material3)
-    更新依赖（AndroLua+ 除外）
+    更新依赖（Lua 运行时除外）
     优化软件主题
     移除游戏、TV、Kotlin、RxJava 等部分依赖
 
@@ -673,11 +673,12 @@ function onVersionChanged(n, o)
 
   ]]
   if o == "" then
-    title = "欢迎使用AndroLua+ " .. n
+    title = "欢迎使用 Mini-LuaXPLUS " .. n
     msg = [[
-    AndroLuaX是由Jesse205基于AndroLua+开发的支持AndroidX的工具
-    该项目已开源到 https://gitlab.com/Jesse205/androluax/ ，您可以到 https://gitlab.com/Jesse205/androluax/-/releases 下载最新版本（长按可复制链接）
-    AndroLua+是由nirenr开发的在安卓使用Lua语言开发应用的工具，该项目基于开源项目luajava和AndroLua优化加强，修复了原版的bug，并加入了很多新的特性，使开发更加简单高效，使用该软件完全免费，如果你喜欢这个项目欢迎捐赠或者宣传他。
+    Mini-LuaXPLUS 是一款在安卓上使用 Lua 语法快速编写应用的脚本编程工具，支持调用绝大部分安卓 API、支持布局表与打包安装，并已适配 AndroidX 与 Material3。
+    本工具在 AndroidX 运行时底座之上进行二次开发，独立维护版本与功能。
+    上游技术来源：AndroLua（作者 nirenr，基于开源项目 LuaJava）与 AndroLua+ 社区版本，在此一并致谢。
+    在使用之前建议详细阅读程序自带帮助文档。
     在使用之前建议详细阅读程序自带帮助文档。
     用户协议
     作者不对使用该软件产生的任何直接或间接损失负责。
@@ -788,7 +789,7 @@ import "android.os.*"
 import "android.widget.*"
 import "android.view.*"
 
---activity.setTitle('AndroLua+')
+--activity.setTitle('Mini-LuaXPLUS')
 activity.setTheme(R.style.Theme_Material3_DynamicColors_DayNight)
 activity.setContentView(loadlayout("layout"))
 ]]
@@ -802,7 +803,7 @@ lcode = [[
   {
     TextView,
     gravity="center",
-    text="Hello AndroLua+",
+    text="Hello Mini-LuaXPLUS",
     layout_width="fill",
     layout_height="fill",
   },
@@ -1053,7 +1054,7 @@ function read(path)
     write(luaproj, string.format("luaproject=%q", luaproject))
     --Toast.makeText(activity, "打开工程."..p.appname, Toast.LENGTH_SHORT ).show()
    else
-    activity.setTitle("AndroLua+")
+    activity.setTitle("Mini-LuaXPLUS")
     luaproject = nil
     write(luaproj, "luaproject=nil")
     --Toast.makeText(activity, "打开文件."..path, Toast.LENGTH_SHORT ).show()
@@ -1667,6 +1668,52 @@ function onMenuItemSelected(id, item)
   }
 end
 
+-- ===== 存储访问自检：Android 11 起分区存储生效，低版本走运行时权限 =====
+local function hasStorageAccess()
+  local Build = luajava.bindClass("android.os.Build")
+  local Environment = luajava.bindClass("android.os.Environment")
+  local PackageManager = luajava.bindClass("android.content.pm.PackageManager")
+  if Build.VERSION.SDK_INT >= 30 then
+    return Environment.isExternalStorageManager()
+  elseif Build.VERSION.SDK_INT >= 23 then
+    return activity.checkSelfPermission("android.permission.WRITE_EXTERNAL_STORAGE") == PackageManager.PERMISSION_GRANTED
+  end
+  return true
+end
+
+local function requestStorageAccess()
+  local Build = luajava.bindClass("android.os.Build")
+  local Settings = luajava.bindClass("android.provider.Settings")
+  local Intent = luajava.bindClass("android.content.Intent")
+  local Uri = luajava.bindClass("android.net.Uri")
+  if Build.VERSION.SDK_INT >= 30 then
+    local ok = pcall(function()
+      local intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+      intent.setData(Uri.parse("package:" .. activity.getPackageName()))
+      activity.startActivity(intent)
+    end)
+    if not ok then
+      pcall(function()
+        activity.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+      end)
+    end
+  elseif Build.VERSION.SDK_INT >= 23 then
+    activity.requestPermissions({"android.permission.WRITE_EXTERNAL_STORAGE", "android.permission.READ_EXTERNAL_STORAGE"}, 1001)
+  end
+end
+
+local function ensureStorageAccess()
+  if hasStorageAccess() then
+    return
+  end
+  local dlg = MaterialAlertDialogBuilder(activity)
+  dlg.setTitle("需要存储权限")
+  dlg.setMessage("工程、备份与安装包都保存在设备存储中。\n请允许 Mini-LuaXPLUS 的“所有文件访问”，授权后返回并重新打开应用即可正常读写工程。")
+  dlg.setPositiveButton("去授权", { onClick = function() requestStorageAccess() end })
+  dlg.setNegativeButton("稍后", nil)
+  dlg.show()
+end
+
 activity.setContentView(loadlayout(layout.main))
 
 function onCreate(s)
@@ -1688,6 +1735,7 @@ function onCreate(s)
     end
   end
   --end
+  ensureStorageAccess()
 end
 
 function onNewIntent(intent)

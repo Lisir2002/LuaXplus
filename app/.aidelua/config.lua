@@ -1,1 +1,1 @@
-appName="AndroLuaX"
+appName="Mini-LuaXPLUS"
