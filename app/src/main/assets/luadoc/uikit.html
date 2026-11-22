@@ -607,7 +607,122 @@ print(ui.cssVars("brand", "dark"))</pre>
     令牌在创建 View 时读取，不是响应式绑定。切换主题或自定义主题后，重建当前页面；不要在旧页面上期待自动换色。
   </div>
 
-  <h2>二十一、限制与常见问题</h2>
+  <h2>二十一、透明度、图片与背景</h2>
+  <p>透明度、图片和背景都复用同一套令牌，不额外引入图片库。透明度既可以传 0-1 的小数，也可以传 0-255 的整数，或直接传 <code class="inline">ui.tokens.opacity</code> 里的名称。</p>
+  <table>
+    <thead><tr><th>令牌</th><th>值</th><th>典型用途</th></tr></thead>
+    <tbody>
+      <tr><td><code>transparent</code></td><td>0</td><td>完全透明</td></tr>
+      <tr><td><code>faint</code></td><td>0.04</td><td>极轻的提示层</td></tr>
+      <tr><td><code>subtle</code></td><td>0.08</td><td>轻量底色、选中态</td></tr>
+      <tr><td><code>light</code></td><td>0.12</td><td>浅遮罩、弱化背景</td></tr>
+      <tr><td><code>medium</code></td><td>0.24</td><td>图片蒙层、次要信息</td></tr>
+      <tr><td><code>strong</code></td><td>0.48</td><td>强调遮罩</td></tr>
+      <tr><td><code>heavy</code></td><td>0.72</td><td>深色蒙层、文字压图</td></tr>
+      <tr><td><code>solid</code></td><td>0.96</td><td>接近不透明</td></tr>
+      <tr><td><code>disabled</code></td><td>0.42</td><td>禁用控件</td></tr>
+      <tr><td><code>pressed</code></td><td>0.7</td><td>按压缩放层</td></tr>
+      <tr><td><code>overlay</code></td><td>0.35</td><td>弹窗遮罩</td></tr>
+      <tr><td><code>scrim</code></td><td>0.55</td><td>图片上的文字保护层</td></tr>
+    </tbody>
+  </table>
+<pre>local veil = ui.withAlpha("#000000", 0.35)
+local soft = ui.withAlpha(ui.tokens.color.accent, "light")   -- 也可以用令牌名
+local alpha = ui.withAlpha(ui.tokens.color.onAccent, "strong")</pre>
+  <p><code class="inline">ui.withAlpha</code> 只改颜色的 alpha，不改变 RGB，适合做半透明底、遮罩、状态色和文字压图。</p>
+
+  <h3>图片组件</h3>
+  <p><code class="inline">ui.image</code> 返回普通 <code class="inline">ImageView</code>，可以直接放进任何布局。支持本地路径、HTTP 路径、Bitmap、Drawable 和 Android 资源 id。</p>
+<pre>-- 本地图片；相对路径会自动拼到 Lua 目录，没有扩展名时补 .png
+local cover = ui.image({
+  src = activity.getLuaExtDir("examples/luax-ui-demo") .. "/hero.jpg",
+  scale = "cover",     -- cover / contain / fill / center / inside
+  radius = 12,         -- 圆角，可传 radius 令牌键
+  alpha = 0.9,
+  tint = ui.tokens.color.accent,
+})
+page:add(cover, 12)
+
+-- 圆形头像
+local avatar = ui.image({
+  src = "avatar.png",
+  circle = true,
+})
+avatar.setLayoutParams(LinearLayout.LayoutParams(dp(56), dp(56)))
+page:add(avatar)</pre>
+  <table>
+    <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>src</code></td><td>string / Bitmap / Drawable / number</td><td>图片源；<code>path</code>、<code>image</code> 是同义别名。</td></tr>
+      <tr><td><code>scale</code></td><td>string</td><td><code>cover</code>（默认，裁切铺满）、<code>contain</code>、<code>fill</code>、<code>center</code>、<code>inside</code>。</td></tr>
+      <tr><td><code>radius</code></td><td>number / string</td><td>圆角半径，传数字 dp 或 radius 令牌键。</td></tr>
+      <tr><td><code>circle</code></td><td>boolean</td><td>圆形裁切；优先于 radius。</td></tr>
+      <tr><td><code>alpha</code></td><td>number / string</td><td>0-1、0-255 或透明度令牌名。</td></tr>
+      <tr><td><code>tint</code></td><td>color</td><td>颜色滤镜，适合单色图标。</td></tr>
+      <tr><td><code>width / height</code></td><td>number</td><td>最小尺寸；精确尺寸请用 LayoutParams。</td></tr>
+      <tr><td><code>placeholder</code></td><td>color</td><td>图片为空或加载失败时的底色。</td></tr>
+      <tr><td><code>adjust</code></td><td>boolean</td><td>是否按图片比例调整 View 边界，默认 true。</td></tr>
+    </tbody>
+  </table>
+
+  <h3>背景卡片</h3>
+  <p><code class="inline">ui.background</code> 在图片上叠加遮罩，再放内容，适合头图、登录页、专题卡和活动入口。内容可以是 View，也可以是函数。</p>
+<pre>local hero = ui.background({
+  src = "hero.jpg",
+  height = 190,
+  radius = 18,
+  scale = "cover",
+  overlay = ui.withAlpha("#000000", "medium"),
+}, function(box)
+  local title = TextView(activity)
+  title.setText("背景图片")
+  title.setTextSize(ui.tokens.type.title.size)
+  title.setTextColor(ui.tokens.color.onAccent)
+  box.addView(title)
+
+  local note = TextView(activity)
+  note.setText("图片铺底 + 遮罩 + 内容层")
+  note.setTextColor(ui.withAlpha(ui.tokens.color.onAccent, 0.82))
+  box.addView(note)
+end)
+page:add(hero, 14)</pre>
+  <table>
+    <thead><tr><th>字段</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>src / scale / alpha</code></td><td>与 <code>ui.image</code> 相同，图片自动铺满。</td></tr>
+      <tr><td><code>height</code></td><td>最小高度，单位 dp 数值。</td></tr>
+      <tr><td><code>radius</code></td><td>圆角；图片和内容层一起裁切。</td></tr>
+      <tr><td><code>overlay</code></td><td>遮罩颜色；传 <code>false</code> 关闭遮罩。默认 <code>palette.scrim</code>。</td></tr>
+      <tr><td><code>background</code></td><td>没有图片时的底色，或图片加载前的占位色。</td></tr>
+      <tr><td><code>contentPadding</code></td><td>内容内边距，默认 16，数字键走 spacing 令牌。</td></tr>
+      <tr><td><code>gravity</code></td><td>内容对齐，默认 <code>Gravity.CENTER_VERTICAL</code>。</td></tr>
+    </tbody>
+  </table>
+
+  <h3>整页背景</h3>
+  <p><code class="inline">ui.page</code> 新增页面级背景参数；<code>page.frame</code> 是最外层容器，<code>page.root</code> 仍是内容主体，原有 <code>page.root.addView(...)</code> 不受影响。</p>
+<pre>local page = ui.page({
+  title = "首页",
+  backgroundImage = "hero.jpg",
+  backgroundScale = "cover",
+  backgroundOverlay = ui.withAlpha("#000000", "scrim"),
+  backgroundAlpha = 0.92,
+})</pre>
+  <table>
+    <thead><tr><th>字段</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>backgroundImage</code></td><td>整页背景图；不传时仍用 <code>background</code> 或 <code>palette.bg</code>。</td></tr>
+      <tr><td><code>backgroundScale</code></td><td>默认 <code>cover</code>。</td></tr>
+      <tr><td><code>backgroundOverlay</code></td><td>整页遮罩颜色；传 <code>false</code> 关闭。</td></tr>
+      <tr><td><code>backgroundAlpha</code></td><td>背景图透明度，0-1、0-255 或令牌名。</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip">
+    图片加载是同步的：本地文件很快；HTTP 图片会阻塞 UI 线程。网络图建议先在后台线程下载并缓存到本地，再传给 <code class="inline">ui.image</code>。大图先按目标尺寸缩放，避免把原图直接塞进小卡片。
+  </div>
+
+  <h2>二十二、限制与常见问题</h2>
   <ul>
     <li><strong>这是 iOS 风格的 Android 组件，不是 UIKit。</strong> 系统字体、阴影和动画与真机 iOS 仍有差异。</li>
     <li><strong>主题切换不会实时重绘已有控件。</strong> 切换后重建页面即可。</li>
@@ -617,7 +732,7 @@ print(ui.cssVars("brand", "dark"))</pre>
   </ul>
 
   <footer>
-    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc15
+    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc16
   </footer>
 </div>
 

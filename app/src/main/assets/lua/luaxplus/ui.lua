@@ -21,6 +21,10 @@ import "android.util.TypedValue"
 import "android.animation.*"
 import "android.view.animation.*"
 
+pcall(function()
+  import "loadbitmap"
+end)
+
 local M = {}
 
 -- ===== 设计令牌 =====
@@ -170,9 +174,18 @@ local BASE = {
     sheet = 16,
   },
   opacity = {
+    transparent = 0,
+    faint = 0.04,
+    subtle = 0.08,
+    light = 0.12,
+    medium = 0.24,
+    strong = 0.48,
+    heavy = 0.72,
+    solid = 0.96,
     disabled = 0.42,
     pressed = 0.7,
     overlay = 0.35,
+    scrim = 0.55,
   },
 }
 
@@ -200,6 +213,7 @@ local LIGHT = normalizeColors({
     gray = "#8E8E93",
     disabled = "#999999",
     overlay = "#66000000",
+    scrim = "#99000000",
     press = "#14000000",
     pressStrong = "#22000000",
     pressOnAccent = "#33FFFFFF",
@@ -230,6 +244,7 @@ local DARK = normalizeColors({
     gray = "#8D8D93",
     disabled = "#666666",
     overlay = "#99000000",
+    scrim = "#CC000000",
     press = "#14FFFFFF",
     pressStrong = "#22FFFFFF",
     pressOnAccent = "#33FFFFFF",
@@ -570,6 +585,191 @@ local function applySystemBars(dark)
   end)
 end
 
+-- ===== 图片、透明度与背景 =====
+local function alphaByte(value)
+  if type(value) == "string" then
+    value = OP[value] or 1
+  end
+  if value > 1 then
+    return math.floor(value)
+  end
+  return math.floor(value * 255 + 0.5)
+end
+
+local function alphaValue(value)
+  if type(value) == "string" then
+    return OP[value] or 1
+  end
+  if value > 1 then
+    return value / 255
+  end
+  return value
+end
+
+-- 将颜色按透明度混合，0-1 或 0-255 都接受。
+function M.withAlpha(color, opacity)
+  return overlay(parseColor(color), alphaByte(opacity))
+end
+
+local function bitmapSource(source)
+  if source == nil then
+    return nil
+  end
+  if type(source) == "userdata" and source.getWidth and source.getHeight then
+    return source
+  end
+  if type(source) ~= "string" then
+    return nil
+  end
+  local loader = _G.loadbitmap
+  if loader then
+    local ok, bitmap = pcall(loader, source)
+    if ok and bitmap then
+      return bitmap
+    end
+  end
+  local ok, bitmap = pcall(BitmapFactory.decodeFile, source)
+  if ok then
+    return bitmap
+  end
+  return nil
+end
+
+local function roundedBitmap(bitmap, radius)
+  local resources = activity.getResources()
+  if radius then
+    local ok, factory = pcall(luajava.bindClass, "androidx.core.graphics.drawable.RoundedBitmapDrawableFactory")
+    if ok and factory then
+      local drawable = factory.create(resources, bitmap)
+      if radius == "circle" then
+        drawable.setCircular(true)
+      else
+        drawable.setCornerRadius(dp(radiusToken(radius)))
+      end
+      drawable.setAntiAlias(true)
+      return drawable
+    end
+  end
+  return BitmapDrawable(resources, bitmap)
+end
+
+local function drawableSource(source, radius)
+  if source == nil then
+    return nil
+  end
+  if type(source) == "number" then
+    return activity.getResources().getDrawable(source)
+  end
+  if type(source) == "userdata" and source.getIntrinsicWidth then
+    return source
+  end
+  if type(source) == "userdata" and source.getBitmap then
+    return roundedBitmap(source.getBitmap(), radius)
+  end
+  local bitmap = bitmapSource(source)
+  if bitmap then
+    return roundedBitmap(bitmap, radius)
+  end
+  return nil
+end
+
+local function imageScale(value)
+  if value == "contain" then
+    return ImageView.ScaleType.FIT_CENTER
+  elseif value == "fill" then
+    return ImageView.ScaleType.FIT_XY
+  elseif value == "center" then
+    return ImageView.ScaleType.CENTER
+  elseif value == "inside" then
+    return ImageView.ScaleType.FIT_START
+  end
+  return ImageView.ScaleType.CENTER_CROP
+end
+
+-- 图片组件：支持本地路径、网络缓存路径、Bitmap、Drawable 和资源 id。
+function M.image(spec)
+  if type(spec) == "string" then
+    spec = { src = spec }
+  end
+  spec = spec or {}
+  local view = ImageView(activity)
+  view.setScaleType(imageScale(spec.scale))
+  view.setAdjustViewBounds(spec.adjust ~= false)
+  local source = spec.src or spec.path or spec.image
+  local radius = spec.radius
+  if spec.circle then
+    radius = "circle"
+  end
+  local drawable = drawableSource(source, radius)
+  if drawable then
+    view.setImageDrawable(drawable)
+  else
+    view.setBackgroundColor(spec.placeholder or colors().fill)
+  end
+  if spec.alpha ~= nil then
+    view.setAlpha(alphaValue(spec.alpha))
+  end
+  if spec.tint then
+    view.setColorFilter(parseColor(spec.tint))
+  end
+  if spec.width then
+    view.setMinimumWidth(dp(space(spec.width)))
+  end
+  if spec.height then
+    view.setMinimumHeight(dp(space(spec.height)))
+  end
+  return view
+end
+
+-- 背景卡片：图片铺底 + 可调遮罩 + 内容层，适合头图、登录页和专题卡。
+function M.background(spec, content)
+  if type(spec) == "string" then
+    spec = { src = spec }
+  end
+  spec = spec or {}
+  local palette = colors()
+  local frame = FrameLayout(activity)
+  if spec.radius then
+    frame.setClipToOutline(true)
+    frame.setBackground(roundRect(spec.background or 0x00000000, spec.radius))
+  elseif spec.background then
+    frame.setBackgroundColor(spec.background)
+  end
+  if spec.src then
+    local image = M.image({
+      src = spec.src,
+      scale = spec.scale or "cover",
+      radius = spec.radius,
+      alpha = spec.alpha,
+      tint = spec.tint,
+      adjust = false,
+    })
+    frame.addView(image, FrameLayout.LayoutParams(-1, -1))
+  end
+  if spec.overlay ~= false then
+    local scrim = View(activity)
+    scrim.setBackgroundColor(spec.overlay or palette.scrim)
+    frame.addView(scrim, FrameLayout.LayoutParams(-1, -1))
+  end
+  if content then
+    local body = LinearLayout(activity)
+    body.setOrientation(LinearLayout.VERTICAL)
+    body.setGravity(spec.gravity or Gravity.CENTER_VERTICAL)
+    local padding = spec.contentPadding or 16
+    body.setPadding(dp(space(padding)), dp(space(padding)), dp(space(padding)), dp(space(padding)))
+    if type(content) == "function" then
+      content(body, frame)
+    else
+      body.addView(content, LinearLayout.LayoutParams(-1, -2))
+    end
+    frame.addView(body, FrameLayout.LayoutParams(-1, -1))
+  end
+  if spec.height then
+    frame.setMinimumHeight(dp(space(spec.height)))
+  end
+  return frame
+end
+
 -- ===== 页面骨架 =====
 function M.page(options)
   options = options or {}
@@ -594,10 +794,28 @@ function M.page(options)
   end)
   applySystemBars(dark)
 
+  local frame = FrameLayout(current)
+  frame.setFitsSystemWindows(true)
+
   local root = LinearLayout(current)
   root.setOrientation(LinearLayout.VERTICAL)
-  root.setBackgroundColor(options.background or palette.bg)
-  root.setFitsSystemWindows(true)
+  if options.backgroundImage then
+    local backdrop = M.image({
+      src = options.backgroundImage,
+      scale = options.backgroundScale or "cover",
+      alpha = options.backgroundAlpha,
+    })
+    frame.addView(backdrop, FrameLayout.LayoutParams(-1, -1))
+    if options.backgroundOverlay ~= false then
+      local scrim = View(current)
+      scrim.setBackgroundColor(options.backgroundOverlay or palette.scrim)
+      frame.addView(scrim, FrameLayout.LayoutParams(-1, -1))
+    end
+    root.setBackgroundColor(0x00000000)
+  else
+    root.setBackgroundColor(options.background or palette.bg)
+  end
+  frame.addView(root, FrameLayout.LayoutParams(-1, -1))
 
   local nav = FrameLayout(current)
   nav.setBackgroundColor(options.navBackground or palette.surface)
@@ -679,6 +897,7 @@ function M.page(options)
   root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1))
 
   local page = {
+    frame = frame,
     root = root,
     nav = nav,
     content = content,
@@ -708,7 +927,7 @@ function M.page(options)
   end
 
   function page:show()
-    current.setContentView(root)
+    current.setContentView(frame)
     return self
   end
 
