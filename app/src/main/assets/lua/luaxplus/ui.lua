@@ -192,6 +192,7 @@ local BASE = {
     avatar = 40,
     avatarGroup = 32,
     avatarFontRatio = 2.4,
+    statusDot = 8,
     alertWidth = 270,
     hitTarget = 44,
     border = 1,
@@ -2409,6 +2410,466 @@ function M.toast(spec)
   toast.setGravity(Gravity.BOTTOM, 0, dp(space(spec.offset or 72)))
   toast.show()
   return toast
+end
+
+-- ===== 原子组件 =====
+-- 原子组件只负责一件事，复合组件由这些原子继续组合。
+-- 文本：统一字号、颜色、字重、对齐、行数、字距和内边距。
+function M.text(spec)
+  if type(spec) == "string" then
+    spec = { text = spec }
+  end
+  spec = spec or {}
+  local palette = colors()
+  local weight = numberValue(spec.weight, 0)
+  local bold = spec.bold == true or weight >= 600
+  local view = textView(
+    spec.text or spec.value or "",
+    spec.type or spec.size or spec.textSize or TY.body.size,
+    parseColor(spec.color or palette.label),
+    bold
+  )
+  if spec.mono then
+    view.setTypeface(Typeface.MONOSPACE)
+  end
+  if spec.tracking then
+    view.setLetterSpacing(numberValue(spec.tracking, 0))
+  end
+  if spec.lines then
+    view.setMaxLines(math.max(1, math.floor(numberValue(spec.lines, 1))))
+  end
+  if spec.ellipsize then
+    view.setEllipsize(TextUtils.TruncateAt.END)
+  end
+  if spec.align == "center" then
+    view.setGravity(Gravity.CENTER)
+  elseif spec.align == "right" then
+    view.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL)
+  end
+  if spec.padding then
+    local padding = dp(space(spec.padding))
+    view.setPadding(padding, padding, padding, padding)
+  end
+  if spec.includeFontPadding == false then
+    view.setIncludeFontPadding(false)
+  end
+  if spec.onClick then
+    view.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
+  end
+  return view
+end
+
+-- 图标：可以是字形，也可以是本地/网络图片；统一尺寸和圆角。
+function M.icon(spec)
+  if type(spec) == "string" then
+    spec = { glyph = spec }
+  end
+  spec = spec or {}
+  local palette = colors()
+  local size = dimension(spec.size or TY.icon.size, TY.icon.size)
+  if spec.src or spec.image then
+    local image = M.image({
+      src = spec.src or spec.image,
+      width = size,
+      height = size,
+      scale = spec.scale or "contain",
+      radius = spec.radius or "circle",
+      circle = spec.circle ~= false,
+      tint = spec.tint,
+      alpha = spec.alpha,
+      placeholder = spec.placeholder,
+    })
+    image.setLayoutParams(LinearLayout.LayoutParams(dp(size), dp(size)))
+    if spec.onClick then
+      image.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
+    end
+    return image
+  end
+  local view = textView(spec.glyph or spec.text or "●", size, parseColor(spec.color or palette.label), spec.bold == true)
+  view.setGravity(Gravity.CENTER)
+  if spec.background or spec.bg then
+    view.setBackground(roundRect(parseColor(spec.background or spec.bg), spec.radius or size / 2))
+  end
+  if spec.padding then
+    local padding = dp(space(spec.padding))
+    view.setPadding(padding, padding, padding, padding)
+  end
+  view.setLayoutParams(LinearLayout.LayoutParams(dp(size), dp(size)))
+  if spec.onClick then
+    view.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
+  end
+  return view
+end
+
+-- 表面：带底色、描边、圆角、内边距和可选点击反馈的容器。
+function M.surface(spec, content)
+  spec = spec or {}
+  local palette = colors()
+  local box = LinearLayout(activity)
+  box.setOrientation(spec.direction == "row" and LinearLayout.HORIZONTAL or LinearLayout.VERTICAL)
+  local fill = parseColor(spec.background or palette.surface)
+  local radius = spec.radius or R.card
+  box.setBackground(shape(fill, spec.stroke and parseColor(spec.stroke), radius))
+  if spec.clip ~= false then
+    box.setClipToOutline(true)
+  end
+  local padding = spec.padding or S.card
+  local paddingValue = dp(space(padding))
+  box.setPadding(paddingValue, paddingValue, paddingValue, paddingValue)
+  if spec.elevation then
+    box.setElevation(dp(space(spec.elevation)))
+  end
+  if spec.onClick then
+    box.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
+  end
+  if content then
+    if type(content) == "function" then
+      content(box, box)
+    else
+      box.addView(content, LinearLayout.LayoutParams(-1, -2))
+    end
+  end
+  return box
+end
+
+-- 栈：按行/列排列子 View，并统一处理 gap。
+function M.stack(spec, content)
+  spec = spec or {}
+  local horizontal = spec.direction == "row" or spec.orientation == "horizontal"
+  local box = LinearLayout(activity)
+  box.setOrientation(horizontal and LinearLayout.HORIZONTAL or LinearLayout.VERTICAL)
+  if spec.align == "center" then
+    box.setGravity(horizontal and Gravity.CENTER_VERTICAL or Gravity.CENTER_HORIZONTAL)
+  elseif spec.align == "end" then
+    box.setGravity(horizontal and Gravity.RIGHT or Gravity.BOTTOM)
+  end
+  if spec.padding then
+    local padding = dp(space(spec.padding))
+    box.setPadding(padding, padding, padding, padding)
+  end
+  local gap = dp(space(spec.gap or S.gap))
+  local function add(view)
+    if not view then
+      return
+    end
+    local params
+    if horizontal then
+      params = LinearLayout.LayoutParams(spec.fill and 0 or -2, -2, spec.fill and 1 or 0)
+      if box.getChildCount() > 0 then
+        params.leftMargin = gap
+      end
+    else
+      params = LinearLayout.LayoutParams(-1, -2)
+      if box.getChildCount() > 0 then
+        params.topMargin = gap
+      end
+    end
+    box.addView(view, params)
+  end
+  if spec.items then
+    for index = 1, #spec.items do
+      add(spec.items[index])
+    end
+  end
+  if content then
+    content(add, box)
+  end
+  return box
+end
+
+function M.vstack(spec, content)
+  spec = spec or {}
+  spec.direction = "column"
+  return M.stack(spec, content)
+end
+
+function M.hstack(spec, content)
+  spec = spec or {}
+  spec.direction = "row"
+  return M.stack(spec, content)
+end
+
+-- 网格：把一组 View 按固定列数摆放，最后一行自动留白。
+function M.grid(spec)
+  spec = spec or {}
+  local items = spec.items or {}
+  local columns = math.max(1, math.floor(numberValue(spec.columns, 2)))
+  local gap = dp(space(spec.gap or S.gap))
+  local root = LinearLayout(activity)
+  root.setOrientation(LinearLayout.VERTICAL)
+  local row
+  for index = 1, #items do
+    local column = (index - 1) % columns
+    if column == 0 then
+      row = LinearLayout(activity)
+      row.setOrientation(LinearLayout.HORIZONTAL)
+      local params = LinearLayout.LayoutParams(-1, -2)
+      if root.getChildCount() > 0 then
+        params.topMargin = gap
+      end
+      root.addView(row, params)
+    end
+    local params = LinearLayout.LayoutParams(0, -2, 1)
+    if column > 0 then
+      params.leftMargin = gap
+    end
+    row.addView(items[index], params)
+  end
+  return root
+end
+
+-- 居中容器：快速把单个 View 或自定义内容放到页面中间。
+function M.center(spec, content)
+  spec = spec or {}
+  local palette = colors()
+  local frame = FrameLayout(activity)
+  if spec.background then
+    frame.setBackground(shape(parseColor(spec.background), nil, spec.radius or R.card))
+  end
+  if spec.padding then
+    local padding = dp(space(spec.padding))
+    frame.setPadding(padding, padding, padding, padding)
+  end
+  if content then
+    if type(content) == "function" then
+      content(frame, frame)
+    else
+      frame.addView(content, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+    end
+  end
+  return frame
+end
+
+-- 输入原子：无标题、无帮助文本的裸输入框。
+function M.input(spec)
+  spec = spec or {}
+  local palette = colors()
+  local input = EditText(activity)
+  configureInput(input, spec)
+  local padding = dp(space(spec.padding or S.row))
+  input.setPadding(padding, padding, padding, padding)
+  if spec.background ~= false then
+    input.setBackground(roundRect(parseColor(spec.background or palette.surface), spec.radius or R.input))
+  end
+  if spec.height then
+    input.setMinimumHeight(dp(space(spec.height)))
+  end
+  return input
+end
+
+-- 表单标签与帮助文本。
+function M.label(spec)
+  if type(spec) == "string" then
+    spec = { text = spec }
+  end
+  spec = spec or {}
+  local text = spec.text or spec.label or ""
+  if spec.required then
+    text = text .. " *"
+  end
+  local view = M.text({
+    text = text,
+    type = spec.type or "footnote",
+    color = spec.color or colors().secondary,
+    bold = spec.bold == true,
+  })
+  view.setPadding(dp(space(4)), dp(space(2)), dp(space(4)), dp(space(2)))
+  return view
+end
+
+function M.helper(spec)
+  if type(spec) == "string" then
+    spec = { text = spec }
+  end
+  spec = spec or {}
+  local palette = colors()
+  local view = M.text({
+    text = spec.text or spec.helper or "",
+    type = spec.type or "footnote",
+    color = spec.error and palette.danger or (spec.color or palette.secondary),
+  })
+  view.setPadding(dp(space(4)), dp(space(4)), dp(space(4)), 0)
+  return view
+end
+
+-- 选择原子：勾选标记、复选框、单选标记。
+function M.checkMark(spec)
+  spec = spec or {}
+  local palette = colors()
+  local checked = spec.checked == true
+  local size = dimension(spec.size or K.checkMark, K.checkMark)
+  local mark = textView(checked and "✓" or "", TY.body.size, checked and palette.onAccent or palette.tertiary, true)
+  mark.setGravity(Gravity.CENTER)
+  if checked then
+    mark.setBackground(roundRect(palette.accent, R.check))
+  else
+    mark.setBackground(shape(0x00000000, palette.tertiary, R.check))
+  end
+  mark.setLayoutParams(LinearLayout.LayoutParams(dp(size), dp(size)))
+  if spec.onClick then
+    mark.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
+  end
+  return mark
+end
+
+function M.checkbox(spec)
+  spec = spec or {}
+  local palette = colors()
+  local checked = spec.checked == true or spec.value == true
+  local row = LinearLayout(activity)
+  row.setOrientation(LinearLayout.HORIZONTAL)
+  row.setGravity(Gravity.CENTER_VERTICAL)
+  row.setPadding(dp(space(4)), dp(space(6)), dp(space(4)), dp(space(6)))
+  local mark = M.checkMark({ checked = checked, size = spec.size })
+  row.addView(mark)
+  local label = M.text({
+    text = spec.text or spec.label or "",
+    type = spec.type or "body",
+    color = spec.color or palette.label,
+  })
+  label.setPadding(dp(space(8)), 0, 0, 0)
+  row.addView(label, LinearLayout.LayoutParams(0, -2, 1))
+  local function apply(value)
+    checked = value
+    mark.setText(checked and "✓" or "")
+    mark.setTextColor(checked and palette.onAccent or palette.tertiary)
+    mark.setBackground(checked and roundRect(palette.accent, R.check) or shape(0x00000000, palette.tertiary, R.check))
+    if spec.onChange then
+      spec.onChange(checked)
+    end
+  end
+  row.setOnClickListener(View.OnClickListener{
+    onClick = function()
+      if not spec.disabled then
+        apply(not checked)
+      end
+    end,
+  })
+  if spec.disabled then
+    row.setAlpha(alphaValue(OP.disabled))
+  end
+  return row
+end
+
+function M.radioMark(spec)
+  spec = spec or {}
+  local palette = colors()
+  local checked = spec.checked == true
+  local size = dimension(spec.size or TY.body.size, TY.body.size)
+  local mark = textView(checked and "●" or "○", size, checked and (spec.color and parseColor(spec.color) or palette.accent) or palette.tertiary, false)
+  mark.setGravity(Gravity.CENTER)
+  mark.setLayoutParams(LinearLayout.LayoutParams(-2, -2))
+  if spec.onClick then
+    mark.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
+  end
+  return mark
+end
+
+M.radio = M.radioMark
+
+-- 状态点：成功、警告、危险等状态的最小视觉单元。
+function M.statusDot(spec)
+  spec = spec or {}
+  local palette = colors()
+  local size = dimension(spec.size or K.statusDot, K.statusDot)
+  local dot = View(activity)
+  dot.setBackground(roundRect(parseColor(spec.color or palette.success), size / 2))
+  dot.setLayoutParams(LinearLayout.LayoutParams(dp(size), dp(size)))
+  return dot
+end
+
+-- 底部标签原子；tabBar 可以用它组合自定义标签栏。
+function M.tabItem(spec)
+  spec = spec or {}
+  local palette = colors()
+  local selected = spec.selected == true
+  local item = LinearLayout(activity)
+  item.setOrientation(LinearLayout.VERTICAL)
+  item.setGravity(Gravity.CENTER)
+  item.setMinimumHeight(dp(K.tabHeight))
+  item.setPadding(0, dp(space(4)), 0, dp(space(2)))
+  item.setBackground(ripple(0x00000000, 0, palette.press))
+  local glyph = textView(spec.glyph or spec.icon or "●", TY.icon.size,
+    selected and palette.accent or palette.secondary, false)
+  glyph.setGravity(Gravity.CENTER)
+  item.addView(glyph)
+  local title = textView(spec.title or spec.text or "", TY.caption.size,
+    selected and palette.accent or palette.secondary, false)
+  title.setGravity(Gravity.CENTER)
+  title.setPadding(0, dp(space(2)), 0, 0)
+  item.addView(title)
+  if spec.onClick then
+    item.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
+  end
+  return item
+end
+
+-- 数据单元格原子：表格、详情网格和列表都可以复用。
+function M.cell(spec)
+  if type(spec) == "string" then
+    spec = { text = spec }
+  end
+  spec = spec or {}
+  local palette = colors()
+  local header = spec.header == true
+  local align = spec.align or "left"
+  local view = M.text({
+    text = spec.text or spec.value or "",
+    type = header and "footnote" or (spec.type or "subhead"),
+    color = spec.color or (header and palette.secondary or palette.label),
+    bold = header,
+    align = align,
+    lines = spec.lines or 2,
+    ellipsize = true,
+  })
+  view.setPadding(dp(space(spec.padding or S.gap)), dp(space(S.tight)), dp(space(spec.padding or S.gap)), dp(space(S.tight)))
+  if spec.width then
+    view.setMinimumWidth(dp(space(spec.width)))
+  end
+  return view
+end
+
+-- 键值行原子：keyValue 之外的详情页也可以直接使用。
+function M.kvRow(spec)
+  spec = spec or {}
+  local palette = colors()
+  local row = LinearLayout(activity)
+  row.setOrientation(LinearLayout.HORIZONTAL)
+  row.setGravity(Gravity.CENTER_VERTICAL)
+  row.setPadding(dp(space(16)), dp(space(10)), dp(space(16)), dp(space(10)))
+  local label = M.text({ text = spec.label or spec.key or "", type = "subhead", color = palette.secondary })
+  row.addView(label, LinearLayout.LayoutParams(0, -2, 1))
+  if type(spec.value) == "userdata" then
+    row.addView(spec.value, LinearLayout.LayoutParams(0, -2, 1.5))
+  else
+    local value = M.text({
+      text = tostring(spec.value or ""),
+      type = "subhead",
+      color = spec.color or palette.label,
+      align = "right",
+    })
+    row.addView(value, LinearLayout.LayoutParams(0, -2, 1.5))
+  end
+  return row
+end
+
+-- 动效原子：给复合组件提供更短的调用入口。
+local function animatePreset(view, spec, preset)
+  local options = spec or {}
+  options.preset = options.preset or preset
+  return M.animate(view, options)
+end
+
+function M.fadeIn(view, spec)
+  return animatePreset(view, spec, "fade")
+end
+
+function M.slideIn(view, spec)
+  return animatePreset(view, spec, "up")
+end
+
+function M.scaleIn(view, spec)
+  return animatePreset(view, spec, "scale")
 end
 
 -- ===== 选择与数据展示 =====

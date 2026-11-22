@@ -185,11 +185,60 @@ ui.show{
     }), LinearLayout.LayoutParams(-1, -2))
   end), 14)
 
+  page:add(ui.card({
+    title = "原子组件",
+    subtitle = "text / icon / surface / stack / grid / checkbox",
+  }, function(box)
+    local panel = ui.surface({ padding = "12px", radius = "12px" }, function(body)
+      body.addView(ui.hstack({ gap = "8px", align = "center" }, function(add)
+        add(ui.icon({
+          glyph = "A",
+          size = "28px",
+          background = palette().accent,
+          color = palette().onAccent,
+        }))
+        add(ui.text({ text = "原子标题", type = "headline" }))
+        add(ui.statusDot({ color = palette().success }))
+      end))
+    end)
+    box.addView(panel, LinearLayout.LayoutParams(-1, -2))
+
+    box.addView(ui.checkbox({
+      text = "启用原子组件",
+      checked = true,
+      onChange = function(value)
+        toast(value and "已启用" or "已关闭")
+      end,
+    }))
+
+    box.addView(ui.input({
+      hint = "这是一个裸输入框",
+      padding = "10px",
+    }), LinearLayout.LayoutParams(-1, -2))
+
+    local tabs = ui.hstack({ gap = "4px" }, function(add)
+      add(ui.tabItem({ title = "首页", glyph = "⌂", selected = true }))
+      add(ui.tabItem({ title = "消息", glyph = "✉", onClick = function() toast("消息") end }))
+    end)
+    box.addView(tabs, LinearLayout.LayoutParams(-1, -2))
+
+    local function tile(text)
+      return ui.surface({ padding = "8px", radius = "10px" }, function(body)
+        body.addView(ui.text({ text = text, type = "caption", align = "center" }))
+      end)
+    end
+    box.addView(ui.grid({
+      columns = 3,
+      gap = "8px",
+      items = { tile("A"), tile("B"), tile("C"), tile("D"), tile("E") },
+    }))
+  end), 14)
+
   page:add(ui.keyValue({
     title = "项目信息",
     items = {
       { label = "包名", value = "com.mini.luaxplus" },
-      { label = "当前版本", value = "1.0.0-rc18" },
+      { label = "当前版本", value = "1.0.0-rc19" },
       { label = "构建渠道", value = "Release" },
     },
     footer = "键值列表适合详情页、设置摘要和订单信息。",

@@ -48,6 +48,7 @@ docs/                     审计与规范文档
 - 组件范围：页面骨架、分组列表、按钮、表单、搜索栏、分段控件、卡片、弹窗、操作菜单、底部标签栏、空态与加载态。
 - 进阶组件：chip、checkRow、slider、stepper、progress、skeleton、banner、stat、fab、toast。
 - 选择与数据：switch、switchRow、radioGroup、rating、select、keyValue、table、timeline、accordion、avatarGroup、pagination。
+- 原子组件：text、label、helper、icon、surface、stack/vstack/hstack、grid、center、input、checkMark、checkbox、radioMark、statusDot、tabItem、cell、kvRow、fadeIn/slideIn/scaleIn。
 - 设计令牌：`ui.tokens` 统一颜色、间距、圆角、字体、控件尺寸、动效和透明度；支持 `ui.defineTheme` 自定义主题、`ui.useTheme` 切换、`ui.cssVars` 导出 CSS 变量。
 - 数值无级调节：尺寸、字号、圆角、透明度和动效都同时接受令牌档位与数值字符串，例如 `textSize="15px"`、`radius="14px"`、`withAlpha(..., "35%")`；`ui.dp`、`ui.number`、`ui.metric` 可直接复用解析器。
 - 图片与背景：`ui.image` 支持本地/网络路径、Bitmap/Drawable、圆角、圆形、缩放和透明度；`ui.background` 支持图片铺底、遮罩、圆角和内容叠加；`ui.page` 支持整页背景图。

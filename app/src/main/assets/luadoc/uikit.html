@@ -590,6 +590,9 @@ t.motion.slow</pre>
       <tr><td><code>switch / radioGroup / rating / select</code></td><td><code>color</code>、<code>type</code>、<code>radius.check/chip</code>、<code>opacity.disabled</code></td></tr>
       <tr><td><code>keyValue / table / timeline</code></td><td><code>color</code>、<code>type</code>、<code>spacing</code>、<code>radius.card</code>、<code>control.hairline</code></td></tr>
       <tr><td><code>accordion / avatarGroup / pagination</code></td><td><code>radius.card/segmentItem</code>、<code>control.avatarGroup</code>、<code>spacing</code>、<code>opacity.disabled</code></td></tr>
+      <tr><td><code>text / icon / surface / stack / grid</code></td><td><code>type</code>、<code>color</code>、<code>spacing</code>、<code>radius</code>、<code>control.statusDot</code></td></tr>
+      <tr><td><code>input / label / helper / checkbox / radio</code></td><td><code>control.inputHeight/checkMark</code>、<code>radius.input/check</code>、<code>opacity.disabled</code></td></tr>
+      <tr><td><code>tabItem / cell / kvRow / fadeIn</code></td><td><code>control.tabHeight</code>、<code>type</code>、<code>motion</code>、<code>spacing</code></td></tr>
       <tr><td><code>animate / stagger / press</code></td><td><code>motion.slow/normal/fast/stagger</code>、<code>motion.enterScale/pressScale</code></td></tr>
     </tbody>
   </table>
@@ -913,7 +916,90 @@ page:add(ui.pagination({
     这些组件都是普通 View 的封装，可以继续 <code>addView</code>、设置 LayoutParams 或放进原生布局；需要更复杂的数据列表时，仍然优先使用 RecyclerView。
   </div>
 
-  <h2>二十三、限制与常见问题</h2>
+  <h2>二十三、原子组件：把每一类拆到最小</h2>
+  <p>复合组件解决“一个完整场景”，原子组件解决“一个最小视觉单元”。新增的原子层覆盖布局、排版、图标、表单、选择、反馈、导航、数据和动效，复杂页面可以按需组合，不必被现成组件的参数限制。</p>
+  <table>
+    <thead><tr><th>分类</th><th>原子组件</th><th>作用</th></tr></thead>
+    <tbody>
+      <tr><td>布局</td><td><code>surface</code>、<code>stack/vstack/hstack</code>、<code>grid</code>、<code>center</code></td><td>底色容器、行列栈、网格和居中容器。</td></tr>
+      <tr><td>排版</td><td><code>text</code>、<code>label</code>、<code>helper</code></td><td>统一字号、字重、颜色、对齐、行数和帮助文本。</td></tr>
+      <tr><td>图标</td><td><code>icon</code>、<code>statusDot</code></td><td>字形或图片图标，以及成功/警告/危险状态点。</td></tr>
+      <tr><td>表单</td><td><code>input</code>、<code>label</code>、<code>helper</code></td><td>裸输入框、字段标签和错误/帮助文本。</td></tr>
+      <tr><td>选择</td><td><code>checkMark</code>、<code>checkbox</code>、<code>radioMark</code>、<code>switch</code></td><td>勾选、单选、开关的最小可交互单元。</td></tr>
+      <tr><td>导航</td><td><code>tabItem</code></td><td>底部标签栏的单个标签项。</td></tr>
+      <tr><td>数据</td><td><code>cell</code>、<code>kvRow</code></td><td>表格单元格和键值行。</td></tr>
+      <tr><td>动效</td><td><code>fadeIn</code>、<code>slideIn</code>、<code>scaleIn</code></td><td>淡入、上移、缩放的短入口。</td></tr>
+    </tbody>
+  </table>
+
+  <h3>布局、排版与图标</h3>
+<pre>local panel = ui.surface({
+  padding = "16px",
+  radius = "14px",
+}, function(body)
+  body.addView(ui.hstack({ gap = "8px", align = "center" }, function(add)
+    add(ui.icon({
+      glyph = "A",
+      size = "30px",
+      background = ui.tokens.color.accent,
+      color = ui.tokens.color.onAccent,
+    }))
+    add(ui.text({ text = "标题", type = "headline" }))
+    add(ui.statusDot({ color = ui.tokens.color.success }))
+  end))
+end)
+
+page:add(panel)
+
+page:add(ui.grid({
+  columns = 3,
+  gap = "8px",
+  items = { tileA, tileB, tileC, tileD },
+}))
+
+page:add(ui.center({ padding = 24 }, ui.text("居中内容")))</pre>
+  <p><code>stack</code> 的 <code>add()</code> 会自动加 gap；<code>grid</code> 最后一行会自动留白；<code>icon</code> 既支持字形，也支持 <code>src</code> 图片。</p>
+
+  <h3>表单与选择</h3>
+<pre>page:add(ui.label({ text = "项目名", required = true }))
+page:add(ui.input({
+  hint = "输入项目名",
+  padding = "12px",
+}))
+page:add(ui.helper({ text = "名称会显示在工程列表", error = false }))
+
+page:add(ui.checkbox({
+  text = "自动保存",
+  checked = true,
+  onChange = function(value) print(value) end,
+}))
+
+page:add(ui.hstack({ gap = 8 }, function(add)
+  add(ui.radioMark({ checked = true }))
+  add(ui.text("标准模式"))
+end))</pre>
+  <p><code>input</code> 是裸输入框，不带标题和帮助文本；<code>field</code> 仍然是三者组合好的表单行。</p>
+
+  <h3>导航、数据与动效</h3>
+<pre>local tab = ui.tabItem({
+  title = "首页",
+  glyph = "⌂",
+  selected = true,
+  onClick = function() print("home") end,
+})
+
+page:add(ui.cell({ text = "名称", header = true }))
+page:add(ui.cell({ text = "Mini-LuaXPLUS" }))
+page:add(ui.kvRow({ label = "版本", value = "1.0.0-rc19" }))
+
+ui.fadeIn(view)
+ui.slideIn(view, { duration = "200ms" })
+ui.scaleIn(view, { duration = "220ms" })</pre>
+  <div class="tip">
+    原子组件不会替代复合组件。需要一整行、整张卡片或完整表单时继续用 <code>row</code>、<code>card</code>、<code>field</code>；需要局部微调时再用原子层拆开组合。
+  </div>
+
+  <h2>二十四、限制与常见问题</h2>
   <ul>
     <li><strong>这是 iOS 风格的 Android 组件，不是 UIKit。</strong> 系统字体、阴影和动画与真机 iOS 仍有差异。</li>
     <li><strong>主题切换不会实时重绘已有控件。</strong> 切换后重建页面即可。</li>
@@ -923,7 +1009,7 @@ page:add(ui.pagination({
   </ul>
 
   <footer>
-    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc18
+    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc19
   </footer>
 </div>
 
