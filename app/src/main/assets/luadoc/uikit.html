@@ -121,11 +121,9 @@ page:show()                      -- 真正调用 activity.setContentView(root)</
 ui.setAppearance("dark")    -- 深色
 ui.setAppearance("auto")    -- 跟随系统
 
-local colors = ui.palette()
-print(colors.blue, colors.bg, colors.label)</pre>
-
-  <p>只换强调色（按钮、链接、选中态）可以这样：</p>
-<pre>ui.setAccent(0xFF5856D6)    -- iOS 紫色</pre>
+local colors = ui.tokens.color
+print(colors.accent, colors.bg, colors.label)</pre>
+  <p>自定义主题、完整令牌和 HTML CSS 导出见后面的“设计令牌”章节。</p>
 
   <div class="note">
     主题在组件创建时读取。已经创建的页面不会自动换色；切换主题后重新创建页面即可。系统状态栏和导航栏颜色会随 <code class="inline">ui.page</code> 一起设置。
@@ -243,7 +241,7 @@ print(segment.getSelected())</pre>
   local value = TextView(activity)
   value.setText("1,284")
   value.setTextSize(34)
-  value.setTextColor(ui.palette().label)
+  value.setTextColor(ui.tokens.color.label)
   box.addView(value)
 end))</pre>
 
@@ -547,7 +545,69 @@ page:reveal({ step = 45, duration = 280 })</pre>
     成品包使用时同样写 <code class="inline">local ui = require "luaxplus.ui"</code>。如果某个工程不想用组件库，不 require 即可，原有代码和包体积都不受影响。
   </div>
 
-  <h2>二十、限制与常见问题</h2>
+  <h2>二十、设计令牌：默认主题与自定义主题</h2>
+  <p>组件库的颜色、间距、圆角、字体、控件尺寸、动效和透明度都来自 <code class="inline">ui.tokens</code>。组件创建时读取令牌，所以换主题后重建页面即可整体换肤。</p>
+  <p>Lua 侧直接点号访问，数字间距用数字键；所有颜色同时接受整数和 <code class="inline">#RRGGBB</code>：</p>
+<pre>local t = ui.tokens
+
+t.color.accent
+t.color.label
+t.color.surface
+t.spacing[16]
+t.radius[12]
+t.type.body.size
+t.type.title.lineHeight
+t.control.buttonHeight
+t.motion.slow</pre>
+  <table>
+    <thead><tr><th>分类</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td><code>color</code></td><td>背景、表面、文字、分隔线、强调色、成功/警告/危险、遮罩和禁用色。</td></tr>
+      <tr><td><code>spacing</code></td><td>页面、卡片、行、间距和图标尺寸的 dp 数值，数字键可直接访问。</td></tr>
+      <tr><td><code>radius</code></td><td>卡片、按钮、输入框、标签和胶囊圆角。</td></tr>
+      <tr><td><code>type</code></td><td>display/title/body/callout/footnote 等字号、字重和行高。</td></tr>
+      <tr><td><code>control</code></td><td>导航、按钮、输入框、标签栏、悬浮按钮和弹窗动作高度。</td></tr>
+      <tr><td><code>motion / opacity / elevation</code></td><td>动效时长、错峰间隔、禁用透明度和阴影高度。</td></tr>
+    </tbody>
+  </table>
+  <p>注册自定义主题。顶层字段同时覆盖浅色和深色，<code class="inline">dark</code> 只写深色差异：</p>
+<pre>ui.defineTheme("brand", {
+  extends = "light",
+  color = {
+    accent = "#FF6B00",
+    accentSoft = "#FFF0E6",
+  },
+  spacing = { [16] = 20 },
+  radius = { [12] = 14 },
+  dark = {
+    color = {
+      accent = "#FF9F45",
+      accentSoft = "#3A2110",
+    },
+  },
+})
+
+ui.useTheme("brand")          -- 跟随系统深浅色
+ui.useTheme("brand", "dark")  -- 强制深色
+ui.useTheme("auto")           -- 回到默认主题</pre>
+  <p>按字符串读取令牌，适合根据变量拼路径：</p>
+<pre>ui.token("color.accent")
+ui.token("spacing.16")
+ui.token("type.body.size", 17)</pre>
+  <p>导出 CSS 变量，给 HTML/H5 或设计文档复用同一套令牌：</p>
+<pre>print(ui.cssVars("brand"))
+print(ui.cssVars("brand", "dark"))</pre>
+<pre>:root {
+  --lx-color-accent: #FF6B00;
+  --lx-spacing-16: 20px;
+  --lx-radius-12: 14px;
+  --lx-type-body-size: 17px;
+}</pre>
+  <div class="tip">
+    令牌在创建 View 时读取，不是响应式绑定。切换主题或自定义主题后，重建当前页面；不要在旧页面上期待自动换色。
+  </div>
+
+  <h2>二十一、限制与常见问题</h2>
   <ul>
     <li><strong>这是 iOS 风格的 Android 组件，不是 UIKit。</strong> 系统字体、阴影和动画与真机 iOS 仍有差异。</li>
     <li><strong>主题切换不会实时重绘已有控件。</strong> 切换后重建页面即可。</li>
@@ -557,7 +617,7 @@ page:reveal({ step = 45, duration = 280 })</pre>
   </ul>
 
   <footer>
-    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc6
+    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc15
   </footer>
 </div>
 

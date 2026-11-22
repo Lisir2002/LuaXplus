@@ -21,7 +21,7 @@ local showTab
 local buildShell
 
 local function palette()
-  return ui.palette()
+  return ui.tokens.color
 end
 
 local function toast(text)
@@ -162,7 +162,7 @@ local function buildControls()
   page:add(ui.group("分组列表", {
     ui.row({
       icon = "W",
-      iconBg = palette().blue,
+      iconBg = palette().accent,
       title = "Wi-Fi",
       subtitle = "已连接，信号良好",
       value = "Home",
@@ -173,7 +173,7 @@ local function buildControls()
     }),
     ui.row({
       icon = "B",
-      iconBg = palette().green,
+      iconBg = palette().success,
       title = "蓝牙",
       subtitle = "已开启",
       toggle = true,
@@ -183,7 +183,7 @@ local function buildControls()
     }),
     ui.row({
       icon = "N",
-      iconBg = palette().orange,
+      iconBg = palette().warning,
       title = "通知",
       subtitle = "允许通知与提示",
       toggle = false,
@@ -193,7 +193,7 @@ local function buildControls()
     }),
     ui.row({
       icon = "✓",
-      iconBg = palette().blue,
+      iconBg = palette().accent,
       title = "选中状态",
       subtitle = "selected = true",
       selected = true,
@@ -226,7 +226,7 @@ local function buildControls()
     ui.row({
       title = "自定义右侧",
       subtitle = "accessory 可以放任意 View",
-      accessory = ui.badge("NEW", palette().blue),
+      accessory = ui.badge("NEW", palette().accent),
       chevron = false,
     }),
     ui.row({
@@ -275,7 +275,7 @@ local function buildControls()
   }, function(box)
     local first = ui.row({
       icon = "i",
-      iconBg = palette().blue,
+      iconBg = palette().accent,
       title = "卡片里的行",
       subtitle = "仍然使用同一套 row",
       chevron = true,
@@ -296,19 +296,19 @@ local function buildControls()
   people.setOrientation(LinearLayout.HORIZONTAL)
   people.setGravity(Gravity.CENTER_VERTICAL)
   people.setPadding(dp(4), dp(8), dp(4), dp(8))
-  people.addView(ui.avatar("L", palette().blue, 52))
+  people.addView(ui.avatar("L", palette().accent, 52))
   local gap1 = View(activity)
   people.addView(gap1, LinearLayout.LayoutParams(dp(10), 1))
-  people.addView(ui.avatar("U", palette().green, 44))
+  people.addView(ui.avatar("U", palette().success, 44))
   local gap2 = View(activity)
   people.addView(gap2, LinearLayout.LayoutParams(dp(10), 1))
-  people.addView(ui.avatar("X", palette().orange, 44))
+  people.addView(ui.avatar("X", palette().warning, 44))
   local gap3 = View(activity)
   people.addView(gap3, LinearLayout.LayoutParams(dp(14), 1))
-  people.addView(ui.badge("NEW", palette().blue))
+  people.addView(ui.badge("NEW", palette().accent))
   local gap4 = View(activity)
   people.addView(gap4, LinearLayout.LayoutParams(dp(6), 1))
-  people.addView(ui.badge("HOT", palette().red))
+  people.addView(ui.badge("HOT", palette().danger))
   page:add(people, 8)
 
   page:add(ui.divider(16), 4)
@@ -411,7 +411,7 @@ local function buildForms()
         matched = matched + 1
         local row = ui.row({
           icon = item.icon,
-          iconBg = palette()[item.bg] or palette().blue,
+          iconBg = palette()[item.bg] or palette().accent,
           title = item.title,
           subtitle = item.subtitle,
           chevron = true,
@@ -655,7 +655,31 @@ local function buildDialogs()
       style = "tinted",
       textSize = 13,
       onClick = function()
-        ui.setAccent(item[2])
+        local function blend(color, base, ratio)
+          local cr = (color >> 16) & 0xFF
+          local cg = (color >> 8) & 0xFF
+          local cb = color & 0xFF
+          local br = (base >> 16) & 0xFF
+          local bg = (base >> 8) & 0xFF
+          local bb = base & 0xFF
+          local r = math.floor(cr * ratio + br * (1 - ratio))
+          local g = math.floor(cg * ratio + bg * (1 - ratio))
+          local b = math.floor(cb * ratio + bb * (1 - ratio))
+          return 0xFF000000 | (r << 16) | (g << 8) | b
+        end
+        ui.defineTheme("demo-accent", {
+          color = {
+            accent = item[2],
+            accentSoft = blend(item[2], 0xFFFFFFFF, 0.12),
+          },
+          dark = {
+            color = {
+              accent = item[2],
+              accentSoft = blend(item[2], 0xFF1C1C1E, 0.22),
+            },
+          },
+        })
+        ui.useTheme("demo-accent", ui.appearance)
         currentTab = 4
         buildShell(4)
       end,
@@ -906,7 +930,7 @@ local function buildAbout()
     head.setOrientation(LinearLayout.HORIZONTAL)
     head.setGravity(Gravity.CENTER_VERTICAL)
 
-    head.addView(ui.avatar("UI", palette().blue, 58))
+    head.addView(ui.avatar("UI", palette().accent, 58))
 
     local info = LinearLayout(activity)
     info.setOrientation(LinearLayout.VERTICAL)
@@ -931,9 +955,9 @@ local function buildAbout()
     local badgeRow = LinearLayout(activity)
     badgeRow.setOrientation(LinearLayout.HORIZONTAL)
     badgeRow.setPadding(0, dp(6), 0, 0)
-    local b1 = ui.badge("自研", palette().blue)
+    local b1 = ui.badge("自研", palette().accent)
     badgeRow.addView(b1)
-    local b2 = ui.badge("不改原生", palette().green)
+    local b2 = ui.badge("不改原生", palette().success)
     local b2Params = LinearLayout.LayoutParams(-2, -2)
     b2Params.leftMargin = dp(6)
     badgeRow.addView(b2, b2Params)
@@ -950,15 +974,16 @@ local function buildAbout()
   end), 0)
 
   page:add(ui.group("组件清单", {
-    ui.row({ icon = "P", iconBg = palette().blue, title = "页面骨架", subtitle = "page", value = "1", chevron = false }),
-    ui.row({ icon = "G", iconBg = palette().green, title = "分组与行", subtitle = "group / row", value = "2", chevron = false }),
-    ui.row({ icon = "B", iconBg = palette().orange, title = "按钮", subtitle = "6 种样式", value = "1", chevron = false }),
-    ui.row({ icon = "F", iconBg = palette().blue, title = "表单", subtitle = "fieldRow / field / textArea / searchBar", value = "4", chevron = false }),
-    ui.row({ icon = "S", iconBg = palette().green, title = "分段控件", subtitle = "segmented", value = "1", chevron = false }),
-    ui.row({ icon = "C", iconBg = palette().orange, title = "卡片", subtitle = "card", value = "1", chevron = false }),
-    ui.row({ icon = "D", iconBg = palette().red, title = "弹窗", subtitle = "alert / actionSheet", value = "2", chevron = false }),
-    ui.row({ icon = "T", iconBg = palette().blue, title = "标签栏", subtitle = "tabBar", value = "1", chevron = false }),
-    ui.row({ icon = "M", iconBg = palette().green, title = "状态与装饰", subtitle = "empty / loading / avatar / badge / divider / spacer", value = "6", chevron = false }),
+    ui.row({ icon = "P", iconBg = palette().accent, title = "页面骨架", subtitle = "page", value = "1", chevron = false }),
+    ui.row({ icon = "G", iconBg = palette().success, title = "分组与行", subtitle = "group / row", value = "2", chevron = false }),
+    ui.row({ icon = "B", iconBg = palette().warning, title = "按钮", subtitle = "6 种样式", value = "1", chevron = false }),
+    ui.row({ icon = "F", iconBg = palette().accent, title = "表单", subtitle = "fieldRow / field / textArea / searchBar", value = "4", chevron = false }),
+    ui.row({ icon = "S", iconBg = palette().success, title = "分段控件", subtitle = "segmented", value = "1", chevron = false }),
+    ui.row({ icon = "C", iconBg = palette().warning, title = "卡片", subtitle = "card", value = "1", chevron = false }),
+    ui.row({ icon = "D", iconBg = palette().danger, title = "弹窗", subtitle = "alert / actionSheet", value = "2", chevron = false }),
+    ui.row({ icon = "T", iconBg = palette().accent, title = "标签栏", subtitle = "tabBar", value = "1", chevron = false }),
+    ui.row({ icon = "M", iconBg = palette().success, title = "状态与装饰", subtitle = "empty / loading / avatar / badge / divider / spacer", value = "6", chevron = false }),
+    ui.row({ icon = "T", iconBg = palette().accent, title = "设计令牌", subtitle = "默认主题 / 自定义主题 / CSS 变量", value = "3", chevron = false }),
   }, "上面这些就是当前组件库的完整清单。"))
 
   local code = TextView(activity)
@@ -982,10 +1007,37 @@ local function buildAbout()
     box.addView(code, LinearLayout.LayoutParams(-1, -2))
   end), 14)
 
+  local tokenCode = TextView(activity)
+  tokenCode.setText([[local t = ui.tokens
+
+t.color.accent
+t.spacing[16]
+t.type.body.size
+
+ui.defineTheme("brand", {
+  color = { accent = "#FF6B00" },
+  spacing = { [16] = 20 },
+})
+ui.useTheme("brand")
+
+ui.cssVars("brand")]])
+  tokenCode.setTextSize(12)
+  tokenCode.setTextColor(palette().label)
+  tokenCode.setTypeface(Typeface.MONOSPACE)
+  tokenCode.setBackgroundColor(palette().fill)
+  tokenCode.setPadding(dp(12), dp(12), dp(12), dp(12))
+
+  page:add(ui.card({
+    title = "设计令牌",
+    subtitle = "Lua 点号访问，HTML 侧导出同名 CSS 变量",
+  }, function(box)
+    box.addView(tokenCode, LinearLayout.LayoutParams(-1, -2))
+  end), 14)
+
   page:add(ui.group("说明", {
     ui.row({
       icon = "?",
-      iconBg = palette().blue,
+      iconBg = palette().accent,
       title = "查看内置手册",
       subtitle = "编辑器 → 手册 → LuaX-UI 组件库",
       chevron = true,
@@ -995,7 +1047,7 @@ local function buildAbout()
     }),
     ui.row({
       icon = "!",
-      iconBg = palette().orange,
+      iconBg = palette().warning,
       title = "与原生写法并存",
       subtitle = "import、luajava、LuaActivity 都没有被改写",
       chevron = true,
@@ -1005,7 +1057,7 @@ local function buildAbout()
     }),
     ui.row({
       icon = "↻",
-      iconBg = palette().green,
+      iconBg = palette().success,
       title = "主题状态",
       subtitle = "浅色、深色、跟随系统",
       value = ui.appearance == "auto" and "自动" or ui.appearance,

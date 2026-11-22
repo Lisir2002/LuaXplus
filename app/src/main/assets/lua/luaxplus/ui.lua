@@ -23,82 +23,260 @@ import "android.view.animation.*"
 
 local M = {}
 
--- ===== 主题 =====
--- 颜色取自 iOS 系统语义色，浅色与深色各一套。
-local LIGHT = {
-  bg = 0xFFF2F2F7,
-  card = 0xFFFFFFFF,
-  cardPressed = 0xFFE5E5EA,
-  label = 0xFF000000,
-  secondary = 0xFF8A8A8E,
-  tertiary = 0xFFC7C7CC,
-  separator = 0xFFC6C6C8,
-  fill = 0xFFE9E9EB,
-  blue = 0xFF007AFF,
-  blueSoft = 0xFFE5F0FF,
-  green = 0xFF34C759,
-  red = 0xFFFF3B30,
-  orange = 0xFFFF9500,
-  purple = 0xFFAF52DE,
-  pink = 0xFFFF2D55,
-  yellow = 0xFFFFCC00,
-  teal = 0xFF5AC8FA,
-  gray = 0xFF8E8E93,
-  white = 0xFFFFFFFF,
+-- ===== 设计令牌 =====
+-- 令牌是组件库唯一的视觉来源：颜色、间距、圆角、字体、控件尺寸和动效都从这里读取。
+-- Lua 侧使用点号：ui.tokens.color.label、ui.tokens.spacing[16]、ui.tokens.type.body.size。
+-- HTML 侧使用同名 CSS 变量：--lx-color-label、--lx-spacing-16、--lx-type-body-size。
+
+local function parseColor(value)
+  if type(value) == "number" then
+    return value
+  end
+  local text = tostring(value or ""):gsub("#", "")
+  local number = tonumber(text, 16)
+  if not number then
+    return 0xFF000000
+  end
+  if #text == 6 then
+    return 0xFF000000 | number
+  end
+  if #text == 8 then
+    return number
+  end
+  return 0xFF000000
+end
+
+local function clone(value)
+  if type(value) ~= "table" then
+    return value
+  end
+  local result = {}
+  for key, item in pairs(value) do
+    result[key] = clone(item)
+  end
+  return result
+end
+
+local function merge(base, patch)
+  local result = clone(base or {})
+  for key, value in pairs(patch or {}) do
+    if type(value) == "table" and type(result[key]) == "table" then
+      result[key] = merge(result[key], value)
+    else
+      result[key] = clone(value)
+    end
+  end
+  return result
+end
+
+local function normalizeColors(theme)
+  for key, value in pairs(theme.color or {}) do
+    theme.color[key] = parseColor(value)
+  end
+  return theme
+end
+
+local BASE = {
+  spacing = {
+    [0] = 0,
+    [1] = 1,
+    [2] = 2,
+    [4] = 4,
+    [6] = 6,
+    [7] = 7,
+    [8] = 8,
+    [10] = 10,
+    [11] = 11,
+    [12] = 12,
+    [14] = 14,
+    [16] = 16,
+    [18] = 18,
+    [19] = 19,
+    [22] = 22,
+    [24] = 24,
+    [26] = 26,
+    [28] = 28,
+    [32] = 32,
+    [36] = 36,
+    [38] = 38,
+    [44] = 44,
+    [46] = 46,
+    [52] = 52,
+    [57] = 57,
+    [72] = 72,
+  },
+  radius = {
+    [0] = 0,
+    [7] = 7,
+    [8] = 8,
+    [9] = 9,
+    [10] = 10,
+    [12] = 12,
+    [14] = 14,
+    [16] = 16,
+    [18] = 18,
+    [22] = 22,
+    [26] = 26,
+    [999] = 999,
+  },
+  type = {
+    display = { size = 34, weight = 700, lineHeight = 40 },
+    title = { size = 29, weight = 600, lineHeight = 34 },
+    headline = { size = 23, weight = 600, lineHeight = 28 },
+    bodyLarge = { size = 20, weight = 400, lineHeight = 26 },
+    body = { size = 17, weight = 400, lineHeight = 22 },
+    bodyCompact = { size = 16, weight = 400, lineHeight = 21 },
+    callout = { size = 15, weight = 400, lineHeight = 20 },
+    subhead = { size = 14, weight = 400, lineHeight = 19 },
+    footnote = { size = 13, weight = 400, lineHeight = 18 },
+    caption = { size = 11, weight = 400, lineHeight = 15 },
+    micro = { size = 10, weight = 400, lineHeight = 14 },
+    icon = { size = 20, weight = 400, lineHeight = 24 },
+    glyph = { size = 27, weight = 400, lineHeight = 30 },
+    stat = { size = 28, weight = 600, lineHeight = 34 },
+    action = { size = 22, weight = 400, lineHeight = 27 },
+    fab = { size = 26, weight = 400, lineHeight = 31 },
+    emptyGlyph = { size = 44, weight = 400, lineHeight = 50 },
+  },
+  control = {
+    buttonHeight = 46,
+    inputHeight = 44,
+    rowHeight = 44,
+    navHeight = 44,
+    tabHeight = 45,
+    iconBadge = 29,
+    fab = 52,
+    sheetItem = 57,
+    actionHeight = 44,
+    searchHeight = 36,
+    segment = 28,
+    checkMark = 24,
+    alertWidth = 270,
+    hitTarget = 44,
+    border = 1,
+    hairline = 0.5,
+  },
+  motion = {
+    fast = 90,
+    normal = 120,
+    slow = 260,
+    stagger = 55,
+    shimmer = 900,
+    staggerItem = 280,
+  },
+  elevation = {
+    card = 0,
+    fab = 6,
+    sheet = 16,
+  },
+  opacity = {
+    disabled = 0.42,
+    pressed = 0.7,
+    overlay = 0.35,
+  },
 }
 
-local DARK = {
-  bg = 0xFF000000,
-  card = 0xFF1C1C1E,
-  cardPressed = 0xFF2C2C2E,
-  label = 0xFFFFFFFF,
-  secondary = 0xFF8D8D93,
-  tertiary = 0xFF48484A,
-  separator = 0xFF38383A,
-  fill = 0xFF2C2C2E,
-  blue = 0xFF0A84FF,
-  blueSoft = 0xFF0A2540,
-  green = 0xFF30D158,
-  red = 0xFFFF453A,
-  orange = 0xFFFF9F0A,
-  purple = 0xFFBF5AF2,
-  pink = 0xFFFF375F,
-  yellow = 0xFFFFD60A,
-  teal = 0xFF64D2FF,
-  gray = 0xFF8D8D93,
-  white = 0xFFFFFFFF,
+local LIGHT = normalizeColors({
+  color = {
+    bg = "#F2F2F7",
+    surface = "#FFFFFF",
+    surfaceRaised = "#FFFFFF",
+    surfacePressed = "#E5E5EA",
+    label = "#000000",
+    secondary = "#8A8A8E",
+    tertiary = "#C7C7CC",
+    separator = "#C6C6C8",
+    fill = "#E9E9EB",
+    accent = "#007AFF",
+    accentSoft = "#E5F0FF",
+    onAccent = "#FFFFFF",
+    success = "#34C759",
+    warning = "#FF9500",
+    danger = "#FF3B30",
+    info = "#5AC8FA",
+    purple = "#AF52DE",
+    pink = "#FF2D55",
+    yellow = "#FFCC00",
+    gray = "#8E8E93",
+    disabled = "#999999",
+    overlay = "#66000000",
+    press = "#14000000",
+    pressStrong = "#22000000",
+    pressOnAccent = "#33FFFFFF",
+  },
+})
+
+local DARK = normalizeColors({
+  color = {
+    bg = "#000000",
+    surface = "#1C1C1E",
+    surfaceRaised = "#2C2C2E",
+    surfacePressed = "#3A3A3C",
+    label = "#FFFFFF",
+    secondary = "#8D8D93",
+    tertiary = "#48484A",
+    separator = "#38383A",
+    fill = "#2C2C2E",
+    accent = "#0A84FF",
+    accentSoft = "#0A2540",
+    onAccent = "#FFFFFF",
+    success = "#30D158",
+    warning = "#FF9F0A",
+    danger = "#FF453A",
+    info = "#64D2FF",
+    purple = "#BF5AF2",
+    pink = "#FF375F",
+    yellow = "#FFD60A",
+    gray = "#8D8D93",
+    disabled = "#666666",
+    overlay = "#99000000",
+    press = "#14FFFFFF",
+    pressStrong = "#22FFFFFF",
+    pressOnAccent = "#33FFFFFF",
+  },
+})
+
+local function buildTheme(mode, colors)
+  local theme = clone(BASE)
+  theme.mode = mode
+  theme.color = clone(colors.color)
+  return theme
+end
+
+local THEMES = {
+  light = buildTheme("light", LIGHT),
+  dark = buildTheme("dark", DARK),
 }
 
+M.themes = { light = THEMES.light, dark = THEMES.dark }
 M.appearance = "auto"
+M.themeName = "auto"
+M.tokens = {}
 
-local function density()
-  local current = activity
-  if not current then
-    return 2
+local function syncTable(target, source)
+  for key, value in pairs(source) do
+    if type(value) == "table" then
+      if type(target[key]) ~= "table" then
+        target[key] = {}
+      end
+      syncTable(target[key], value)
+    else
+      target[key] = value
+    end
   end
-  return current.getResources().getDisplayMetrics().density
+  for key in pairs(target) do
+    if source[key] == nil then
+      target[key] = nil
+    end
+  end
 end
 
-function M.dp(value)
-  return math.floor(value * density() + 0.5)
+local function applyTokens(theme)
+  syncTable(M.tokens, theme)
+  return M.tokens
 end
 
-local dp = M.dp
-
-local function hairline()
-  local value = dp(0.5)
-  if value < 1 then
-    return 1
-  end
-  return value
-end
-
-function M.isDark()
-  if M.appearance == "dark" then
-    return true
-  elseif M.appearance == "light" then
-    return false
-  end
+local function systemDark()
   local current = activity
   if not current then
     return false
@@ -107,26 +285,221 @@ function M.isDark()
   return math.floor(mode / 32) % 2 == 1
 end
 
-function M.palette()
-  if M.isDark() then
-    return DARK
+function M.isDark()
+  if M.appearance == "dark" then
+    return true
+  elseif M.appearance == "light" then
+    return false
   end
-  return LIGHT
+  return systemDark()
 end
 
-function M.setAppearance(mode)
-  M.appearance = mode or "auto"
-  return M.palette()
+local function customTheme(name)
+  local theme = M.customThemes and M.customThemes[name]
+  if not theme then
+    return nil
+  end
+  return theme
 end
 
--- 允许调用方覆盖强调色，其余语义色保持系统风格
-function M.setAccent(color)
-  LIGHT.blue = color
-  DARK.blue = color
+local function currentTheme()
+  if M.themeName == "auto" then
+    return M.isDark() and THEMES.dark or THEMES.light
+  elseif M.themeName == "light" then
+    return THEMES.light
+  elseif M.themeName == "dark" then
+    return THEMES.dark
+  end
+  local theme = customTheme(M.themeName)
+  if theme then
+    return M.isDark() and theme.dark or theme.light
+  end
+  return M.isDark() and THEMES.dark or THEMES.light
+end
+
+local function applyCurrentTheme()
+  return applyTokens(currentTheme())
+end
+
+applyCurrentTheme()
+
+local C = M.tokens.color
+local S = M.tokens.spacing
+local R = M.tokens.radius
+local TY = M.tokens.type
+local K = M.tokens.control
+local MO = M.tokens.motion
+local EL = M.tokens.elevation
+local OP = M.tokens.opacity
+
+local function space(value)
+  return S[value] or value
+end
+
+local function radiusToken(value)
+  return R[value] or value
+end
+
+local function typeSize(name)
+  local item = TY[name]
+  return item and item.size or TY.body.size
+end
+
+local function sizeToken(value)
+  if type(value) == "string" then
+    return typeSize(value)
+  end
+  return value or TY.body.size
 end
 
 local function colors()
-  return M.palette()
+  local wanted = M.isDark() and "dark" or "light"
+  if M.tokens.mode ~= wanted then
+    applyCurrentTheme()
+  end
+  return C
+end
+
+-- 注册自定义主题。顶层字段同时覆盖浅色和深色，dark 只覆盖深色差异。
+function M.defineTheme(name, spec)
+  spec = spec or {}
+  local base = customTheme(spec.extends)
+  local baseLight = base and base.light or THEMES.light
+  local baseDark = base and base.dark or THEMES.dark
+  local patch = {}
+  for key, value in pairs(spec) do
+    if key ~= "extends" and key ~= "dark" then
+      patch[key] = value
+    end
+  end
+  local light = normalizeColors(merge(baseLight, patch))
+  local dark = normalizeColors(merge(merge(baseDark, patch), spec.dark or {}))
+  M.customThemes = M.customThemes or {}
+  M.customThemes[name] = {
+    light = light,
+    dark = dark,
+  }
+  return M.customThemes[name]
+end
+
+-- name 可以是 auto / light / dark，也可以是 defineTheme 注册的主题名。
+function M.useTheme(name, mode)
+  name = name or "auto"
+  if name == "auto" or name == "light" or name == "dark" then
+    M.appearance = name
+    M.themeName = name
+  else
+    if not customTheme(name) then
+      error("未注册的主题: " .. tostring(name))
+    end
+    M.themeName = name
+    if mode == "light" or mode == "dark" or mode == "auto" then
+      M.appearance = mode
+    end
+  end
+  return applyCurrentTheme()
+end
+
+function M.setAppearance(mode)
+  mode = mode or "auto"
+  if mode ~= "auto" and mode ~= "light" and mode ~= "dark" then
+    error("外观模式必须是 auto、light 或 dark")
+  end
+  M.appearance = mode
+  if M.themeName == "light" or M.themeName == "dark" then
+    M.themeName = mode
+  end
+  return applyCurrentTheme()
+end
+
+function M.theme()
+  return {
+    name = M.themeName,
+    mode = M.isDark() and "dark" or "light",
+    appearance = M.appearance,
+  }
+end
+
+-- 按点号读取令牌；数字段会自动转成数字键，例如 spacing.16。
+function M.token(path, fallback)
+  local node = M.tokens
+  for part in tostring(path or ""):gmatch("[^%.]+") do
+    if type(node) ~= "table" then
+      return fallback
+    end
+    local value = node[part]
+    if value == nil and tonumber(part) then
+      value = node[tonumber(part)]
+    end
+    if value == nil then
+      return fallback
+    end
+    node = value
+  end
+  return node
+end
+
+local function cssColor(value)
+  local alpha = (value >> 24) & 0xFF
+  local red = (value >> 16) & 0xFF
+  local green = (value >> 8) & 0xFF
+  local blue = value & 0xFF
+  if alpha == 0xFF then
+    return string.format("#%02X%02X%02X", red, green, blue)
+  end
+  return string.format("rgba(%d, %d, %d, %.2f)", red, green, blue, alpha / 255)
+end
+
+local function cssValue(path, value)
+  if path:match("^color%-") then
+    return cssColor(value)
+  end
+  if path:match("^motion%-") then
+    return tostring(value) .. "ms"
+  end
+  if path:match("^opacity%-") or path:match("%-weight$") then
+    return tostring(value)
+  end
+  if path:match("^spacing%-") or path:match("^radius%-")
+      or path:match("^control%-") or path:match("^elevation%-")
+      or path:match("%-size$") or path:match("%-line%-height$") then
+    return tostring(value) .. "px"
+  end
+  return tostring(value)
+end
+
+local function cssKey(key)
+  return tostring(key):gsub("(%l)(%u)", "%1-%2"):lower()
+end
+
+local function flatten(prefix, value, output)
+  if type(value) == "table" then
+    for key, item in pairs(value) do
+      local part = cssKey(key)
+      flatten(prefix == "" and part or (prefix .. "-" .. part), item, output)
+    end
+  elseif prefix ~= "mode" then
+    output[#output + 1] = string.format("  --lx-%s: %s;", prefix, cssValue(prefix, value))
+  end
+end
+
+-- 导出 CSS 变量，便于 HTML/H5 或设计文档复用同一套令牌。
+function M.cssVars(name, mode)
+  local theme
+  if name == nil or name == "current" then
+    theme = currentTheme()
+  elseif name == "light" or name == "dark" then
+    theme = THEMES[name]
+  else
+    local custom = customTheme(name)
+    if not custom then
+      error("未注册的主题: " .. tostring(name))
+    end
+    theme = (mode == "dark" or (mode ~= "light" and M.isDark())) and custom.dark or custom.light
+  end
+  local output = {}
+  flatten("", theme, output)
+  return ":root {\n" .. table.concat(output, "\n") .. "\n}"
 end
 
 -- ===== 基础绘制 =====
@@ -134,11 +507,15 @@ local function shape(fill, stroke, radius)
   local drawable = GradientDrawable()
   drawable.setShape(GradientDrawable.RECTANGLE)
   drawable.setColor(fill)
-  drawable.setCornerRadius(dp(radius))
+  drawable.setCornerRadius(dp(radiusToken(radius)))
   if stroke then
     drawable.setStroke(hairline(), stroke)
   end
   return drawable
+end
+
+local function overlay(color, alpha)
+  return (alpha << 24) | (color & 0x00FFFFFF)
 end
 
 local function ripple(fill, radius, color)
@@ -159,7 +536,7 @@ end
 local function textView(text, size, color, bold)
   local view = TextView(activity)
   view.setText(tostring(text or ""))
-  view.setTextSize(size)
+  view.setTextSize(sizeToken(size))
   view.setTextColor(color)
   if bold then
     view.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL))
@@ -197,7 +574,7 @@ end
 function M.page(options)
   options = options or {}
   local dark = M.isDark()
-  local palette = M.palette()
+  local palette = colors()
   local current = activity
   if not current then
     error("LuaX-UI 需要在 Activity 脚本中使用")
@@ -223,20 +600,20 @@ function M.page(options)
   root.setFitsSystemWindows(true)
 
   local nav = FrameLayout(current)
-  nav.setBackgroundColor(options.navBackground or palette.card)
-  root.addView(nav, LinearLayout.LayoutParams(-1, dp(44)))
+  nav.setBackgroundColor(options.navBackground or palette.surface)
+  root.addView(nav, LinearLayout.LayoutParams(-1, dp(K.navHeight)))
 
-  local navTitle = textView(options.title or "", 17, palette.label, true)
+  local navTitle = textView(options.title or "", TY.body.size, palette.label, true)
   navTitle.setGravity(Gravity.CENTER)
   local titleParams = FrameLayout.LayoutParams(-2, -2)
   titleParams.gravity = Gravity.CENTER
   nav.addView(navTitle, titleParams)
 
   if options.back then
-    local back = textView("‹", 27, palette.blue, false)
+    local back = textView("‹", TY.glyph.size, palette.accent, false)
     back.setGravity(Gravity.CENTER)
-    back.setBackground(ripple(0x00000000, 22, 0x14000000))
-    local backParams = FrameLayout.LayoutParams(dp(44), -1)
+    back.setBackground(ripple(0x00000000, 22, palette.press))
+    local backParams = FrameLayout.LayoutParams(dp(K.navHeight), -1)
     backParams.gravity = Gravity.LEFT
     nav.addView(back, backParams)
     back.setOnClickListener(View.OnClickListener{
@@ -256,10 +633,10 @@ function M.page(options)
     rightSpec = { title = rightSpec }
   end
   if rightSpec then
-    local right = textView(rightSpec.title or "完成", 17, palette.blue, true)
+    local right = textView(rightSpec.title or "完成", TY.body.size, palette.accent, true)
     right.setGravity(Gravity.CENTER)
-    right.setPadding(dp(12), 0, dp(12), 0)
-    right.setBackground(ripple(0x00000000, 22, 0x14000000))
+    right.setPadding(dp(space(12)), 0, dp(space(12)), 0)
+    right.setBackground(ripple(0x00000000, 22, palette.press))
     local rightParams = FrameLayout.LayoutParams(-2, -1)
     rightParams.gravity = Gravity.RIGHT
     nav.addView(right, rightParams)
@@ -277,18 +654,18 @@ function M.page(options)
   nav.addView(navLine, lineParams)
 
   if options.largeTitle ~= false and options.title then
-    local large = textView(options.title, 34, palette.label, true)
-    large.setPadding(dp(16), dp(8), dp(16), dp(2))
+    local large = textView(options.title, TY.display.size, palette.label, true)
+    large.setPadding(dp(space(16)), dp(space(8)), dp(space(16)), dp(space(2)))
     large.setIncludeFontPadding(false)
     root.addView(large, LinearLayout.LayoutParams(-1, -2))
     if options.subtitle then
-      local subtitle = textView(options.subtitle, 13, palette.secondary, false)
-      subtitle.setPadding(dp(16), 0, dp(16), dp(10))
+      local subtitle = textView(options.subtitle, TY.footnote.size, palette.secondary, false)
+      subtitle.setPadding(dp(space(16)), 0, dp(space(16)), dp(space(10)))
       root.addView(subtitle, LinearLayout.LayoutParams(-1, -2))
     end
   elseif options.subtitle then
-    local subtitle = textView(options.subtitle, 13, palette.secondary, false)
-    subtitle.setPadding(dp(16), 0, dp(16), dp(8))
+    local subtitle = textView(options.subtitle, TY.footnote.size, palette.secondary, false)
+    subtitle.setPadding(dp(space(16)), 0, dp(space(16)), dp(space(8)))
     root.addView(subtitle, LinearLayout.LayoutParams(-1, -2))
   end
 
@@ -297,7 +674,7 @@ function M.page(options)
   scroll.setVerticalScrollBarEnabled(false)
   local content = LinearLayout(current)
   content.setOrientation(LinearLayout.VERTICAL)
-  content.setPadding(dp(16), dp(8), dp(16), dp(32))
+  content.setPadding(dp(space(16)), dp(space(8)), dp(space(16)), dp(space(32)))
   scroll.addView(content, LinearLayout.LayoutParams(-1, -2))
   root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1))
 
@@ -315,7 +692,7 @@ function M.page(options)
       return self
     end
     local params = LinearLayout.LayoutParams(-1, -2)
-    params.topMargin = dp(topMargin or 0)
+    params.topMargin = dp(space(topMargin or 0))
     content.addView(view, params)
     return self
   end
@@ -355,7 +732,7 @@ local function separatorView(leftInset)
   local line = View(activity)
   line.setBackgroundColor(colors().separator)
   local params = LinearLayout.LayoutParams(-1, hairline())
-  params.leftMargin = dp(leftInset or 16)
+  params.leftMargin = dp(space(leftInset or 16))
   return line, params
 end
 
@@ -365,21 +742,21 @@ function M.row(spec)
   local row = LinearLayout(activity)
   row.setOrientation(LinearLayout.HORIZONTAL)
   row.setGravity(Gravity.CENTER_VERTICAL)
-  row.setMinimumHeight(dp(spec.height or 44))
-  row.setPadding(dp(spec.icon and 12 or 16), dp(7), dp(12), dp(7))
-  row.setBackground(ripple(0x00000000, 0, 0x14000000))
+  row.setMinimumHeight(dp(space(spec.height or K.rowHeight)))
+  row.setPadding(dp(space(spec.icon and 12 or 16)), dp(space(7)), dp(space(12)), dp(space(7)))
+  row.setBackground(ripple(0x00000000, 0, palette.press))
 
   if spec.icon then
     if type(spec.icon) == "string" then
-      local badge = textView(spec.icon, 15, palette.white, true)
+      local badge = textView(spec.icon, TY.callout.size, palette.onAccent, true)
       badge.setGravity(Gravity.CENTER)
-      badge.setBackground(roundRect(spec.iconBg or palette.blue, 7))
-      local params = LinearLayout.LayoutParams(dp(29), dp(29))
-      params.rightMargin = dp(11)
+      badge.setBackground(roundRect(spec.iconBg or palette.accent, 7))
+      local params = LinearLayout.LayoutParams(dp(K.iconBadge), dp(K.iconBadge))
+      params.rightMargin = dp(space(11))
       row.addView(badge, params)
     else
-      local params = LinearLayout.LayoutParams(dp(29), dp(29))
-      params.rightMargin = dp(11)
+      local params = LinearLayout.LayoutParams(dp(K.iconBadge), dp(K.iconBadge))
+      params.rightMargin = dp(space(11))
       row.addView(spec.icon, params)
     end
   end
@@ -388,24 +765,24 @@ function M.row(spec)
   textBox.setOrientation(LinearLayout.VERTICAL)
   row.addView(textBox, LinearLayout.LayoutParams(0, -2, 1))
 
-  local titleColor = spec.destructive and palette.red or palette.label
-  local title = textView(spec.title or "", spec.titleSize or 17, titleColor, false)
+  local titleColor = spec.destructive and palette.danger or palette.label
+  local title = textView(spec.title or "", spec.titleSize or TY.body.size, titleColor, false)
   title.setSingleLine(true)
   title.setEllipsize(TextUtils.TruncateAt.END)
   textBox.addView(title)
 
   if spec.subtitle then
-    local subtitle = textView(spec.subtitle, 13, palette.secondary, false)
+    local subtitle = textView(spec.subtitle, TY.footnote.size, palette.secondary, false)
     subtitle.setSingleLine(true)
     subtitle.setEllipsize(TextUtils.TruncateAt.END)
-    subtitle.setPadding(0, dp(2), 0, 0)
+    subtitle.setPadding(0, dp(space(2)), 0, 0)
     textBox.addView(subtitle)
   end
 
   if spec.value then
-    local value = textView(spec.value, 15, palette.secondary, false)
+    local value = textView(spec.value, TY.callout.size, palette.secondary, false)
     value.setSingleLine(true)
-    value.setPadding(dp(8), 0, dp(2), 0)
+    value.setPadding(dp(space(8)), 0, dp(space(2)), 0)
     row.addView(value)
   end
 
@@ -422,7 +799,7 @@ function M.row(spec)
       switchView.setShowText(false)
     else
       pcall(function()
-        switchView.setTrackColors(palette.fill, palette.green)
+        switchView.setTrackColors(palette.fill, palette.success)
       end)
     end
     local checked = spec.toggle == true
@@ -445,17 +822,17 @@ function M.row(spec)
       })
     end
   elseif spec.selected then
-    local check = textView("✓", 17, palette.blue, true)
-    check.setPadding(dp(6), 0, dp(2), 0)
+    local check = textView("✓", TY.body.size, palette.accent, true)
+    check.setPadding(dp(space(6)), 0, dp(space(2)), 0)
     row.addView(check)
   elseif spec.chevron ~= false and (spec.onClick or spec.chevron) then
-    local chevron = textView("›", 20, palette.tertiary, false)
-    chevron.setPadding(dp(6), 0, 0, 0)
+    local chevron = textView("›", TY.bodyLarge.size, palette.tertiary, false)
+    chevron.setPadding(dp(space(6)), 0, 0, 0)
     row.addView(chevron)
   end
 
   if spec.disabled then
-    row.setAlpha(0.42)
+    row.setAlpha(OP.disabled)
     row.setEnabled(false)
   elseif spec.onClick then
     row.setOnClickListener(View.OnClickListener{
@@ -472,15 +849,15 @@ function M.group(header, rows, footer)
   box.setOrientation(LinearLayout.VERTICAL)
 
   if header then
-    local caption = textView(string.upper(tostring(header)), 13, palette.secondary, false)
+    local caption = textView(string.upper(tostring(header)), TY.footnote.size, palette.secondary, false)
     caption.setLetterSpacing(0.04)
-    caption.setPadding(dp(4), dp(6), dp(4), dp(6))
+    caption.setPadding(dp(space(4)), dp(space(6)), dp(space(4)), dp(space(6)))
     box.addView(caption)
   end
 
   local card = LinearLayout(activity)
   card.setOrientation(LinearLayout.VERTICAL)
-  card.setBackground(roundRect(palette.card, 12))
+  card.setBackground(roundRect(palette.surface, 12))
   card.setClipToOutline(true)
   box.addView(card, LinearLayout.LayoutParams(-1, -2))
 
@@ -509,8 +886,8 @@ function M.group(header, rows, footer)
   end
 
   if footer then
-    local note = textView(tostring(footer), 13, palette.secondary, false)
-    note.setPadding(dp(4), dp(7), dp(4), dp(4))
+    local note = textView(tostring(footer), TY.footnote.size, palette.secondary, false)
+    note.setPadding(dp(space(4)), dp(space(7)), dp(space(4)), dp(space(4)))
     box.addView(note)
   end
 
@@ -529,38 +906,38 @@ function M.button(spec)
   local style = spec.style or "filled"
   local fill, textColor, rippleColor
   if style == "filled" then
-    fill = palette.blue
-    textColor = palette.white
-    rippleColor = 0x33FFFFFF
+    fill = palette.accent
+    textColor = palette.onAccent
+    rippleColor = palette.pressOnAccent
   elseif style == "tinted" then
-    fill = palette.blueSoft
-    textColor = palette.blue
-    rippleColor = 0x22007AFF
+    fill = palette.accentSoft
+    textColor = palette.accent
+    rippleColor = overlay(palette.accent, 0x22)
   elseif style == "gray" then
     fill = palette.fill
     textColor = palette.label
-    rippleColor = 0x22000000
+    rippleColor = palette.pressStrong
   elseif style == "plain" then
     fill = 0x00000000
-    textColor = palette.blue
-    rippleColor = 0x14007AFF
+    textColor = palette.accent
+    rippleColor = overlay(palette.accent, 0x14)
   elseif style == "destructive" then
-    fill = palette.red
-    textColor = palette.white
-    rippleColor = 0x33FFFFFF
+    fill = palette.danger
+    textColor = palette.onAccent
+    rippleColor = palette.pressOnAccent
   else
-    fill = palette.blue
-    textColor = palette.white
-    rippleColor = 0x33FFFFFF
+    fill = palette.accent
+    textColor = palette.onAccent
+    rippleColor = palette.pressOnAccent
   end
 
-  local button = textView(spec.text or "按钮", spec.textSize or 17, textColor, true)
+  local button = textView(spec.text or "按钮", spec.textSize or TY.body.size, textColor, true)
   button.setGravity(Gravity.CENTER)
-  button.setPadding(dp(14), dp(12), dp(14), dp(12))
-  button.setMinimumHeight(dp(46))
+  button.setPadding(dp(space(14)), dp(space(12)), dp(space(14)), dp(space(12)))
+  button.setMinimumHeight(dp(K.buttonHeight))
   button.setBackground(ripple(fill, spec.radius or 12, rippleColor))
   if spec.enabled == false then
-    button.setAlpha(0.45)
+    button.setAlpha(OP.disabled)
     button.setEnabled(false)
   elseif spec.onClick then
     button.setOnClickListener(View.OnClickListener{
@@ -573,7 +950,7 @@ end
 -- ===== 输入 =====
 local function configureInput(input, spec)
   local palette = colors()
-  input.setTextSize(spec.textSize or 17)
+  input.setTextSize(sizeToken(spec.textSize or TY.body.size))
   input.setTextColor(palette.label)
   input.setHintTextColor(palette.tertiary)
   input.setBackgroundColor(0x00000000)
@@ -619,10 +996,10 @@ function M.fieldRow(spec)
   local row = LinearLayout(activity)
   row.setOrientation(LinearLayout.HORIZONTAL)
   row.setGravity(Gravity.CENTER_VERTICAL)
-  row.setMinimumHeight(dp(44))
-  row.setPadding(dp(16), dp(7), dp(16), dp(7))
+  row.setMinimumHeight(dp(K.inputHeight))
+  row.setPadding(dp(space(16)), dp(space(7)), dp(space(16)), dp(space(7)))
 
-  local label = textView(spec.label or "字段", 17, palette.label, false)
+  local label = textView(spec.label or "字段", TY.body.size, palette.label, false)
   label.setSingleLine(true)
   row.addView(label)
 
@@ -630,7 +1007,7 @@ function M.fieldRow(spec)
   configureInput(input, spec)
   input.setGravity(Gravity.RIGHT)
   local params = LinearLayout.LayoutParams(0, -2, 1)
-  params.leftMargin = dp(12)
+  params.leftMargin = dp(space(12))
   row.addView(input, params)
 
   return { view = row, input = input }
@@ -642,21 +1019,21 @@ function M.field(spec)
   local box = LinearLayout(activity)
   box.setOrientation(LinearLayout.VERTICAL)
   if spec.label then
-    local label = textView(spec.label, 13, palette.secondary, false)
-    label.setPadding(dp(4), dp(6), dp(4), dp(6))
+    local label = textView(spec.label, TY.footnote.size, palette.secondary, false)
+    label.setPadding(dp(space(4)), dp(space(6)), dp(space(4)), dp(space(6)))
     box.addView(label)
   end
   local holder = LinearLayout(activity)
   holder.setOrientation(LinearLayout.VERTICAL)
-  holder.setBackground(roundRect(palette.card, 12))
-  holder.setPadding(dp(16), dp(10), dp(16), dp(10))
+  holder.setBackground(roundRect(palette.surface, 12))
+  holder.setPadding(dp(space(16)), dp(space(10)), dp(space(16)), dp(space(10)))
   local input = EditText(activity)
   configureInput(input, spec)
   holder.addView(input, LinearLayout.LayoutParams(-1, -2))
   box.addView(holder, LinearLayout.LayoutParams(-1, -2))
   if spec.footer then
-    local note = textView(spec.footer, 13, palette.secondary, false)
-    note.setPadding(dp(4), dp(6), dp(4), 0)
+    local note = textView(spec.footer, TY.footnote.size, palette.secondary, false)
+    note.setPadding(dp(space(4)), dp(space(6)), dp(space(4)), 0)
     box.addView(note)
   end
   return { view = box, input = input }
@@ -675,9 +1052,9 @@ function M.searchBar(spec)
   bar.setOrientation(LinearLayout.HORIZONTAL)
   bar.setGravity(Gravity.CENTER_VERTICAL)
   bar.setBackground(roundRect(palette.fill, 10))
-  bar.setPadding(dp(10), 0, dp(10), 0)
+  bar.setPadding(dp(space(10)), 0, dp(space(10)), 0)
 
-  local glyph = textView("⌕", 15, palette.secondary, false)
+  local glyph = textView("⌕", TY.callout.size, palette.secondary, false)
   bar.addView(glyph)
 
   local input = EditText(activity)
@@ -686,9 +1063,9 @@ function M.searchBar(spec)
     value = spec.value,
     onChange = spec.onChange,
   })
-  input.setTextSize(15)
-  local params = LinearLayout.LayoutParams(0, dp(36), 1)
-  params.leftMargin = dp(6)
+  input.setTextSize(TY.callout.size)
+  local params = LinearLayout.LayoutParams(0, dp(K.searchHeight), 1)
+  params.leftMargin = dp(space(6))
   bar.addView(input, params)
 
   return bar
@@ -701,7 +1078,7 @@ function M.segmented(spec)
   local track = LinearLayout(activity)
   track.setOrientation(LinearLayout.HORIZONTAL)
   track.setBackground(roundRect(palette.fill, 9))
-  track.setPadding(dp(2), dp(2), dp(2), dp(2))
+  track.setPadding(dp(space(2)), dp(space(2)), dp(space(2)), dp(space(2)))
 
   local labels = {}
   local items = spec.items or {}
@@ -711,7 +1088,7 @@ function M.segmented(spec)
     for index = 1, #labels do
       local item = labels[index]
       if index == selected then
-        item.setBackground(roundRect(palette.card, 7))
+        item.setBackground(roundRect(palette.surface, 7))
         item.setTextColor(palette.label)
         item.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL))
       else
@@ -727,10 +1104,10 @@ function M.segmented(spec)
     if type(value) == "table" then
       value = value.title or value.text or ""
     end
-    local label = textView(value, 13, palette.label, false)
+    local label = textView(value, TY.footnote.size, palette.label, false)
     label.setGravity(Gravity.CENTER)
-    label.setPadding(dp(6), dp(6), dp(6), dp(6))
-    track.addView(label, LinearLayout.LayoutParams(0, dp(28), 1))
+    label.setPadding(dp(space(6)), dp(space(6)), dp(space(6)), dp(space(6)))
+    track.addView(label, LinearLayout.LayoutParams(0, dp(K.segment), 1))
     labels[index] = label
     label.setOnClickListener(View.OnClickListener{
       onClick = function()
@@ -762,21 +1139,21 @@ function M.card(spec, content)
   local palette = colors()
   local card = LinearLayout(activity)
   card.setOrientation(LinearLayout.VERTICAL)
-  card.setBackground(roundRect(palette.card, 12))
-  card.setPadding(dp(16), dp(16), dp(16), dp(16))
+  card.setBackground(roundRect(palette.surface, 12))
+  card.setPadding(dp(space(16)), dp(space(16)), dp(space(16)), dp(space(16)))
 
   if spec.title then
-    local title = textView(spec.title, spec.titleSize or 17, palette.label, true)
+    local title = textView(spec.title, spec.titleSize or TY.body.size, palette.label, true)
     card.addView(title)
   end
   if spec.subtitle then
-    local subtitle = textView(spec.subtitle, 14, palette.secondary, false)
-    subtitle.setPadding(0, dp(4), 0, 0)
+    local subtitle = textView(spec.subtitle, TY.subhead.size, palette.secondary, false)
+    subtitle.setPadding(0, dp(space(4)), 0, 0)
     card.addView(subtitle)
   end
   if content then
     local params = LinearLayout.LayoutParams(-1, -2)
-    params.topMargin = dp(10)
+    params.topMargin = dp(space(10))
     if type(content) == "function" then
       local holder = LinearLayout(activity)
       holder.setOrientation(LinearLayout.VERTICAL)
@@ -795,26 +1172,26 @@ function M.empty(spec)
   local box = LinearLayout(activity)
   box.setOrientation(LinearLayout.VERTICAL)
   box.setGravity(Gravity.CENTER)
-  box.setPadding(dp(24), dp(44), dp(24), dp(44))
+  box.setPadding(dp(space(24)), dp(space(44)), dp(space(24)), dp(space(44)))
 
   local glyph
   if type(spec.icon) == "string" or spec.icon == nil then
-    glyph = textView(spec.icon or "○", 44, palette.tertiary, false)
+    glyph = textView(spec.icon or "○", TY.emptyGlyph.size, palette.tertiary, false)
     glyph.setGravity(Gravity.CENTER)
   else
     glyph = spec.icon
   end
   box.addView(glyph)
 
-  local title = textView(spec.title or "暂无内容", 17, palette.label, true)
+  local title = textView(spec.title or "暂无内容", TY.body.size, palette.label, true)
   title.setGravity(Gravity.CENTER)
-  title.setPadding(0, dp(12), 0, 0)
+  title.setPadding(0, dp(space(12)), 0, 0)
   box.addView(title)
 
   if spec.message then
-    local message = textView(spec.message, 14, palette.secondary, false)
+    local message = textView(spec.message, TY.subhead.size, palette.secondary, false)
     message.setGravity(Gravity.CENTER)
-    message.setPadding(0, dp(6), 0, 0)
+    message.setPadding(0, dp(space(6)), 0, 0)
     box.addView(message)
   end
 
@@ -824,8 +1201,8 @@ function M.empty(spec)
       style = "tinted",
       onClick = spec.action.onClick,
     }
-    local params = LinearLayout.LayoutParams(-2, dp(46))
-    params.topMargin = dp(16)
+    local params = LinearLayout.LayoutParams(-2, dp(space(46)))
+    params.topMargin = dp(space(16))
     box.addView(action, params)
   end
   return box
@@ -837,18 +1214,18 @@ function M.loading(spec)
   local box = LinearLayout(activity)
   box.setOrientation(LinearLayout.VERTICAL)
   box.setGravity(Gravity.CENTER)
-  box.setPadding(dp(24), dp(36), dp(24), dp(36))
+  box.setPadding(dp(space(24)), dp(space(36)), dp(space(24)), dp(space(36)))
 
   local progress = ProgressBar(activity)
   progress.setIndeterminate(true)
   pcall(function()
-    progress.getIndeterminateDrawable().setColorFilter(palette.blue, PorterDuff.Mode.SRC_IN)
+    progress.getIndeterminateDrawable().setColorFilter(palette.accent, PorterDuff.Mode.SRC_IN)
   end)
-  box.addView(progress, LinearLayout.LayoutParams(dp(28), dp(28)))
+  box.addView(progress, LinearLayout.LayoutParams(dp(space(28)), dp(space(28))))
 
-  local label = textView(spec.text or "加载中…", 14, palette.secondary, false)
+  local label = textView(spec.text or "加载中…", TY.subhead.size, palette.secondary, false)
   label.setGravity(Gravity.CENTER)
-  label.setPadding(0, dp(10), 0, 0)
+  label.setPadding(0, dp(space(10)), 0, 0)
   box.addView(label)
   return box
 end
@@ -859,18 +1236,18 @@ function M.avatar(name, color, size)
   if name and #tostring(name) > 0 then
     initial = string.sub(tostring(name), 1, 1)
   end
-  local avatar = textView(string.upper(initial), math.floor((size or 40) / 2.4), palette.white, true)
+  local avatar = textView(string.upper(initial), math.floor((size or 40) / 2.4), palette.onAccent, true)
   avatar.setGravity(Gravity.CENTER)
-  avatar.setBackground(roundRect(color or palette.blue, (size or 40) / 2))
+  avatar.setBackground(roundRect(color or palette.accent, (size or 40) / 2))
   avatar.setLayoutParams(LinearLayout.LayoutParams(dp(size or 40), dp(size or 40)))
   return avatar
 end
 
 function M.badge(text, color)
   local palette = colors()
-  local badge = textView(text or "", 11, color or palette.red, true)
+  local badge = textView(text or "", TY.caption.size, color or palette.danger, true)
   badge.setGravity(Gravity.CENTER)
-  badge.setPadding(dp(6), dp(2), dp(6), dp(2))
+  badge.setPadding(dp(space(6)), dp(space(2)), dp(space(6)), dp(space(2)))
   badge.setBackground(roundRect(palette.fill, 8))
   return badge
 end
@@ -885,7 +1262,7 @@ end
 
 function M.spacer(height)
   local view = View(activity)
-  view.setMinimumHeight(dp(height or 12))
+  view.setMinimumHeight(dp(space(height or 12)))
   return view
 end
 
@@ -894,8 +1271,8 @@ function M.tabBar(spec)
   local palette = colors()
   local bar = LinearLayout(activity)
   bar.setOrientation(LinearLayout.HORIZONTAL)
-  bar.setBackgroundColor(palette.card)
-  bar.setPadding(0, dp(4), 0, dp(6))
+  bar.setBackgroundColor(palette.surface)
+  bar.setPadding(0, dp(space(4)), 0, dp(space(6)))
 
   local topLine = View(activity)
   topLine.setBackgroundColor(palette.separator)
@@ -909,8 +1286,8 @@ function M.tabBar(spec)
     for index = 1, #tabs do
       local tab = tabs[index]
       local active = index == selected
-      tab.icon.setTextColor(active and palette.blue or palette.gray)
-      tab.label.setTextColor(active and palette.blue or palette.gray)
+      tab.icon.setTextColor(active and palette.accent or palette.secondary)
+      tab.label.setTextColor(active and palette.accent or palette.secondary)
       tab.label.setTypeface(Typeface.create(active and "sans-serif-medium" or "sans-serif", Typeface.NORMAL))
     end
   end
@@ -923,17 +1300,17 @@ function M.tabBar(spec)
     local tab = LinearLayout(activity)
     tab.setOrientation(LinearLayout.VERTICAL)
     tab.setGravity(Gravity.CENTER)
-    tab.setPadding(0, dp(4), 0, dp(2))
+    tab.setPadding(0, dp(space(4)), 0, dp(space(2)))
 
-    local icon = textView(item.icon or "•", 19, palette.gray, false)
+    local icon = textView(item.icon or "•", TY.icon.size, palette.secondary, false)
     icon.setGravity(Gravity.CENTER)
     tab.addView(icon)
 
-    local label = textView(item.title or "", 10, palette.gray, false)
+    local label = textView(item.title or "", TY.micro.size, palette.secondary, false)
     label.setGravity(Gravity.CENTER)
     tab.addView(label)
 
-    bar.addView(tab, LinearLayout.LayoutParams(0, dp(45), 1))
+    bar.addView(tab, LinearLayout.LayoutParams(0, dp(K.tabHeight), 1))
     tab.setOnClickListener(View.OnClickListener{
       onClick = function()
         selected = index
@@ -972,22 +1349,22 @@ function M.alert(spec)
 
   local card = LinearLayout(current)
   card.setOrientation(LinearLayout.VERTICAL)
-  card.setBackground(roundRect(palette.card, 14))
+  card.setBackground(roundRect(palette.surface, 14))
   card.setClipToOutline(true)
 
-  local title = textView(spec.title or "提示", 17, palette.label, true)
+  local title = textView(spec.title or "提示", TY.body.size, palette.label, true)
   title.setGravity(Gravity.CENTER)
-  title.setPadding(dp(19), dp(19), dp(19), 0)
+  title.setPadding(dp(space(19)), dp(space(19)), dp(space(19)), 0)
   card.addView(title, LinearLayout.LayoutParams(-1, -2))
 
   if spec.message then
-    local message = textView(spec.message, 13, palette.secondary, false)
+    local message = textView(spec.message, TY.footnote.size, palette.secondary, false)
     message.setGravity(Gravity.CENTER)
-    message.setPadding(dp(19), dp(7), dp(19), dp(19))
+    message.setPadding(dp(space(19)), dp(space(7)), dp(space(19)), dp(space(19)))
     card.addView(message, LinearLayout.LayoutParams(-1, -2))
   else
     local gap = View(current)
-    gap.setLayoutParams(LinearLayout.LayoutParams(1, dp(10)))
+    gap.setLayoutParams(LinearLayout.LayoutParams(1, dp(space(10))))
     card.addView(gap)
   end
 
@@ -997,13 +1374,13 @@ function M.alert(spec)
   end
 
   local function makeAction(action)
-    local color = palette.blue
+    local color = palette.accent
     if action.style == "destructive" then
-      color = palette.red
+      color = palette.danger
     end
-    local button = textView(action.title or "好", 17, color, action.style == "cancel")
+    local button = textView(action.title or "好", TY.body.size, color, action.style == "cancel")
     button.setGravity(Gravity.CENTER)
-    button.setBackground(ripple(0x00000000, 0, 0x14000000))
+    button.setBackground(ripple(0x00000000, 0, palette.press))
     button.setOnClickListener(View.OnClickListener{
       onClick = function()
         local keep = false
@@ -1031,7 +1408,7 @@ function M.alert(spec)
         divider.setBackgroundColor(palette.separator)
         row.addView(divider, LinearLayout.LayoutParams(hairline(), -1))
       end
-      row.addView(makeAction(actions[index]), LinearLayout.LayoutParams(0, dp(44), 1))
+      row.addView(makeAction(actions[index]), LinearLayout.LayoutParams(0, dp(K.actionHeight), 1))
     end
     card.addView(row, LinearLayout.LayoutParams(-1, -2))
   else
@@ -1039,7 +1416,7 @@ function M.alert(spec)
       local line = View(current)
       line.setBackgroundColor(palette.separator)
       card.addView(line, LinearLayout.LayoutParams(-1, hairline()))
-      card.addView(makeAction(actions[index]), LinearLayout.LayoutParams(-1, dp(44)))
+      card.addView(makeAction(actions[index]), LinearLayout.LayoutParams(-1, dp(K.actionHeight)))
     end
   end
 
@@ -1048,9 +1425,9 @@ function M.alert(spec)
   if window then
     window.setBackgroundDrawable(ColorDrawable(0x00000000))
     window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-    window.setDimAmount(0.35)
+    window.setDimAmount(OP.overlay)
     window.setGravity(Gravity.CENTER)
-    window.setLayout(dp(270), -2)
+    window.setLayout(dp(K.alertWidth), -2)
   end
   dialog.show()
   return dialog
@@ -1066,26 +1443,26 @@ function M.actionSheet(spec)
 
   local root = LinearLayout(current)
   root.setOrientation(LinearLayout.VERTICAL)
-  root.setPadding(dp(8), dp(8), dp(8), dp(24))
+  root.setPadding(dp(space(8)), dp(space(8)), dp(space(8)), dp(space(24)))
 
   local group = LinearLayout(current)
   group.setOrientation(LinearLayout.VERTICAL)
-  group.setBackground(roundRect(palette.card, 14))
+  group.setBackground(roundRect(palette.surface, 14))
   group.setClipToOutline(true)
 
   if spec.title or spec.message then
     local head = LinearLayout(current)
     head.setOrientation(LinearLayout.VERTICAL)
-    head.setPadding(dp(16), dp(14), dp(16), dp(14))
+    head.setPadding(dp(space(16)), dp(space(14)), dp(space(16)), dp(space(14)))
     if spec.title then
-      local title = textView(spec.title, 13, palette.secondary, true)
+      local title = textView(spec.title, TY.footnote.size, palette.secondary, true)
       title.setGravity(Gravity.CENTER)
       head.addView(title)
     end
     if spec.message then
-      local message = textView(spec.message, 13, palette.secondary, false)
+      local message = textView(spec.message, TY.footnote.size, palette.secondary, false)
       message.setGravity(Gravity.CENTER)
-      message.setPadding(0, dp(4), 0, 0)
+      message.setPadding(0, dp(space(4)), 0, 0)
       head.addView(message)
     end
     group.addView(head)
@@ -1097,10 +1474,10 @@ function M.actionSheet(spec)
     local line = View(current)
     line.setBackgroundColor(palette.separator)
     group.addView(line, LinearLayout.LayoutParams(-1, hairline()))
-    local color = action.style == "destructive" and palette.red or palette.blue
-    local item = textView(action.title or "", 20, color, false)
+    local color = action.style == "destructive" and palette.danger or palette.accent
+    local item = textView(action.title or "", TY.bodyLarge.size, color, false)
     item.setGravity(Gravity.CENTER)
-    item.setBackground(ripple(0x00000000, 0, 0x14000000))
+    item.setBackground(ripple(0x00000000, 0, palette.press))
     item.setOnClickListener(View.OnClickListener{
       onClick = function()
         local keep = false
@@ -1112,15 +1489,15 @@ function M.actionSheet(spec)
         end
       end
     })
-    group.addView(item, LinearLayout.LayoutParams(-1, dp(57)))
+    group.addView(item, LinearLayout.LayoutParams(-1, dp(K.sheetItem)))
   end
   root.addView(group, LinearLayout.LayoutParams(-1, -2))
 
-  local cancel = textView(spec.cancelText or "取消", 20, palette.blue, true)
+  local cancel = textView(spec.cancelText or "取消", TY.bodyLarge.size, palette.accent, true)
   cancel.setGravity(Gravity.CENTER)
-  cancel.setBackground(ripple(palette.card, 14, 0x14000000))
-  local cancelParams = LinearLayout.LayoutParams(-1, dp(57))
-  cancelParams.topMargin = dp(8)
+  cancel.setBackground(ripple(palette.surface, 14, palette.press))
+  local cancelParams = LinearLayout.LayoutParams(-1, dp(K.sheetItem))
+  cancelParams.topMargin = dp(space(8))
   root.addView(cancel, cancelParams)
   cancel.setOnClickListener(View.OnClickListener{
     onClick = function()
@@ -1133,7 +1510,7 @@ function M.actionSheet(spec)
   if window then
     window.setBackgroundDrawable(ColorDrawable(0x00000000))
     window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-    window.setDimAmount(0.35)
+    window.setDimAmount(OP.overlay)
     window.setGravity(Gravity.BOTTOM)
     window.setLayout(-1, -2)
   end
@@ -1208,13 +1585,13 @@ function M.chip(spec)
   spec = spec or {}
   local palette = colors()
   local selected = spec.selected == true
-  local fill = selected and (spec.color or palette.blue) or palette.fill
-  local textColor = selected and palette.white or palette.label
+  local fill = selected and (spec.color or palette.accent) or palette.fill
+  local textColor = selected and palette.onAccent or palette.label
 
-  local chip = textView(spec.text or "", spec.textSize or 14, textColor, true)
+  local chip = textView(spec.text or "", spec.textSize or TY.subhead.size, textColor, true)
   chip.setGravity(Gravity.CENTER)
-  chip.setPadding(dp(12), dp(7), dp(12), dp(7))
-  chip.setMinHeight(dp(32))
+  chip.setPadding(dp(space(12)), dp(space(7)), dp(space(12)), dp(space(7)))
+  chip.setMinHeight(dp(space(32)))
   chip.setBackground(roundRect(fill, 16))
   if spec.onClick then
     chip.setOnClickListener(View.OnClickListener{
@@ -1239,8 +1616,8 @@ function M.chipGroup(spec)
     for index = 1, #chips do
       local chip = chips[index]
       local active = index == selected
-      chip.setTextColor(active and palette.white or palette.label)
-      chip.setBackground(roundRect(active and palette.blue or palette.fill, 16))
+      chip.setTextColor(active and palette.onAccent or palette.label)
+      chip.setBackground(roundRect(active and palette.accent or palette.fill, 16))
     end
   end
 
@@ -1252,7 +1629,7 @@ function M.chipGroup(spec)
     local chip = M.chip({ text = item.text or item.title or "", textSize = 13 })
     local params = LinearLayout.LayoutParams(-2, -2)
     if index > 1 then
-      params.leftMargin = dp(8)
+      params.leftMargin = dp(space(8))
     end
     row.addView(chip, params)
     chips[index] = chip
@@ -1288,30 +1665,30 @@ function M.checkRow(spec)
   local row = LinearLayout(activity)
   row.setOrientation(LinearLayout.HORIZONTAL)
   row.setGravity(Gravity.CENTER_VERTICAL)
-  row.setMinimumHeight(dp(46))
-  row.setPadding(dp(16), dp(7), dp(14), dp(7))
-  row.setBackground(ripple(0x00000000, 0, 0x14000000))
+  row.setMinimumHeight(dp(K.buttonHeight))
+  row.setPadding(dp(space(16)), dp(space(7)), dp(space(14)), dp(space(7)))
+  row.setBackground(ripple(0x00000000, 0, palette.press))
 
   local textBox = LinearLayout(activity)
   textBox.setOrientation(LinearLayout.VERTICAL)
   row.addView(textBox, LinearLayout.LayoutParams(0, -2, 1))
 
-  local title = textView(spec.title or "", 16, palette.label, false)
+  local title = textView(spec.title or "", TY.bodyCompact.size, palette.label, false)
   textBox.addView(title)
   if spec.subtitle then
-    local subtitle = textView(spec.subtitle, 13, palette.secondary, false)
-    subtitle.setPadding(0, dp(2), 0, 0)
+    local subtitle = textView(spec.subtitle, TY.footnote.size, palette.secondary, false)
+    subtitle.setPadding(0, dp(space(2)), 0, 0)
     textBox.addView(subtitle)
   end
 
-  local mark = textView("", 14, palette.white, true)
+  local mark = textView("", TY.subhead.size, palette.onAccent, true)
   mark.setGravity(Gravity.CENTER)
-  row.addView(mark, LinearLayout.LayoutParams(dp(24), dp(24)))
+  row.addView(mark, LinearLayout.LayoutParams(dp(K.checkMark), dp(K.checkMark)))
 
   local function apply()
     mark.setText(checked and "✓" or "")
-    mark.setTextColor(checked and palette.white or palette.tertiary)
-    mark.setBackground(checked and roundRect(palette.blue, 12) or shape(0x00000000, palette.tertiary, 12))
+    mark.setTextColor(checked and palette.onAccent or palette.tertiary)
+    mark.setBackground(checked and roundRect(palette.accent, 12) or shape(0x00000000, palette.tertiary, 12))
   end
 
   local function setChecked(value, notify)
@@ -1347,9 +1724,9 @@ function M.slider(spec)
   local header = LinearLayout(activity)
   header.setOrientation(LinearLayout.HORIZONTAL)
   header.setGravity(Gravity.CENTER_VERTICAL)
-  local valueView = textView("", 13, palette.secondary, false)
+  local valueView = textView("", TY.footnote.size, palette.secondary, false)
   if spec.label then
-    local label = textView(spec.label, 14, palette.label, false)
+    local label = textView(spec.label, TY.subhead.size, palette.label, false)
     header.addView(label, LinearLayout.LayoutParams(0, -2, 1))
     header.addView(valueView)
   else
@@ -1361,8 +1738,8 @@ function M.slider(spec)
   seek.setMax(spec.max or 100)
   seek.setProgress(spec.value or 0)
   pcall(function()
-    seek.setProgressTintList(ColorStateList.valueOf(palette.blue))
-    seek.setThumbTintList(ColorStateList.valueOf(palette.blue))
+    seek.setProgressTintList(ColorStateList.valueOf(palette.accent))
+    seek.setThumbTintList(ColorStateList.valueOf(palette.accent))
   end)
 
   local function format(value)
@@ -1412,8 +1789,8 @@ function M.stepper(spec)
   local box = LinearLayout(activity)
   box.setOrientation(LinearLayout.VERTICAL)
   if spec.label then
-    local label = textView(spec.label, 13, palette.secondary, false)
-    label.setPadding(dp(4), dp(4), dp(4), dp(4))
+    local label = textView(spec.label, TY.footnote.size, palette.secondary, false)
+    label.setPadding(dp(space(4)), dp(space(4)), dp(space(4)), dp(space(4)))
     box.addView(label)
   end
 
@@ -1422,17 +1799,17 @@ function M.stepper(spec)
   row.setGravity(Gravity.CENTER_VERTICAL)
 
   local function control(text)
-    local view = textView(text, 22, palette.blue, false)
+    local view = textView(text, TY.action.size, palette.accent, false)
     view.setGravity(Gravity.CENTER)
     view.setBackground(roundRect(palette.fill, 10))
-    row.addView(view, LinearLayout.LayoutParams(dp(38), dp(38)))
+    row.addView(view, LinearLayout.LayoutParams(dp(space(38)), dp(space(38))))
     return view
   end
 
   local minus = control("−")
-  local valueView = textView("", 17, palette.label, true)
+  local valueView = textView("", TY.body.size, palette.label, true)
   valueView.setGravity(Gravity.CENTER)
-  row.addView(valueView, LinearLayout.LayoutParams(0, dp(38), 1))
+  row.addView(valueView, LinearLayout.LayoutParams(0, dp(space(38)), 1))
   local plus = control("+")
   box.addView(row, LinearLayout.LayoutParams(-1, -2))
 
@@ -1487,14 +1864,14 @@ function M.progress(spec)
     bar.setIndeterminate(true)
   end
   pcall(function()
-    bar.setProgressTintList(ColorStateList.valueOf(spec.color or palette.blue))
+    bar.setProgressTintList(ColorStateList.valueOf(spec.color or palette.accent))
   end)
 
   local box = LinearLayout(activity)
   box.setOrientation(LinearLayout.VERTICAL)
   if spec.label then
-    local label = textView(spec.label, 13, palette.secondary, false)
-    label.setPadding(dp(4), dp(4), dp(4), dp(2))
+    local label = textView(spec.label, TY.footnote.size, palette.secondary, false)
+    label.setPadding(dp(space(4)), dp(space(4)), dp(space(4)), dp(space(2)))
     box.addView(label)
   end
   box.addView(bar, LinearLayout.LayoutParams(-1, -2))
@@ -1516,7 +1893,7 @@ function M.shimmer(view, spec)
     view = view.view
   end
   local animator = ValueAnimator.ofFloat(float{0.28, 0.72})
-  animator.setDuration(spec.duration or 900)
+  animator.setDuration(spec.duration or MO.shimmer)
   animator.setRepeatCount(-1)
   animator.setRepeatMode(2)
   animator.addUpdateListener(ValueAnimator.AnimatorUpdateListener{
@@ -1533,22 +1910,22 @@ function M.skeleton(spec)
   local palette = colors()
   local box = LinearLayout(activity)
   box.setOrientation(LinearLayout.VERTICAL)
-  box.setPadding(dp(16), dp(16), dp(16), dp(16))
-  box.setBackground(roundRect(palette.card, 12))
+  box.setPadding(dp(space(16)), dp(space(16)), dp(space(16)), dp(space(16)))
+  box.setBackground(roundRect(palette.surface, 12))
 
   local lines = spec.lines or 3
   for index = 1, lines do
     local line = View(activity)
     line.setBackground(roundRect(palette.fill, 6))
     local width = index == lines and 0.55 or (index == 1 and 0.86 or 0.7)
-    local params = LinearLayout.LayoutParams(-1, dp(index == 1 and 16 or 12))
+    local params = LinearLayout.LayoutParams(-1, dp(space(index == 1 and 16 or 12)))
     if index > 1 then
-      params.topMargin = dp(10)
+      params.topMargin = dp(space(10))
     end
     if width < 1 then
       local holder = LinearLayout(activity)
       holder.setOrientation(LinearLayout.HORIZONTAL)
-      holder.addView(line, LinearLayout.LayoutParams(0, dp(index == 1 and 16 or 12), width))
+      holder.addView(line, LinearLayout.LayoutParams(0, dp(space(index == 1 and 16 or 12)), width))
       local rest = View(activity)
       holder.addView(rest, LinearLayout.LayoutParams(0, 1, 1 - width))
       box.addView(holder, params)
@@ -1557,7 +1934,7 @@ function M.skeleton(spec)
     end
   end
 
-  local animator = M.shimmer(box, { duration = spec.duration or 900 })
+  local animator = M.shimmer(box, { duration = spec.duration or MO.shimmer })
   return {
     view = box,
     stop = function()
@@ -1574,26 +1951,26 @@ function M.banner(spec)
   local palette = colors()
   local card = LinearLayout(activity)
   card.setOrientation(LinearLayout.VERTICAL)
-  card.setPadding(dp(14), dp(13), dp(14), dp(13))
-  card.setBackground(roundRect(spec.background or palette.blueSoft, 12))
+  card.setPadding(dp(space(14)), dp(space(13)), dp(space(14)), dp(space(13)))
+  card.setBackground(roundRect(spec.background or palette.accentSoft, 12))
 
   local header = LinearLayout(activity)
   header.setOrientation(LinearLayout.HORIZONTAL)
   header.setGravity(Gravity.CENTER_VERTICAL)
   card.addView(header)
 
-  local glyph = textView(spec.icon or "i", 14, palette.white, true)
+  local glyph = textView(spec.icon or "i", TY.subhead.size, palette.onAccent, true)
   glyph.setGravity(Gravity.CENTER)
-  glyph.setBackground(roundRect(spec.color or palette.blue, 9))
-  header.addView(glyph, LinearLayout.LayoutParams(dp(28), dp(28)))
+  glyph.setBackground(roundRect(spec.color or palette.accent, 9))
+  header.addView(glyph, LinearLayout.LayoutParams(dp(space(28)), dp(space(28))))
 
-  local title = textView(spec.title or "提示", 15, palette.label, true)
-  title.setPadding(dp(10), 0, 0, 0)
+  local title = textView(spec.title or "提示", TY.callout.size, palette.label, true)
+  title.setPadding(dp(space(10)), 0, 0, 0)
   header.addView(title, LinearLayout.LayoutParams(0, -2, 1))
 
   if spec.message then
-    local message = textView(spec.message, 13, palette.secondary, false)
-    message.setPadding(dp(38), dp(4), 0, 0)
+    local message = textView(spec.message, TY.footnote.size, palette.secondary, false)
+    message.setPadding(dp(space(38)), dp(space(4)), 0, 0)
     card.addView(message)
   end
 
@@ -1604,9 +1981,9 @@ function M.banner(spec)
       textSize = 13,
       onClick = spec.action.onClick,
     })
-    local params = LinearLayout.LayoutParams(-2, dp(44))
-    params.leftMargin = dp(38)
-    params.topMargin = dp(4)
+    local params = LinearLayout.LayoutParams(-2, dp(space(44)))
+    params.leftMargin = dp(space(38))
+    params.topMargin = dp(space(4))
     card.addView(action, params)
   end
   return card
@@ -1617,20 +1994,20 @@ function M.stat(spec)
   local palette = colors()
   local card = LinearLayout(activity)
   card.setOrientation(LinearLayout.VERTICAL)
-  card.setPadding(dp(14), dp(14), dp(14), dp(14))
-  card.setBackground(roundRect(palette.card, 12))
+  card.setPadding(dp(space(14)), dp(space(14)), dp(space(14)), dp(space(14)))
+  card.setBackground(roundRect(palette.surface, 12))
 
-  local value = textView(spec.value or "0", spec.valueSize or 28, spec.color or palette.label, true)
+  local value = textView(spec.value or "0", spec.valueSize or TY.stat.size, spec.color or palette.label, true)
   value.setIncludeFontPadding(false)
   card.addView(value)
 
-  local label = textView(spec.label or "", 13, palette.secondary, false)
-  label.setPadding(0, dp(4), 0, 0)
+  local label = textView(spec.label or "", TY.footnote.size, palette.secondary, false)
+  label.setPadding(0, dp(space(4)), 0, 0)
   card.addView(label)
 
   if spec.note then
-    local note = textView(spec.note, 11, spec.noteColor or palette.blue, true)
-    note.setPadding(0, dp(6), 0, 0)
+    local note = textView(spec.note, TY.caption.size, spec.noteColor or palette.accent, true)
+    note.setPadding(0, dp(space(6)), 0, 0)
     card.addView(note)
   end
   return card
@@ -1643,7 +2020,7 @@ function M.statRow(items, spec)
   for index = 1, #(items or {}) do
     local params = LinearLayout.LayoutParams(0, -2, 1)
     if index > 1 then
-      params.leftMargin = dp(spec.gap or 8)
+      params.leftMargin = dp(space(spec.gap or 8))
     end
     row.addView(M.stat(items[index]), params)
   end
@@ -1656,12 +2033,12 @@ function M.fab(spec)
   end
   spec = spec or {}
   local palette = colors()
-  local fab = textView(spec.text or "+", spec.textSize or 26, palette.white, true)
+  local fab = textView(spec.text or "+", spec.textSize or TY.fab.size, palette.onAccent, true)
   fab.setGravity(Gravity.CENTER)
-  fab.setBackground(roundRect(spec.color or palette.blue, 26))
-  fab.setMinWidth(dp(52))
-  fab.setMinHeight(dp(52))
-  fab.setElevation(dp(6))
+  fab.setBackground(roundRect(spec.color or palette.accent, 26))
+  fab.setMinWidth(dp(K.fab))
+  fab.setMinHeight(dp(K.fab))
+  fab.setElevation(dp(EL.fab))
   if spec.onClick then
     fab.setOnClickListener(View.OnClickListener{
       onClick = spec.onClick
@@ -1677,14 +2054,14 @@ function M.toast(spec)
   spec = spec or {}
   local palette = colors()
   local box = LinearLayout(activity)
-  box.setPadding(dp(16), dp(10), dp(16), dp(10))
-  box.setBackground(roundRect(palette.card, 18))
-  local text = textView(spec.text or "", 13, palette.label, false)
+  box.setPadding(dp(space(16)), dp(space(10)), dp(space(16)), dp(space(10)))
+  box.setBackground(roundRect(palette.surface, 18))
+  local text = textView(spec.text or "", TY.footnote.size, palette.label, false)
   box.addView(text)
 
   local toast = Toast.makeText(activity, "", spec.long and Toast.LENGTH_LONG or Toast.LENGTH_SHORT)
   toast.setView(box)
-  toast.setGravity(Gravity.BOTTOM, 0, dp(spec.offset or 72))
+  toast.setGravity(Gravity.BOTTOM, 0, dp(space(spec.offset or 72)))
   toast.show()
   return toast
 end
@@ -1700,15 +2077,15 @@ function M.animate(view, spec)
   end
 
   local preset = spec.preset or "up"
-  local duration = spec.duration or 260
+  local duration = spec.duration or MO.slow
   view.setAlpha(0)
   if preset == "scale" then
     view.setScaleX(0.92)
     view.setScaleY(0.92)
   elseif preset == "down" then
-    view.setTranslationY(-dp(14))
+    view.setTranslationY(-dp(space(14)))
   elseif preset ~= "fade" then
-    view.setTranslationY(dp(14))
+    view.setTranslationY(dp(space(14)))
   end
 
   local animator = ValueAnimator.ofFloat(float{0, 1})
@@ -1727,9 +2104,9 @@ function M.animate(view, spec)
         view.setScaleX(0.92 + 0.08 * progress)
         view.setScaleY(0.92 + 0.08 * progress)
       elseif preset == "down" then
-        view.setTranslationY(-dp(14) * (1 - progress))
+        view.setTranslationY(-dp(space(14)) * (1 - progress))
       elseif preset ~= "fade" then
-        view.setTranslationY(dp(14) * (1 - progress))
+        view.setTranslationY(dp(space(14)) * (1 - progress))
       end
     end,
   })
@@ -1741,10 +2118,10 @@ function M.stagger(views, spec)
   spec = spec or {}
   views = views or {}
   for index = 1, #views do
-    local delay = (spec.delay or 0) + (index - 1) * (spec.step or 55)
+    local delay = (spec.delay or 0) + (index - 1) * (spec.step or MO.stagger)
     M.animate(views[index], {
       preset = spec.preset or "up",
-      duration = spec.duration or 280,
+      duration = spec.duration or MO.staggerItem,
       delay = delay,
     })
   end
@@ -1759,9 +2136,9 @@ function M.press(view, spec)
     onTouch = function(target, event)
       local action = event.getAction()
       if action == 0 then
-        target.animate().scaleX(spec.scale or 0.97).scaleY(spec.scale or 0.97).setDuration(90).start()
+        target.animate().scaleX(spec.scale or 0.97).scaleY(spec.scale or 0.97).setDuration(MO.fast).start()
       elseif action == 1 or action == 3 then
-        target.animate().scaleX(1).scaleY(1).setDuration(120).start()
+        target.animate().scaleX(1).scaleY(1).setDuration(MO.normal).start()
       end
       return false
     end,

@@ -47,10 +47,11 @@ docs/                     审计与规范文档
 - 快捷 API：`ui.show` 一行建页面，`ui.form` 一行建表单并直接读写字段。
 - 组件范围：页面骨架、分组列表、按钮、表单、搜索栏、分段控件、卡片、弹窗、操作菜单、底部标签栏、空态与加载态。
 - 进阶组件：chip、checkRow、slider、stepper、progress、skeleton、banner、stat、fab、toast。
+- 设计令牌：`ui.tokens` 统一颜色、间距、圆角、字体、控件尺寸和动效；支持 `ui.defineTheme` 自定义主题、`ui.useTheme` 切换、`ui.cssVars` 导出 CSS 变量。
 - 动画：`ui.animate`、`ui.stagger`、`ui.press` 与 `page:reveal`，默认 260ms 上移淡入。
 - 自绘开关：`app/src/main/java/com/mini/luaxplus/ui/IosSwitch.java`，失败时自动回退系统 `Switch`。
 - 打包携带：`assets/lua/luaxplus/` 在打包白名单内，新打包的成品会自动带上组件库；已安装的旧成品需重新打包。
-- 教程：应用内“手册 → LuaX-UI 组件库”，含字段表、明暗主题与可直接运行的完整页面示例。
+- 教程：应用内“手册 → LuaX-UI 组件库”，含字段表、设计令牌、自定义主题与可直接运行的完整页面示例。
 
 ## 官方示例
 
