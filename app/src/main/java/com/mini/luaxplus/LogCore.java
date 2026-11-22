@@ -25,8 +25,10 @@ import java.util.Locale;
  */
 public final class LogCore {
 
-    /** 外部日志目录 */
-    public static final String EXT_LOG_DIR = "/storage/emulated/0/LuaXPlus/logs";
+    /** 外部存储根目录 */
+    public static final String EXT_ROOT = "/storage/emulated/0/LuaXPlus";
+    /** 主程序包名，用于区分本应用与打包成品 */
+    public static final String OWNER_PACKAGE = "com.mini.luaxplus";
 
     private static final String TAG = "LogCore";
     private static final long MAX_FILE_BYTES = 2L * 1024 * 1024L;
@@ -53,6 +55,8 @@ public final class LogCore {
     private static long lastExternalRetry;
     private static String lastLuaMessage;
     private static long lastLuaTime;
+    private static String lastWarnMessage;
+    private static long lastWarnTime;
 
     private LogCore() {
     }
@@ -65,7 +69,7 @@ public final class LogCore {
             }
             appContext = context.getApplicationContext();
             external = prepareExternal();
-            activeDir = external ? new File(EXT_LOG_DIR) : internalDir();
+            activeDir = external ? new File(extLogDir()) : internalDir();
             if (!activeDir.exists()) {
                 activeDir.mkdirs();
             }
@@ -84,7 +88,7 @@ public final class LogCore {
     /** 当前日志目录，供界面展示 */
     public static String dir() {
         synchronized (LOCK) {
-            return activeDir == null ? EXT_LOG_DIR : activeDir.getAbsolutePath();
+            return activeDir == null ? extLogDir() : activeDir.getAbsolutePath();
         }
     }
 
@@ -99,8 +103,10 @@ public final class LogCore {
         write("I", tag, message);
     }
 
+    /** 警告：写入运行日志的同时留一份快照，便于回溯 */
     public static void w(String tag, String message) {
         write("W", tag, message);
+        warnSnapshot(tag, message);
     }
 
     public static void e(String tag, String message) {
@@ -140,6 +146,28 @@ public final class LogCore {
                 // 独立文件写不进去时退回主日志，保证错误不丢
                 write("E", "Lua", message + " (独立日志写入失败: " + exception + ")");
             }
+        }
+    }
+
+    /** 记录警告快照，短时间内重复的同一警告只留首次 */
+    public static void warnSnapshot(String tag, String message) {
+        synchronized (LOCK) {
+            long now = System.currentTimeMillis();
+            if (message == null || (message.equals(lastWarnMessage) && now - lastWarnTime < 5000L)) {
+                return;
+            }
+            lastWarnMessage = message;
+            lastWarnTime = now;
+            ensureReady();
+            File target = new File(activeDir, "warn_" + CLOCK.format(new Date())
+                    + "_" + android.os.Process.myPid() + ".log");
+            StringBuilder body = new StringBuilder();
+            body.append("时间: ").append(STAMP.format(new Date())).append('\n');
+            body.append("版本: ").append(versionName()).append('\n');
+            body.append("线程: ").append(Thread.currentThread().getName()).append('\n');
+            body.append("来源: ").append(tag).append('\n');
+            body.append("警告: ").append(message).append('\n');
+            appendToFile(target, body.toString());
         }
     }
 
@@ -275,13 +303,22 @@ public final class LogCore {
         }
     }
 
+    /** 外部日志目录：主程序写在根目录，打包成品按包名各自独立 */
+    public static String extLogDir() {
+        String pkg = appContext == null ? OWNER_PACKAGE : appContext.getPackageName();
+        if (OWNER_PACKAGE.equals(pkg)) {
+            return EXT_ROOT + "/logs";
+        }
+        return EXT_ROOT + "/products/" + pkg + "/logs";
+    }
+
     private static File internalDir() {
-        File base = appContext == null ? new File(EXT_LOG_DIR) : appContext.getFilesDir();
+        File base = appContext == null ? new File(EXT_ROOT) : appContext.getFilesDir();
         return new File(base, "logs");
     }
 
     private static boolean prepareExternal() {
-        File dir = new File(EXT_LOG_DIR);
+        File dir = new File(extLogDir());
         if (!dir.exists() && !dir.mkdirs()) {
             return false;
         }
@@ -310,11 +347,11 @@ public final class LogCore {
         if (prepareExternal()) {
             external = true;
             closeWriter();
-            activeDir = new File(EXT_LOG_DIR);
+            activeDir = new File(extLogDir());
             activeFile = null;
             activeDay = "";
             part = 1;
-            write("I", "Log", "外部存储已授权，日志切换至 " + EXT_LOG_DIR);
+            write("I", "Log", "外部存储已授权，日志切换至 " + extLogDir());
         }
     }
 

@@ -297,7 +297,7 @@ local function binapk(luapath, apkpath)
         local lib = name:match("([^/]+%.so)$")
         if replace[name] then
         elseif lib and replace[lib] then
-        elseif name:find("^assets/") then
+        elseif name:find("^assets/") and (not name:find("^assets/lua/")) and (not name:find("^assets/luaxplus/")) then
         elseif name:find("^lua/") then
         elseif name:find("META%-INF") then
         elseif !name:find("%a") then
