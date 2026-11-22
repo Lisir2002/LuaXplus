@@ -142,7 +142,31 @@ local function hasExample()
   return false
 end
 
+local function removeTree(path)
+  local file = File(path)
+  local children = file.listFiles()
+  if children then
+    for index = 0, #children - 1 do
+      removeTree(children[index].getAbsolutePath())
+    end
+  end
+  pcall(function()
+    file.delete()
+  end)
+end
+
+local function removeObsoleteExamples()
+  -- 早期拆分的快速示例已并入完整示例，旧安装留下的目录需要清掉
+  for _, name in ipairs({ "luax-ui-quick" }) do
+    local path = examplesRoot .. "/" .. name
+    if File(path).exists() then
+      removeTree(path)
+    end
+  end
+end
+
 local function ensureExamples(force)
+  removeObsoleteExamples()
   local changed = force or readMarker() ~= appVersion or not hasExample()
   if not changed then
     return true

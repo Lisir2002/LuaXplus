@@ -1515,7 +1515,7 @@ function M.shimmer(view, spec)
   if type(view) == "table" and view.view and type(view.view) ~= "function" then
     view = view.view
   end
-  local animator = ValueAnimator.ofFloat(0.28, 0.72)
+  local animator = ValueAnimator.ofFloat(float{0.28, 0.72})
   animator.setDuration(spec.duration or 900)
   animator.setRepeatCount(-1)
   animator.setRepeatMode(2)
@@ -1711,7 +1711,7 @@ function M.animate(view, spec)
     view.setTranslationY(dp(14))
   end
 
-  local animator = ValueAnimator.ofFloat(0, 1)
+  local animator = ValueAnimator.ofFloat(float{0, 1})
   animator.setDuration(duration)
   if spec.delay and spec.delay > 0 then
     animator.setStartDelay(spec.delay)

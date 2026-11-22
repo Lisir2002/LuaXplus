@@ -1,11 +1,11 @@
-appname = "LuaX-UI 组件库与快速上手"
+appname = "LuaX-UI 组件库完整示例"
 appver = "1.0"
 appcode = "1"
 appsdk = "21"
 packagename = "com.mini.luaxui.demo"
 theme = "Theme_Material_Light"
 developer = "Mini-LuaXPLUS"
-description = "一个工程看完 LuaX-UI：快速上手、控件、表单、弹窗、进阶组件、动画与明暗主题。"
+description = "一个工程看完 LuaX-UI：控件、表单、弹窗、进阶组件、动画与明暗主题。"
 debugmode = true
 official = true
 user_permission = {"INTERNET"}
