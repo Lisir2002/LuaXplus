@@ -237,7 +237,7 @@ local function switchTab(index)
       tabViews[i].setBackgroundColor(0x00000000)
     end
     if tabIcons[i] then
-      tabIcons[i].setColorFilter(i == index and ACCENT_DEEP or MUTED)
+      icons.tintDrawable(tabIcons[i], i == index and ACCENT_DEEP or MUTED)
     end
   end
   pageHolder.removeAllViews()

@@ -1,14 +1,41 @@
-/* 手册通用交互：桌面侧栏、移动抽屉、目录高亮、阅读进度、代码复制、全局搜索 */
+/* 手册自绘图标：24×24 网格、2px 描边，颜色跟随 currentColor，深浅主题自动适配 */
+var ICON_PATHS = {
+  menu: '<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h11"/>',
+  close: '<path d="M6 6l12 12"/><path d="M18 6l-12 12"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+  plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  arrowRight: '<path d="M9 5.5l6.5 6.5-6.5 6.5"/>',
+  arrowUp: '<path d="M12 19V6"/><path d="M6.5 11.5L12 6l5.5 5.5"/>',
+  play: '<path d="M7.5 5.5l10.5 6.5-10.5 6.5z" fill="currentColor" stroke="none"/>',
+  home: '<path d="M4 11.5L12 4.5l8 7v9h-5.5v-6h-5v6H4z"/>',
+  code: '<path d="M9.3 7L4.5 12l4.8 5"/><path d="M14.7 7l4.8 5-4.8 5"/><path d="M13.2 5.5l-2.4 13"/>',
+  layers: '<path d="M12 4l8 4.5-8 4.5-8-4.5z"/><path d="M4 13l8 4.5 8-4.5"/><path d="M4 17l8 4.5 8-4.5"/>',
+  package: '<path d="M4 8.5L12 4.5l8 4v8L12 20l-8-4z"/><path d="M4 8.5L12 12.5l8-4"/><path d="M12 12.5v8"/>',
+  help: '<circle cx="12" cy="12" r="8"/><path d="M9.6 9.6a2.7 2.7 0 0 1 5.1 1c0 1.8-2.7 2-2.7 3.4"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/>',
+  book: '<path d="M4 6.6c2.7-1.5 5.3-1 8 .5 2.7-1.5 5.3-2 8-.5v12c-2.7-1.5-5.3-1-8 .5-2.7-1.5-5.3-2-8-.5z"/><path d="M12 7v12"/>',
+  settings: '<circle cx="12" cy="12" r="2.9"/><path d="M12 3.8v2.2M12 18v2.2M3.8 12h2.2M18 12h2.2M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/>',
+  bookmark: '<path d="M7 4.5h10v16l-5-3.5-5 3.5z"/>',
+  check: '<path d="M5 12l4.5 4.5L19 7"/>'
+};
+
+function iconSvg(name, className) {
+  var path = ICON_PATHS[name];
+  if (!path) { return ""; }
+  return '<svg class="lx-icon' + (className ? " " + className : "") + '" viewBox="0 0 24 24" ' +
+    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+    'stroke-linejoin="round" aria-hidden="true" focusable="false">' + path + "</svg>";
+}
+
 (function () {
   var PAGES = [
-    { file: "contents.html", mark: "始", title: "手册首页", group: "开始", desc: "三条上手路径与全部章节入口", keywords: "首页 目录 开始 索引" },
-    { file: "start.html", mark: "启", title: "快速开始", group: "开始", desc: "新建工程、写脚本、运行第一个界面", keywords: "新建 工程 运行 目录 main.lua 入口 五分钟" },
-    { file: "api.html", mark: "接", title: "常用接口", group: "开发", desc: "import、luajava、界面、事件、文件、网络、线程", keywords: "import luajava 布局 控件 事件 对话框 文件 网络 线程 权限 日志" },
-    { file: "uikit.html", mark: "UI", title: "LuaX-UI 组件库", group: "开发", desc: "iOS 风格组件、快捷页面、表单、动画与完整示例", keywords: "ui 组件 按钮 表单 弹窗 动画 主题 示例 页面 show form animate" },
-    { file: "pack.html", mark: "包", title: "打包与权限", group: "发布", desc: "打包流程、签名、安装、权限清单与成品日志", keywords: "打包 签名 安装 权限 成品 日志 apk 发布" },
-    { file: "faq.html", mark: "问", title: "常见问题", group: "发布", desc: "模块找不到、界面错误、安装被拒、日志排查", keywords: "报错 模块 找不到 闪退 安装 日志 排查 权限" },
-    { file: "manual.html", mark: "典", title: "Lua 语言参考", group: "参考", desc: "Lua 5.3 语法、元表、协程、标准库与 C API", keywords: "lua 语法 元表 协程 标准库 string table math io os" },
-    { file: "glossary.html", mark: "术", title: "术语表", group: "参考", desc: "工程目录、app_lua、dex、快照等名词解释", keywords: "术语 名词 目录 app_lua dex 快照 运行时 铺设" }
+    { file: "contents.html", icon: "home", mark: "始", title: "手册首页", group: "开始", desc: "三条上手路径与全部章节入口", keywords: "首页 目录 开始 索引" },
+    { file: "start.html", icon: "play", mark: "启", title: "快速开始", group: "开始", desc: "新建工程、写脚本、运行第一个界面", keywords: "新建 工程 运行 目录 main.lua 入口 五分钟" },
+    { file: "api.html", icon: "code", mark: "接", title: "常用接口", group: "开发", desc: "import、luajava、界面、事件、文件、网络、线程", keywords: "import luajava 布局 控件 事件 对话框 文件 网络 线程 权限 日志" },
+    { file: "uikit.html", icon: "layers", mark: "UI", title: "LuaX-UI 组件库", group: "开发", desc: "iOS 风格组件、快捷页面、表单、动画与完整示例", keywords: "ui 组件 按钮 表单 弹窗 动画 主题 示例 页面 show form animate" },
+    { file: "pack.html", icon: "package", mark: "包", title: "打包与权限", group: "发布", desc: "打包流程、签名、安装、权限清单与成品日志", keywords: "打包 签名 安装 权限 成品 日志 apk 发布" },
+    { file: "faq.html", icon: "help", mark: "问", title: "常见问题", group: "发布", desc: "模块找不到、界面错误、安装被拒、日志排查", keywords: "报错 模块 找不到 闪退 安装 日志 排查 权限" },
+    { file: "manual.html", icon: "book", mark: "典", title: "Lua 语言参考", group: "参考", desc: "Lua 5.3 语法、元表、协程、标准库与 C API", keywords: "lua 语法 元表 协程 标准库 string table math io os" },
+    { file: "glossary.html", icon: "bookmark", mark: "术", title: "术语表", group: "参考", desc: "工程目录、app_lua、dex、快照等名词解释", keywords: "术语 名词 目录 app_lua dex 快照 运行时 铺设" }
   ];
 
   function ready(fn) {
@@ -57,7 +84,7 @@
       bar = document.createElement("div");
       bar.className = "topbar";
       bar.innerHTML =
-        '<button class="home menu-btn" type="button" aria-label="打开目录">☰</button>' +
+        '<button class="home menu-btn" type="button" aria-label="打开目录">' + iconSvg("menu") + '</button>' +
         '<span class="title">Lua 语言参考</span>';
       body.insertBefore(bar, wrap);
     }
@@ -66,7 +93,7 @@
       button.className = "search-btn";
       button.type = "button";
       button.setAttribute("aria-label", "搜索手册章节");
-      button.innerHTML = "⌕ <span>搜索</span>";
+      button.innerHTML = iconSvg("search") + "<span>搜索</span>";
       var sub = bar.querySelector(".sub");
       if (sub) { bar.insertBefore(button, sub); } else { bar.appendChild(button); }
     }
@@ -86,7 +113,7 @@
       var active = p.file === current ? " current" : "";
       inner += '<a class="nav-item' + active + '" href="' + p.file + '" data-title="' +
         esc(norm(p.title + " " + p.desc + " " + p.keywords)) + '">' +
-        "<em>" + esc(p.mark) + "</em><span>" + esc(p.title) + "</span></a>";
+        "<em class=\"nav-icon\">" + iconSvg(p.icon) + "</em><span>" + esc(p.title) + "</span></a>";
     }
 
     var drawer = document.createElement("div");
@@ -96,7 +123,7 @@
       '<aside class="panel" aria-label="手册章节">' +
         '<div class="brand"><span class="logo">ML</span>' +
           '<div><b>Mini-LuaXPLUS</b><span>内置使用手册 · 离线可用</span></div></div>' +
-        '<label class="nav-search"><span>⌕</span>' +
+        '<label class="nav-search"><span>' + iconSvg("search") + '</span>' +
           '<input id="side-search" type="search" placeholder="筛选章节" aria-label="筛选章节"></label>' +
         "<nav>" + inner + "</nav>" +
         '<div class="side-foot">当前页会在目录中高亮。<br>按 / 可快速搜索全部章节。</div>' +
@@ -159,7 +186,7 @@
     if (!holder || !page || holder.querySelector(".crumbs")) { return; }
     var crumbs = document.createElement("div");
     crumbs.className = "crumbs";
-    crumbs.innerHTML = '<a href="contents.html">手册</a><i>/</i><span>' + esc(page.title) + "</span>";
+    crumbs.innerHTML = '<a href="contents.html">手册</a><i>' + iconSvg("arrowRight") + '</i><span>' + esc(page.title) + "</span>";
     holder.insertBefore(crumbs, holder.firstChild);
   }
 
@@ -410,7 +437,7 @@
     nav.innerHTML =
       (prev ? '<a href="' + prev.file + '"><small>上一页</small><b>← ' + esc(prev.title) + "</b></a>" :
         '<a class="placeholder"></a>') +
-      (next ? '<a class="next" href="' + next.file + '"><small>下一页</small><b>' + esc(next.title) + " →</b></a>" :
+      (next ? '<a class="next" href="' + next.file + '"><small>下一页</small><b>' + esc(next.title) + " " + iconSvg("arrowRight") + "</b></a>" :
         '<a class="placeholder"></a>');
     host.appendChild(nav);
   }
@@ -425,7 +452,7 @@
     top.className = "backtop";
     top.type = "button";
     top.setAttribute("aria-label", "返回顶部");
-    top.innerHTML = "↑";
+    top.innerHTML = iconSvg("arrowUp");
     top.onclick = function () {
       try { window.scrollTo({ top: 0, behavior: "smooth" }); }
       catch (error) { window.scrollTo(0, 0); }
@@ -443,6 +470,53 @@
       if (!ticking) { ticking = true; setTimeout(refresh, 60); }
     }, false);
     refresh();
+  }
+
+  /* 把 HTML 里遗留的字符图标升级成内联 SVG；JS 动态生成的内容同样覆盖。 */
+  function upgradeIcons() {
+    var menus = document.querySelectorAll(".menu-btn");
+    for (var i = 0; i < menus.length; i++) {
+      if (!menus[i].querySelector(".lx-icon")) { menus[i].innerHTML = iconSvg("menu"); }
+    }
+    var clears = document.querySelectorAll(".search .clear");
+    for (var c = 0; c < clears.length; c++) {
+      if (!clears[c].querySelector(".lx-icon")) { clears[c].innerHTML = iconSvg("close"); }
+    }
+    var cardIcons = {
+      "start.html": "play", "api.html": "code", "uikit.html": "layers",
+      "pack.html": "package", "faq.html": "help", "manual.html": "book",
+      "glossary.html": "bookmark"
+    };
+    var cards = document.querySelectorAll(".card");
+    for (var d = 0; d < cards.length; d++) {
+      var mark = cards[d].querySelector(".glyph");
+      var file = cards[d].getAttribute("href");
+      if (mark && cardIcons[file] && !mark.querySelector(".lx-icon")) {
+        mark.innerHTML = iconSvg(cardIcons[file]);
+      }
+    }
+    var arrows = document.querySelectorAll(".card .arrow");
+    for (var a = 0; a < arrows.length; a++) {
+      if (!arrows[a].querySelector(".lx-icon")) { arrows[a].innerHTML = iconSvg("arrowRight"); }
+    }
+    var taskIcons = {
+      "start.html": "plus", "uikit.html": "settings", "api.html": "code",
+      "pack.html": "package", "faq.html": "help", "manual.html": "book"
+    };
+    var chips = document.querySelectorAll(".task-chip");
+    for (var t = 0; t < chips.length; t++) {
+      var slot = chips[t].querySelector("em");
+      var target = chips[t].getAttribute("href");
+      if (slot && taskIcons[target] && !slot.querySelector(".lx-icon")) {
+        slot.innerHTML = iconSvg(taskIcons[target]);
+      }
+    }
+    var texts = document.querySelectorAll(".hero-actions a, .page-nav .next b");
+    for (var n = 0; n < texts.length; n++) {
+      if (texts[n].innerHTML.indexOf("→") >= 0) {
+        texts[n].innerHTML = texts[n].innerHTML.replace(/→/g, iconSvg("arrowRight"));
+      }
+    }
   }
 
   function pressFeedback() {
@@ -468,6 +542,7 @@
     buildPageNav();
     buildScrollTools();
     pressFeedback();
+    upgradeIcons();
     document.body.className = (document.body.className || "") + " page-enter";
   });
 })();

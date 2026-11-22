@@ -246,7 +246,7 @@ if searchIcon then
   pcall(function()
     local drawable = search.getCompoundDrawables()[0]
     if drawable then
-      drawable.setColorFilter(MUTED)
+      icons.tintDrawable(drawable, MUTED)
     end
   end)
 end

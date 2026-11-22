@@ -34,3 +34,9 @@ icons.button("add", "新建", { background = ACCENT_WASH, stroke = ACCENT_LINE, 
 首页、编辑器、项目页、设置、关于、示例列表、Java 浏览器、手册 Activity、LuaX-UI 组件库和组件示例都使用同一套图标。新增图标时先加 SVG 源稿和生成脚本定义，再在 `icons.lua` 注册名称。
 
 预览板：`docs/icons-preview.png`。
+
+## 内置手册网页图标
+
+手册页面不再使用 `☰ / ⌕ / ✕ / ›` 等字符符号，统一由 `luadoc/doc.js` 输出 24×24 内联 SVG。图标使用 `currentColor`，因此浅色、深色主题和强调色变化时自动跟随；章节标记、任务标签、搜索框、翻页和返回顶部共用同一套路径。
+
+预览：`docs/manual-icons-preview.png`。

@@ -2140,7 +2140,7 @@ function M.checkRow(spec)
       pcall(function()
         local drawable = mark.getCompoundDrawables()[0]
         if drawable then
-          drawable.setColorFilter(palette.onAccent)
+          icons.tintDrawable(drawable, palette.onAccent)
         end
       end)
     else
@@ -2892,7 +2892,7 @@ local function paintCheckMark(mark, checked, palette)
       local drawables = mark.getCompoundDrawables()
       local drawable = drawables and drawables[0]
       if drawable then
-        drawable.setColorFilter(palette.onAccent)
+        icons.tintDrawable(drawable, palette.onAccent)
       end
     end)
   else

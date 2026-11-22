@@ -21,4 +21,5 @@ echo "[lua-check] Lua: $($LUA_BIN -v 2>&1 | head -1)"
 "$LUA_BIN" tools/lua-smoke/run.lua
 "$LUA_BIN" tools/lua-smoke/packcheck_test.lua
 "$LUA_BIN" tools/lua-smoke/pkgname_test.lua
+"$LUA_BIN" tools/lua-smoke/icons_test.lua
 echo "[lua-check] 全部通过"

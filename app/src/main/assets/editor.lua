@@ -144,7 +144,7 @@ local function setButtonIcon(view, name, color)
   pcall(function()
     local drawable = view.getCompoundDrawables()[0]
     if drawable then
-      drawable.setColorFilter(color or TEXT_MUTED)
+      icons.tintDrawable(drawable, color or TEXT_MUTED)
     end
   end)
 end

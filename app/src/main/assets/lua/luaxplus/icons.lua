@@ -131,10 +131,28 @@ function M.tint(view, color)
   if not view then
     return view
   end
-  pcall(function()
-    view.setColorFilter(parseColor(color))
+  local value = parseColor(color)
+  local ok = pcall(function()
+    view.setColorFilter(value)
   end)
+  if not ok then
+    pcall(function()
+      view.setColorFilter(PorterDuffColorFilter(value, PorterDuff.Mode.SRC_IN))
+    end)
+  end
   return view
+end
+
+-- Drawable 不是 View：VectorDrawable 只接受 ColorFilter 对象，
+-- 不能像 ImageView 一样直接传颜色整数，否则 LuaJava 会报 Invalid method call。
+function M.tintDrawable(drawable, color)
+  if not drawable then
+    return drawable
+  end
+  pcall(function()
+    drawable.setColorFilter(PorterDuffColorFilter(parseColor(color), PorterDuff.Mode.SRC_IN))
+  end)
+  return drawable
 end
 
 local function fallbackGlyph(name, spec, color)
