@@ -76,6 +76,35 @@ local DEFAULT_LIBRARIES = {
   { name = "lint", module = "luaxplus.lint", description = "保存前审计" },
 }
 
+-- 对象规则：某种工厂创建的对象，在生命周期里必须调用某个方法。
+-- 默认 ui.page 必须 show；后续自研库可注册自己的规则，不用改审计核心。
+local objectRules = {
+  {
+    module = "luaxplus.ui",
+    factory = "page",
+    kind = "page",
+    requiresMethod = "show",
+    message = "页面对象 %s 已创建，但没有调用 %s:show()，运行后不会显示",
+    fixTitle = "补页面显示 %s:show()",
+  },
+}
+
+-- 视图包装规则：工厂返回的是包装表，真正传给容器的是它的某个属性。
+local viewWrappers = {
+  {
+    module = "luaxplus.ui",
+    factory = "field",
+    property = "view",
+    label = "field",
+  },
+  {
+    module = "luaxplus.ui",
+    factory = "textArea",
+    property = "view",
+    label = "textArea",
+  },
+}
+
 local libraries = {}
 local libraryOrder = {}
 local loadedManifests = {}
@@ -209,6 +238,38 @@ function M.registerLibrary(spec)
     explicit = spec.explicit ~= false,
   }
   return addLibrary(copy, "api")
+end
+
+function M.registerObjectRule(spec)
+  if type(spec) ~= "table" or type(spec.module) ~= "string"
+      or type(spec.factory) ~= "string" or type(spec.requiresMethod) ~= "string" then
+    return false
+  end
+  objectRules[#objectRules + 1] = {
+    module = spec.module,
+    factory = spec.factory,
+    kind = spec.kind or spec.factory,
+    requiresMethod = spec.requiresMethod,
+    message = spec.message
+      or "对象 %s 已创建，但没有调用 %s:" .. spec.requiresMethod .. "()",
+    fixTitle = spec.fixTitle
+      or "补对象调用 %s:" .. spec.requiresMethod .. "()",
+  }
+  return true
+end
+
+function M.registerViewWrapper(spec)
+  if type(spec) ~= "table" or type(spec.module) ~= "string"
+      or type(spec.factory) ~= "string" or type(spec.property) ~= "string" then
+    return false
+  end
+  viewWrappers[#viewWrappers + 1] = {
+    module = spec.module,
+    factory = spec.factory,
+    property = spec.property,
+    label = spec.label or spec.factory,
+  }
+  return true
 end
 
 function M.lookupLibrary(name)
@@ -856,30 +917,67 @@ local function analyze(tokens, source)
   return facts
 end
 
-local function findUIPageBindings(tokens)
-  local result = {}
+local function findFactoryBindings(tokens, facts)
+  local objects = {}
+  local wrappers = {}
   for index, token in ipairs(tokens) do
     if token.value == "local" then
       local nameToken = tokens[index + 1]
       local equalsToken = tokens[index + 2]
       local baseToken = tokens[index + 3]
       local dotToken = tokens[index + 4]
-      local pageToken = tokens[index + 5]
+      local factoryToken = tokens[index + 5]
       if nameToken and nameToken.type == "name"
           and equalsToken and equalsToken.value == "="
-          and baseToken and baseToken.value == "ui"
+          and baseToken and baseToken.type == "name"
           and dotToken and dotToken.value == "."
-          and pageToken and pageToken.value == "page" then
-        result[#result + 1] = {
-          name = nameToken.value,
-          line = nameToken.line,
-          column = nameToken.column,
-          offset = nameToken.offset,
-        }
+          and factoryToken and factoryToken.type == "name" then
+        local module = facts.requireBindings[baseToken.value]
+        if not module and baseToken.value == "ui" then
+          module = "luaxplus.ui"
+        end
+        if module then
+          for _, rule in ipairs(objectRules) do
+            if rule.module == module and rule.factory == factoryToken.value then
+              local binding = {
+                name = nameToken.value,
+                line = nameToken.line,
+                column = nameToken.column,
+                offset = nameToken.offset,
+                token = nameToken,
+                module = module,
+                factory = factoryToken.value,
+                kind = rule.kind,
+                requiresMethod = rule.requiresMethod,
+                rule = rule,
+              }
+              objects[#objects + 1] = binding
+              break
+            end
+          end
+          for _, wrapper in ipairs(viewWrappers) do
+            if wrapper.module == module and wrapper.factory == factoryToken.value then
+              local binding = {
+                name = nameToken.value,
+                line = nameToken.line,
+                column = nameToken.column,
+                offset = nameToken.offset,
+                token = nameToken,
+                module = module,
+                factory = factoryToken.value,
+                property = wrapper.property,
+                label = wrapper.label,
+                wrapper = wrapper,
+              }
+              wrappers[#wrappers + 1] = binding
+              break
+            end
+          end
+        end
       end
     end
   end
-  return result
+  return objects, wrappers
 end
 
 local function scanDefinitions(tokens)
@@ -1088,6 +1186,8 @@ local ISSUE_CODES = {
   page_object = "LX1007",
   undefined_function = "LX1008",
   page_not_shown = "LX1009",
+  view_wrapper = "LX1010",
+  object_not_called = "LX1011",
 }
 
 local function addIssue(report, issue)
@@ -1172,7 +1272,7 @@ function M.audit(source, options)
   source = tostring(source or "")
   local tokens = tokenize(source)
   local facts = analyze(tokens, source)
-  local pageBindings = findUIPageBindings(tokens)
+  local factoryObjects, wrapperBindings = findFactoryBindings(tokens, facts)
 
   local definitions = options.projectDefinitions
   if not definitions and options.projectRoot then
@@ -1253,16 +1353,25 @@ function M.audit(source, options)
       end
     end
   end
-  local pageCanUseUI = facts.requireBindings.ui == "luaxplus.ui"
-    or facts.globalDefs.ui ~= nil
-  if not pageCanUseUI and not facts.hasLocal.ui then
+  local uiAlias = nil
+  for alias, module in pairs(facts.requireBindings) do
+    if module == "luaxplus.ui" then
+      uiAlias = alias
+      break
+    end
+  end
+  if not uiAlias and facts.globalDefs.ui ~= nil then
+    uiAlias = "ui"
+  end
+  if not uiAlias and not facts.hasLocal.ui then
     for _, use in ipairs(facts.uses) do
       if use.name == "ui" then
-        pageCanUseUI = true
+        uiAlias = "ui"
         break
       end
     end
   end
+  local pageCanUseUI = uiAlias ~= nil
 
   local function maybePageAction(use)
     if not pageCanUseUI or #pageLikeUses == 0 then
@@ -1273,11 +1382,12 @@ function M.audit(source, options)
     if not indent:match("^%s*$") then
       indent = ""
     end
+    local pageFactory = uiAlias .. ".page{}"
     local edits = {
       {
         startOffset = start,
         endOffset = start,
-        text = indent .. "local page = ui.page{}\n",
+        text = indent .. "local page = " .. pageFactory .. "\n",
       },
     }
     local suffix = ""
@@ -1299,7 +1409,7 @@ function M.audit(source, options)
       title = "插入页面骨架",
       edits = edits,
       preview = "在第 " .. tostring(first.token.line or 1)
-        .. " 行前插入 local page = ui.page{}" .. suffix,
+        .. " 行前插入 local page = " .. pageFactory .. suffix,
     })
   end
 
@@ -1434,41 +1544,115 @@ function M.audit(source, options)
     end
   end
 
-  for _, binding in ipairs(pageBindings) do
-    local shown = false
-    for _, use in ipairs(facts.uses) do
-      if use.name == binding.name and use.memberCall and use.memberName == "show" then
-        shown = true
-        break
+  local containerNames = {}
+  for _, use in ipairs(facts.uses) do
+    if use.memberCall and use.memberName == "add" then
+      containerNames[use.name] = true
+    end
+  end
+
+  for _, binding in ipairs(factoryObjects) do
+    if binding.requiresMethod then
+      if binding.kind == "page" then
+        containerNames[binding.name] = true
+      end
+      local called = false
+      for _, use in ipairs(facts.uses) do
+        if use.name == binding.name and use.memberCall
+            and use.memberName == binding.requiresMethod then
+          called = true
+          break
+        end
+      end
+      if not called then
+        local kind = binding.kind == "page" and "page_not_shown" or "object_not_called"
+        local code = ISSUE_CODES[kind]
+        local message = string.format(
+          binding.rule.message or "对象 %s 已创建，但没有调用 %s:%s()",
+          binding.name,
+          binding.name,
+          binding.requiresMethod
+        )
+        addIssue(report, {
+          severity = "warning",
+          kind = kind,
+          name = binding.name,
+          line = binding.line,
+          column = binding.column,
+          offset = binding.offset,
+          message = message,
+        })
+        local callText = binding.name .. ":" .. binding.requiresMethod .. "()"
+        local title = string.format(
+          binding.rule.fixTitle or "补对象调用 %s:%s()",
+          binding.name,
+          binding.requiresMethod
+        )
+        local prefix = source:sub(-1) == "\n" and "" or "\n"
+        addAction(report, seenActions, {
+          code = code,
+          kind = "quickfix",
+          confidence = "guided",
+          name = binding.name,
+          title = title,
+          edits = {
+            {
+              startOffset = #source,
+              endOffset = #source,
+              text = prefix .. callText .. "\n",
+            },
+          },
+          preview = "在文件末尾补 " .. callText,
+        })
       end
     end
-    if not shown then
-      addIssue(report, {
-        severity = "warning",
-        kind = "page_not_shown",
-        name = binding.name,
-        line = binding.line,
-        column = binding.column,
-        offset = binding.offset,
-        message = "页面对象 " .. binding.name .. " 已创建，但没有调用 "
-          .. binding.name .. ":show()，运行后不会显示",
-      })
-      local prefix = source:sub(-1) == "\n" and "" or "\n"
-      addAction(report, seenActions, {
-        code = ISSUE_CODES.page_not_shown,
-        kind = "quickfix",
-        confidence = "guided",
-        name = binding.name,
-        title = "补页面显示 " .. binding.name .. ":show()",
-        edits = {
-          {
-            startOffset = #source,
-            endOffset = #source,
-            text = prefix .. binding.name .. ":show()\n",
-          },
-        },
-        preview = "在文件末尾补 " .. binding.name .. ":show()",
-      })
+  end
+
+  local wrapperMap = {}
+  for _, binding in ipairs(wrapperBindings) do
+    wrapperMap[binding.name] = binding
+  end
+  for index, token in ipairs(tokens) do
+    if token.type == "name" and containerNames[token.value]
+        and tokens[index + 1] and tokens[index + 1].value == ":"
+        and tokens[index + 2] and tokens[index + 2].value == "add"
+        and tokens[index + 3] and tokens[index + 3].value == "(" then
+      local argument = tokens[index + 4]
+      if argument and argument.type == "name" then
+        local after = tokens[index + 5]
+        local isProperty = after and (after.value == "." or after.value == ":")
+        local wrapper = wrapperMap[argument.value]
+        if wrapper and not isProperty then
+          local replacement = argument.value .. "." .. wrapper.property
+          addIssue(report, {
+            severity = "warning",
+            kind = "view_wrapper",
+            name = argument.value,
+            line = argument.line,
+            column = argument.column,
+            offset = argument.offset,
+            endOffset = argument.endOffset,
+            message = token.value .. ":add 需要 View，但 " .. argument.value
+              .. " 是 " .. wrapper.label .. " 包装表，应使用 "
+              .. replacement,
+          })
+          addAction(report, seenActions, {
+            code = ISSUE_CODES.view_wrapper,
+            kind = "quickfix",
+            confidence = "guided",
+            name = argument.value .. "@" .. tostring(argument.line),
+            title = "改用 " .. replacement,
+            edits = {
+              {
+                startOffset = argument.offset - 1,
+                endOffset = argument.endOffset,
+                text = replacement,
+              },
+            },
+            preview = "把 " .. argument.value .. " 改为 " .. replacement,
+          })
+        end
+      end
     end
   end
 
@@ -1757,6 +1941,8 @@ function M.applyRepair(source, report, options)
     page_object = true,
     undefined_function = true,
     page_not_shown = true,
+    view_wrapper = true,
+    object_not_called = true,
   }
   for _, issue in ipairs(after.issues) do
     if selectedKeys[(issue.code or "") .. "\0" .. (issue.name or "")]

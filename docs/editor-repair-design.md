@@ -67,7 +67,9 @@
 | 问题 | 修复动作 | 置信度 | 说明 |
 | --- | --- | --- | --- |
 | 缺少已知库 require | 插入 `local x = require "module"` | safe | 优先插在文件头注释之后、第一个代码行之前 |
-| `page:add` / `page:show` 但 page 未定义 | 插入 `local page = ui.page{}`；必要时补 `page:show()` | guided | 从调用形态推断为 LuaX-UI 页面对象 |
+| `page:add` / `page:show` 但 page 未定义 | 插入 `local page = <ui别名>.page{}`；必要时补 `page:show()` | guided | 从调用形态推断为 LuaX-UI 页面对象 |
+| 页面对象创建后未 `show` | 文件末尾补 `<对象>:show()` | guided | 变量名不限 page，规则表驱动 |
+| `ui.field` / `ui.textArea` 包装表传给 `page:add` | 改为 `<变量>.view` | guided | 包装表属性由规则表声明 |
 | 未定义函数式全局 `foo(` | 插入 `local function foo(...) end` | guided | 只保证不再 nil，函数体需要用户补 |
 | 未定义表式全局 `foo.bar` | 插入 `local foo = {}` 或提示手动声明 | guided/manual | 只有后续是赋值/表访问时才生成空表 |
 | 拼写相近的未定义变量 | 重命名为候选符号 | guided | 预览所有受影响位置，不能静默改 |
@@ -81,7 +83,7 @@
 
 - `page` 未解析；
 - `page` 被 `:` 调用，方法名包含 `add` 或 `show`；
-- 当前文件已引用 `ui`，或 `ui` 是已知库；
+- 当前文件已引用 `ui`，或 `ui` 是已知库，或使用别名引用 `luaxplus.ui`；
 
 生成两条编辑：
 
@@ -89,7 +91,7 @@
 local page = ui.page{}
 ```
 
-插入在第一次 `page` 使用之前；如果文件中没有 `page:show()`，再追加：
+如果 UI 库别名是 `u`，生成 `local page = u.page{}`。插入在第一次 `page` 使用之前；如果文件中没有 `page:show()`，再追加：
 
 ```lua
 page:show()
@@ -98,6 +100,10 @@ page:show()
 预览会显示两处修改。用户可以取消 `page:show()`，只保留页面对象。
 
 这不是“猜测业务”，而是补齐 LuaX-UI 页面对象的最小可运行骨架。标题、导航、主题等仍由用户填写。
+
+页面对象创建后的 `show` 检查不依赖变量名 `page`：`local home = ui.page{}` 会检查并补 `home:show()`。
+
+包装表误传的检查同样不依赖变量名：`page:add(email)` 和 `home:add(email)` 都会提示并改为 `email.view`。
 
 ## 6. 应用流水线
 
@@ -109,8 +115,8 @@ page:show()
   -> 倒序应用偏移
   -> load() 编译检查
   -> 重新 audit()
-  -> 仍有 error：回滚并展示失败原因
-  -> 无 error：写入编辑器，保留撤销快照
+  -> 仍有 error / 页面未 show / 包装表误传：回滚并展示失败原因
+  -> 无阻断问题：写入编辑器，保留撤销快照
 ```
 
 ### 防止破坏文件
@@ -160,39 +166,42 @@ page:show()
 
 > 当前问题没有安全自动修复项。`page` 需要先声明为页面对象，不能凭空创建业务变量。
 
-## 8. 自研库修复提供者
+## 8. 自研库规则接入
 
-修复器不能把 `ui.page` 写死在核心。自研库可以注册：
+修复器不能把 `ui.page`、`ui.field` 写死在核心。自研库通过两张规则表接入：
 
 ```lua
-local repair = require "luaxplus.repair"
+local lint = require "luaxplus.lint"
 
-repair.registerProvider({
-  code = "LX1002",
-  name = "page",
-  match = function(issue, context)
-    return issue.name == "page" and context.hasMemberCall("add")
-  end,
-  build = function(issue, context)
-    return {
-      title = "插入页面骨架",
-      confidence = "guided",
-      edits = { ... },
-    }
-  end,
+-- 对象生命周期：pane 创建后必须 show。
+lint.registerObjectRule({
+  module = "acme.ui",
+  factory = "pane",
+  kind = "pane",
+  requiresMethod = "show",
+})
+
+-- 视图包装：input 返回包装表，传给容器要取 .view。
+lint.registerViewWrapper({
+  module = "acme.ui",
+  factory = "input",
+  property = "view",
+  label = "input",
 })
 ```
 
-库也可以只注册“修复模板”：
+注册后，审计自动产生 `object_not_called` 和 `view_wrapper` 诊断及对应快速修复，不需要改 `audit` 主循环。
 
-```lua
-repair.registerTemplate("page", {
-  declaration = "local page = ui.page{}",
-  showCall = "page:show()",
-})
-```
+规则字段：
 
-审计负责发现问题，修复器负责生成候选，库负责解释自己的对象结构。
+- `module`：`require` 的完整模块路径。
+- `factory`：工厂函数名，例如 `page`、`field`、`pane`。
+- `kind`：对象类别，用于诊断码和文案；`page` 会映射为 LX1009。
+- `requiresMethod`：生命周期里必须调用的方法。
+- `property`：包装表中真正传给容器的属性名。
+- `label`：文案里显示的对象/组件名。
+
+审计负责发现问题，规则表负责解释对象结构，修复器只负责把动作应用回源码。
 
 ## 9. 验收标准
 

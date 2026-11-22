@@ -218,6 +218,59 @@ expect(#pageDefinedAfter.issues == 0, "补 page:show 后仍有问题")
 local alreadyShown = lint.audit(pageDefined .. "page:show()\n", { file = "main.lua" })
 expect(not issueKinds(alreadyShown).page_not_shown, "已有 page:show 时不应重复提示")
 
+-- 任意变量名的页面对象都要检查 show，不再只认 page。
+local homePage = [[local ui = require "luaxplus.ui"
+local home = ui.page{ title = "首页" }
+home:add(ui.text{ text = "你好" }.view)
+]]
+local homeReport = lint.audit(homePage, { file = "main.lua" })
+expect(issueKinds(homeReport).page_not_shown, "自定义页面变量名没有检查 show")
+expect(homeReport.actions[1].title:match("home"), "页面动作没有使用实际变量名")
+local homeResult = lint.applyRepair(homePage, homeReport)
+expect(homeResult.ok and homeResult.text:match("home:show%(%)"), "自定义页面没有补 home:show")
+
+-- field 包装表直接传给 page:add 时，自动改为 email.view。
+local wrapperSource = [[local ui = require "luaxplus.ui"
+local page = ui.page{}
+local email = ui.field{ label = "邮箱" }
+page:add(email, 12)
+page:show()
+]]
+local wrapperReport = lint.audit(wrapperSource, { file = "main.lua" })
+expect(issueKinds(wrapperReport).view_wrapper, "field 包装表传给 page:add 没有提示")
+expect(wrapperReport.issues[1].code == "LX1010", "view_wrapper 诊断码不对")
+local wrapperResult = lint.applyRepair(wrapperSource, wrapperReport)
+expect(wrapperResult.ok and wrapperResult.text:match("page:add%(email%.view, 12%)"),
+  "包装表没有改成 email.view")
+local wrapperAfter = lint.audit(wrapperResult.text, { file = "main.lua" })
+expect(#wrapperAfter.issues == 0, "改为 email.view 后仍有问题")
+
+-- 自研库可以注册对象生命周期和视图包装规则，不用改审计核心。
+lint.registerObjectRule({
+  module = "acme.ui",
+  factory = "pane",
+  kind = "pane",
+  requiresMethod = "show",
+})
+lint.registerViewWrapper({
+  module = "acme.ui",
+  factory = "input",
+  property = "view",
+  label = "input",
+})
+local customSource = [[local a = require "acme.ui"
+local pane = a.pane{}
+local name = a.input{ label = "名字" }
+pane:add(name)
+]]
+local customReport = lint.audit(customSource, { file = "main.lua" })
+expect(issueKinds(customReport).object_not_called, "自研对象生命周期规则没有生效")
+expect(issueKinds(customReport).view_wrapper, "自研视图包装规则没有生效")
+local customResult = lint.applyRepair(customSource, customReport)
+expect(customResult.ok, "自研库规则生成的修复没有通过复检")
+expect(customResult.text:match("pane:add%(name%.view%)"), "自研包装表没有改成 name.view")
+expect(customResult.text:match("pane:show%(%)"), "自研对象没有补 pane:show")
+
 -- 未知表成员不生成自动修复，避免凭空创建错误对象。
 local ambiguous = lint.audit("foo.bar()\n", { file = "main.lua" })
 expect(#ambiguous.actions == 0, "未知表成员不应生成自动修复")

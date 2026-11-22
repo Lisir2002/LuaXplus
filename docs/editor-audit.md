@@ -56,11 +56,11 @@ local page = ui.page{}
 page:show()
 ```
 
-这补齐的是 LuaX-UI 页面对象的最小运行骨架，不会替用户决定标题、导航和业务布局。
+这补齐的是 LuaX-UI 页面对象的最小运行骨架，不会替用户决定标题、导航和业务布局。若当前文件用别名引用 UI 库（例如 `local u = require "luaxplus.ui"`），骨架会写成 `u.page{}`，不强行使用 `ui`。
 
 ### 页面忘记 show
 
-当文件里出现：
+当文件里出现任意变量名的页面对象：
 
 ```lua
 local page = ui.page{
@@ -74,7 +74,62 @@ local page = ui.page{
 page:show()
 ```
 
-这样保存后运行才会真正显示页面，而不是只创建对象。
+变量名不要求叫 `page`；`local home = ui.page{}` 会检查 `home:show()`，修复也补 `home:show()`。
+
+### 包装表直接传入容器
+
+LuaX-UI 的 `ui.field` 和 `ui.textArea` 返回的是包装表 `{ view, input }`，真正能传给 `page:add` 的是 `.view`。因此：
+
+```lua
+local email = ui.field{ label = "邮箱" }
+page:add(email)
+```
+
+会标记 LX1010，并生成“改用 email.view”的动作，替换为：
+
+```lua
+page:add(email.view)
+```
+
+同样的检查适用于任意页面变量名，例如 `home:add(email)`。如果传入的已经是 `email.view`、`email.input`，不会误报。
+
+### 通用规则而不是逐个适配
+
+页面 `show` 和包装表 `.view` 不再写死在审计主循环，而是由两张规则表驱动：
+
+- `objectRules`：某个工厂创建的对象，生命周期里必须调用某个方法。
+- `viewWrappers`：某个工厂返回包装表，传给容器时要取某个属性。
+
+自研库可以在初始化时注册规则：
+
+```lua
+local lint = require "luaxplus.lint"
+
+lint.registerObjectRule({
+  module = "acme.ui",
+  factory = "pane",
+  kind = "pane",
+  requiresMethod = "show",
+})
+
+lint.registerViewWrapper({
+  module = "acme.ui",
+  factory = "input",
+  property = "view",
+  label = "input",
+})
+```
+
+注册后，以下代码会自动得到“补 `pane:show()`”和“改用 `name.view`”两个修复：
+
+```lua
+local a = require "acme.ui"
+local pane = a.pane{}
+local name = a.input{ label = "名字" }
+pane:add(name)
+```
+
+新增同类错误时优先扩展规则表，不再在审计主循环里加一个 `if`。
 
 ### 修复流水线
 
@@ -83,7 +138,7 @@ page:show()
 3. 按偏移倒序应用；同一位置插入时 `require` 优先于页面骨架。
 4. 用 `load` / `loadstring` 做语法编译。
 5. 重新跑同一套审计。
-6. 仍有 error、页面对象问题或函数未定义时，不写入文件并展示剩余问题。
+6. 仍有 error、页面对象问题、页面未 show、包装表误传或函数未定义时，不写入文件并展示剩余问题。
 7. 成功后保留原文快照，菜单“撤销上次修复”可恢复。
 
 ### 修复边界
@@ -105,6 +160,8 @@ page:show()
 | LX1007 | 页面对象未定义 |
 | LX1008 | 函数式全局未定义 |
 | LX1009 | 页面已创建但未调用 show |
+| LX1010 | 包装表被直接传给容器 |
+| LX1011 | 对象已创建但未调用必需方法 |
 
 弹窗同时保留“仍然保存”和“取消”。静态分析无法覆盖所有 Lua 动态写法，因此审计不会强制阻断保存。
 
@@ -195,3 +252,6 @@ bash tools/lua-check/run.sh
 - 自研库清单和目录自动发现。
 - 注释、字符串、表键、import、引擎全局不误报。
 - 未使用变量、拼写建议、作用域遮蔽和声明前使用。
+- 任意页面变量名的 `show` 检查与补全。
+- `ui.field` / `ui.textArea` 包装表直接传给 `page:add` 的检测与改 `.view`。
+- 自研库注册对象生命周期规则和视图包装规则。

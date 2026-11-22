@@ -1,5 +1,22 @@
 # 更新日志
 
+## 1.0.0-rc38
+
+### 新功能
+- **通用对象规则**：页面必须 `show` 不再写死在主循环，改为 `objectRules` 表驱动，同类“对象创建后必须调用方法”的错误自动纳入检查。
+- **视图包装规则**：`ui.field`、`ui.textArea` 返回的包装表直接传给 `page:add` 时，提示并改为 `.view`；规则同样由 `viewWrappers` 表驱动。
+- **自研库注册入口**：新增 `registerObjectRule` 和 `registerViewWrapper`，自研库可声明对象生命周期与包装属性，不用改审计核心。
+
+### 改进
+- **任意页面变量名**：`local home = ui.page{}` 也会检查 `home:show()`，修复补 `home:show()`，不再只认变量名 `page`。
+- **别名骨架**：用 `local u = require "luaxplus.ui"` 时，页面骨架生成 `local page = u.page{}`，不强行写 `ui`。
+
+### 修复
+- **包装表误传**：`page:add(email)` 这类把 `field` 包装表直接传给容器的代码，保存前生成 LX1010 并提供“改用 email.view”动作。
+- **保存复检**：修复后仍有 `view_wrapper` 或 `object_not_called` 时拒绝写盘，避免半修状态落盘。
+
+---
+
 ## 1.0.0-rc37
 
 ### 修复
