@@ -147,6 +147,8 @@ keyPassword=****
 
 - 产物：`app/build/outputs/apk/release/app-release.apk`
 - 需要 JDK 17 与 Android SDK Platform 34
+- 构建前自动执行 `:app:luaCheck`：Lua 语法检查 + JavaAPI 严格契约测试，不需要模拟器
+- 单独运行：`./gradlew :app:luaCheck`；详细说明见 `tools/lua-check/README.md`
 
 ## Android 12 及以上适配
 

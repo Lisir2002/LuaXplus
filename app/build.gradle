@@ -457,3 +457,24 @@ dependencies {
     implementation libs.drakeet.drawer
 }
 
+// ===== Lua 门禁：语法检查 + JavaAPI 严格契约测试，不依赖 Android 设备 =====
+def luaCheckScript = rootProject.file('tools/lua-check/run.sh')
+tasks.register('luaCheck', Exec) {
+    group = 'verification'
+    description = '检查 Lua 资源语法，并运行 JavaAPI 页面的 Java 方法契约测试'
+    workingDir rootProject.projectDir
+    commandLine 'bash', luaCheckScript.absolutePath
+    inputs.files(fileTree(rootProject.projectDir) {
+        include 'app/src/main/assets/**/*.lua'
+        include 'app/src/main/resources/**/*.lua'
+        include 'tools/lua-check/**'
+        include 'tools/lua-smoke/**'
+    })
+    // 页面逻辑是运行期脚本，Gradle 无法据此推断增量，保证每次都真正执行
+    outputs.upToDateWhen { false }
+}
+
+tasks.matching { it.name == 'preBuild' || it.name == 'check' }.configureEach {
+    dependsOn tasks.named('luaCheck')
+}
+

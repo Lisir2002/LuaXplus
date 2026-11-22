@@ -1,0 +1,27 @@
+name: Lua checks
+
+on:
+  push:
+    paths:
+      - 'app/src/main/assets/**/*.lua'
+      - 'app/src/main/resources/**/*.lua'
+      - 'tools/lua-check/**'
+      - 'tools/lua-smoke/**'
+      - 'app/build.gradle'
+  pull_request:
+    paths:
+      - 'app/src/main/assets/**/*.lua'
+      - 'app/src/main/resources/**/*.lua'
+      - 'tools/lua-check/**'
+      - 'tools/lua-smoke/**'
+      - 'app/build.gradle'
+
+jobs:
+  lua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua 5.3
+        run: sudo apt-get update && sudo apt-get install -y lua5.3
+      - name: Run Lua syntax and contract checks
+        run: bash tools/lua-check/run.sh

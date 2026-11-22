@@ -1,0 +1,4 @@
+# 语法门禁的历史例外。每项必须写清楚原因，修复后删掉对应行。
+# mainbody.lua 是早期编辑器壳，当前入口使用 main.lua / editor.lua；文件内保留
+# 了一段 C 风格的 switch/case 伪代码，直接执行会语法失败，因此暂不纳入门禁。
+app/src/main/assets/mainbody.lua
