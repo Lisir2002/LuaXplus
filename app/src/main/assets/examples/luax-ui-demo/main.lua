@@ -238,7 +238,7 @@ ui.show{
     title = "项目信息",
     items = {
       { label = "包名", value = "com.mini.luaxplus" },
-      { label = "当前版本", value = "1.0.0-rc20" },
+      { label = "当前版本", value = "1.0.0-rc21" },
       { label = "构建渠道", value = "Release" },
     },
     footer = "键值列表适合详情页、设置摘要和订单信息。",

@@ -443,6 +443,11 @@ local function dp(value)
   return baseDp(dimension(value, 0))
 end
 
+-- 极细分割线：优先使用控件令牌 control.hairline，至少保证 1 个物理像素。
+local function hairline()
+  return math.max(1, dp(K.hairline))
+end
+
 local function space(value, fallback)
   return dimension(S[value] or value, fallback or 0)
 end
