@@ -327,15 +327,12 @@ local function binapk(luapath, apkpath)
                     req[".*\\\\.alp"] = ".*\\\\."..path_pattern
                     req["application/alp"] = "application/"..path_pattern
                 end
+                -- 成品包继承模板的完整权限清单，不再按项目声明裁剪，
+                -- 否则存储、摄像头等权限会丢失，用户也无法在系统设置里授权
                 for n = 0, list.size() - 1 do
                     local v = list.get(n)
                     if req[v] then
                         list.set(n, req[v])
-                    elseif user_permission then
-                        local p = v:match("%.permission%.([%w_]+)$")
-                        if p and (not user_permission[p]) then
-                            list.set(n, "android.permission.UNKNOWN")
-                        end
                     end
                 end
                 local pt = activity.getLuaPath(".tmp")
