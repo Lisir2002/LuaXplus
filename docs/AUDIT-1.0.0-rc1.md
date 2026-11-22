@@ -499,11 +499,11 @@
 
 实现位置：
 
-- `app/src/main/assets/luaxplus/ui.lua`：主题、页面骨架、分组行、按钮、表单、分段控件、卡片、弹窗、标签栏等。
+- `app/src/main/assets/lua/luaxplus/ui.lua`：主题、页面骨架、分组行、按钮、表单、分段控件、卡片、弹窗、标签栏等。
 - `app/src/main/java/com/mini/luaxplus/ui/IosSwitch.java`：51×31dp 胶囊开关，180ms 位移动画，失败回退系统 `Switch`。
 - `app/src/main/assets/luadoc/uikit.html`：内置教程，已从手册首页与侧栏接入。
 
-验证：`luac5.3 -p` 检查组件库与教程内 19 段示例全部通过；`:app:assembleRelease` 构建成功；APK 内确认包含 `assets/luaxplus/ui.lua`、`assets/luadoc/uikit.html` 与 `IosSwitch` 类，v1/v2/v3 签名校验通过。
+验证：`luac5.3 -p` 检查组件库与教程内 19 段示例全部通过；`:app:assembleRelease` 构建成功；APK 内确认包含 `assets/lua/luaxplus/ui.lua`、`assets/luadoc/uikit.html` 与 `IosSwitch` 类，v1/v2/v3 签名校验通过。
 
 已知限制：组件库不做虚拟列表，超长列表继续使用原生 `RecyclerView` 或 `LuaAdapter`；旧成品不会自动获得组件库，需要重新打包。
 

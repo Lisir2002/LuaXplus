@@ -419,7 +419,7 @@ page:show()</pre>
   </table>
 
   <h2>十六、打包与发布</h2>
-  <p>组件库放在 <code class="inline">assets/luaxplus/ui.lua</code>，属于打包器保留的运行时目录，所有成品包会自动带上，不需要在工程里复制文件，也不需要改打包脚本。</p>
+  <p>组件库放在 <code class="inline">assets/lua/luaxplus/ui.lua</code>，会随基础模块铺设到运行时的 <code class="inline">app_lua</code>，所有成品包会自动带上，不需要在工程里复制文件，也不需要改打包脚本。</p>
   <p>iOS 风格开关是一个很小的原生 View（<code class="inline">com.mini.luaxplus.ui.IosSwitch</code>），已经随模板 APK 一起打包；Lua 侧通过 <code class="inline">luajava</code> 反射创建，不依赖额外权限。</p>
 
   <div class="tip">
@@ -431,7 +431,7 @@ page:show()</pre>
     <li><strong>这是 iOS 风格的 Android 组件，不是 UIKit。</strong> 系统字体、阴影和动画与真机 iOS 仍有差异。</li>
     <li><strong>主题切换不会实时重绘已有控件。</strong> 切换后重建页面即可。</li>
     <li><strong>不要在一个 ScrollView 里嵌套长列表。</strong> 数据量大时用原生 RecyclerView / LuaAdapter。</li>
-    <li><strong>组件只封装常用能力。</strong> 需要新组件时，可以继续在 <code class="inline">assets/luaxplus/ui.lua</code> 里追加，不影响已有调用。</li>
+    <li><strong>组件只封装常用能力。</strong> 需要新组件时，可以继续在 <code class="inline">assets/lua/luaxplus/ui.lua</code> 里追加，不影响已有调用。</li>
     <li><strong>原生写法永远可用。</strong> 组件库只是可选的语法糖，不是新的运行时。</li>
   </ul>
 
