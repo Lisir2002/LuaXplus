@@ -26,6 +26,10 @@ local function callback(s)
     LuaUtil.rmDir(File(activity.getLuaExtDir("bin/.temp")))
     bin_dlg.hide()
     bin_dlg.Message = ""
+    s = tostring(s or "")
+    if s == "" then
+        s = "打包任务没有返回结果，请查看运行日志"
+    end
     if not s:find("成功") then
         error_dlg.Message = s
         error_dlg.show()
@@ -62,9 +66,12 @@ local function binapk(luapath, apkpath)
     require "import"
     import "console"
     local pinfo = {}
-    pcall(function()
+    local initOk, initErr = pcall(function()
         loadfile(luapath .. "init.lua", "bt", pinfo)()
     end)
+    if not initOk then
+        return "打包配置异常：" .. tostring(initErr)
+    end
     compile "mao"
     compile "sign"
     import "java.util.zip.*"
@@ -312,7 +319,7 @@ local function binapk(luapath, apkpath)
         elseif name:find("^assets/") and (not name:find("^assets/lua/")) and (not name:find("^assets/luaxplus/")) then
         elseif name:find("^lua/") then
         elseif name:find("META%-INF") then
-        elseif !name:find("%a") then
+        elseif not name:find("%a") then
         else
             local entry = ZipEntry(name)
             out.putNextEntry(entry)
@@ -401,7 +408,16 @@ local function binapk(luapath, apkpath)
             Signer.sign(tmp, apkpath)
         end
         os.remove(tmp)
-        activity.installApk(apkpath)
+        local installOk, installErr = pcall(function()
+            activity.installApk(apkpath)
+        end)
+        if not installOk then
+            pcall(function()
+                luajava.bindClass("com.mini.luaxplus.LogCore")
+                    .luaError("安装器启动失败 " .. tostring(apkpath), tostring(installErr))
+            end)
+            return "打包成功:" .. apkpath .. "\n安装器启动失败，请到 bin 目录手动安装"
+        end
         --[[import "android.net.*"
         import "android.content.*"
         i = Intent(Intent.ACTION_VIEW);
@@ -425,6 +441,19 @@ end
 
 --luabindir=activity.getLuaExtDir("bin")
 --print(activity.getLuaExtPath("bin","a"))
+local function safe_binapk(luapath, apkpath)
+    local ok, result = pcall(binapk, luapath, apkpath)
+    if ok then
+        return result
+    end
+    local message = "打包异常：" .. tostring(result)
+    pcall(function()
+        luajava.bindClass("com.mini.luaxplus.LogCore")
+            .luaError("打包任务异常 " .. tostring(apkpath), message)
+    end)
+    return message
+end
+
 local function bin(path)
     local p = {}
     local e, s = pcall(loadfile(path .. "init.lua", "bt", p))
@@ -436,7 +465,9 @@ local function bin(path)
         create_error_dlg2()
         create_bin_dlg()
         bin_dlg.show()
-        activity.newTask(binapk, update, callback).execute { path, activity.getLuaExtPath("bin", p.appname .. "_" .. p.appver .. ".apk") }
+        local appName = tostring(p.appname or "app")
+        local appVer = tostring(p.appver or "1.0")
+        activity.newTask(safe_binapk, update, callback).execute { path, activity.getLuaExtPath("bin", appName .. "_" .. appVer .. ".apk") }
     else
         Toast.makeText(activity, "工程配置文件错误." .. s, Toast.LENGTH_SHORT).show()
     end
