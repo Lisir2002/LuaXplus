@@ -63,14 +63,6 @@ local function toast(text)
   Toast.makeText(activity, text, Toast.LENGTH_SHORT).show()
 end
 
--- 外部删除项目目录后，已打开的工程页不继续停留在失效路径
-function onResume()
-  if projectDir ~= "" and not File(projectDir).exists() then
-    toast("项目目录已被外部删除")
-    activity.finish()
-  end
-end
-
 -- 运行前先编译校验，语法错误也能落快照，而不是只弹一个错误页
 local function runScript(filePath)
   local ok, err = loadfile(filePath)

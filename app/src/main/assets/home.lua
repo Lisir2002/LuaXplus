@@ -812,9 +812,7 @@ local function attachSwipe(view)
   })
 end
 
-attachSwipe(root)
 attachSwipe(scroll)
-attachSwipe(list)
 attachSwipe(sidePanel)
 
 -- 外部目录被文件管理器或其它应用删除时，项目列表即时刷新
@@ -835,7 +833,7 @@ local function scheduleProjectRefresh()
 end
 
 pcall(function()
-  projectObserver = LuaFileObserver(projectRoot, 0x00000fff)
+  projectObserver = LuaFileObserver(projectRoot, 0x00000f0a)
   projectObserver.setOnEventListener(luajava.new(
     luajava.bindClass("com.androlua.LuaFileObserver$OnEventListener"),
     {
