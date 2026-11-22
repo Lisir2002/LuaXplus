@@ -105,7 +105,7 @@ local function row(title, detail)
 end
 
 local intro = TextView(activity)
-intro.setText("设置中心先占位，后续接入主题、编辑器、存储同步和权限开关。")
+intro.setText("外观、编辑器、存储与同步仍为占位；权限管理已接入独立页面。")
 intro.setTextSize(12)
 intro.setTextColor(MUTED)
 intro.setPadding(dp(8), dp(8), dp(8), dp(4))
@@ -120,12 +120,25 @@ local items = {
   { "外观", "浅色 / 深色主题、强调色" },
   { "编辑器", "字号、自动保存、缩进与符号条" },
   { "存储与同步", "项目目录、外部删除同步、备份与恢复" },
-  { "权限", "存储、网络与打包签名相关开关" }
+  { "权限管理", "存储、网络与全部敏感权限", "permissioncenter" }
 }
 
 for index = 1, #items do
   local item = items[index]
-  group.addView(row(item[1], item[2]))
+  local itemView = row(item[1], item[2])
+  group.addView(itemView)
+  if item[3] then
+    itemView.setOnClickListener(View.OnClickListener{
+      onClick = function()
+        local ok, err = pcall(function()
+          activity.newActivity(item[3])
+        end)
+        if not ok then
+          Toast.makeText(activity, "权限管理页启动失败：" .. tostring(err), Toast.LENGTH_SHORT).show()
+        end
+      end
+    })
+  end
   if index < #items then
     local line = View(activity)
     line.setBackgroundColor(0xffe5e5ea)
@@ -135,7 +148,7 @@ for index = 1, #items do
   end
 end
 
-local note = label("占位页面：设置项尚未接入，当前不改变任何行为。", 11, MUTED)
+local note = label("权限管理已接入；其余设置项仍在逐步接入。", 11, MUTED)
 note.setGravity(Gravity.CENTER)
 note.setPadding(0, dp(18), 0, 0)
 content.addView(note, LinearLayout.LayoutParams(-1, -2))

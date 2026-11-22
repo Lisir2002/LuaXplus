@@ -23,10 +23,15 @@ public final class LaunchPermissions {
     }
 
     /**
-     * 每次冷启动由启动页调用，等待第一个脚本页面进入前台后触发一次申请。
+     * 仅首次冷启动由启动页调用，等待第一个脚本页面进入前台后申请一次存储权限。
+     * 申请过后写入偏好，后续启动不再重复判断或弹窗。
      */
     public static void arm(Application application) {
         if (application == null) {
+            return;
+        }
+        if (Permissions.firstLaunchDone(application)) {
+            pending = false;
             return;
         }
         pending = true;
@@ -49,12 +54,16 @@ public final class LaunchPermissions {
                     return;
                 }
                 pending = false;
+                if (Permissions.firstLaunchDone(activity)) {
+                    return;
+                }
+                Permissions.markFirstLaunchDone(activity);
                 final Activity target = activity;
                 new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
                     @Override
                     public void run() {
                         if (!target.isFinishing()) {
-                            Permissions.requestAllFiles(target);
+                            Permissions.requestStorage(target);
                         }
                     }
                 }, DELAY_MS);

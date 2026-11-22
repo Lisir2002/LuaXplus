@@ -1675,58 +1675,6 @@ function onMenuItemSelected(id, item)
   }
 end
 
--- ===== 存储访问自检：Android 11 起分区存储生效，低版本走运行时权限 =====
-local function hasStorageAccess()
-  local Build = luajava.bindClass("android.os.Build")
-  local Environment = luajava.bindClass("android.os.Environment")
-  local PackageManager = luajava.bindClass("android.content.pm.PackageManager")
-  local granted
-  if Build.VERSION.SDK_INT >= 30 then
-    granted = Environment.isExternalStorageManager()
-  elseif Build.VERSION.SDK_INT >= 23 then
-    granted = activity.checkSelfPermission("android.permission.WRITE_EXTERNAL_STORAGE") == PackageManager.PERMISSION_GRANTED
-  else
-    granted = true
-  end
-  pcall(function()
-    luajava.bindClass("com.mini.luaxplus.LogCore").i("Storage", "存储访问检查 sdk=" .. Build.VERSION.SDK_INT .. " 结果=" .. tostring(granted))
-  end)
-  return granted
-end
-
-local function requestStorageAccess()
-  local Build = luajava.bindClass("android.os.Build")
-  local Settings = luajava.bindClass("android.provider.Settings")
-  local Intent = luajava.bindClass("android.content.Intent")
-  local Uri = luajava.bindClass("android.net.Uri")
-  if Build.VERSION.SDK_INT >= 30 then
-    local ok = pcall(function()
-      local intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-      intent.setData(Uri.parse("package:" .. activity.getPackageName()))
-      activity.startActivity(intent)
-    end)
-    if not ok then
-      pcall(function()
-        activity.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
-      end)
-    end
-  elseif Build.VERSION.SDK_INT >= 23 then
-    activity.requestPermissions({"android.permission.WRITE_EXTERNAL_STORAGE", "android.permission.READ_EXTERNAL_STORAGE"}, 1001)
-  end
-end
-
-local function ensureStorageAccess()
-  if hasStorageAccess() then
-    return
-  end
-  local dlg = MaterialAlertDialogBuilder(activity)
-  dlg.setTitle("需要存储权限")
-  dlg.setMessage("工程、备份与安装包都保存在设备存储中。\n请允许 Mini-LuaXPLUS 的“所有文件访问”，授权后返回并重新打开应用即可正常读写工程。")
-  dlg.setPositiveButton("去授权", { onClick = function() requestStorageAccess() end })
-  dlg.setNegativeButton("稍后", nil)
-  dlg.show()
-end
-
 activity.setContentView(loadlayout(layout.main))
 
 function onCreate(s)
@@ -1751,7 +1699,6 @@ function onCreate(s)
     end
   end
   --end
-  ensureStorageAccess()
 end
 
 function onNewIntent(intent)
