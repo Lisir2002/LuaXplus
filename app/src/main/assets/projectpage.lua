@@ -30,11 +30,29 @@ pcall(function()
   end
 end)
 
-local PAPER = 0xfff7f1e6
-local CARD = 0xFFFFFDF8
-local INK = 0xff1c2b3a
-local MUTED = 0xff5f6f7c
-local LINE = 0xffe6dbc8
+local theme = require "luaxplus.theme"
+local C = theme.colors
+local PAPER = C.paper
+local CARD = C.card
+local INK = C.ink
+local MUTED = C.muted
+local LINE = C.line
+local ACCENT_DEEP = C.accentDeep
+local ACCENT_WASH = C.accentWash
+local ACCENT_LINE = C.accentLine
+local PAPER_SOFT = C.paperSoft
+local PAPER_LINE = C.paperLine
+local WARM_INK = C.warmInk
+local WARM_WASH = C.warmWash
+local INFO_INK = C.infoInk
+local INFO_WASH = C.infoWash
+local INFO_BG = C.infoBg
+local INFO_LINE = C.infoLine
+local INFO_TEXT = C.infoText
+local BLUE_INK = C.blueInk
+local BLUE_WASH = C.blueWash
+local BROWN_INK = C.brownInk
+local BROWN_WASH = C.brownWash
 
 local args = {...}
 local projectDir = args[1]
@@ -136,6 +154,7 @@ local root = LinearLayout(activity)
 root.setOrientation(LinearLayout.VERTICAL)
 root.setBackgroundColor(PAPER)
 root.setFitsSystemWindows(true)
+theme.apply(activity, { background = PAPER, root = root, dark = false })
 activity.setContentView(root)
 
 -- 顶部信息
@@ -152,7 +171,7 @@ else
   icon.setImageResource(R.drawable.icon)
 end
 icon.setScaleType(ImageView.ScaleType.CENTER_CROP)
-icon.setBackground(rounded(0xfff2ece0, nil, 12))
+icon.setBackground(rounded(PAPER_SOFT, nil, 12))
 header.addView(icon, LinearLayout.LayoutParams(dp(46), dp(46)))
 
 local headerText = LinearLayout(activity)
@@ -207,9 +226,9 @@ local function switchTab(index)
   currentTab = index
   for i = 1, #tabViews do
     if i == index then
-      tabViews[i].setTextColor(0xff0b6f6a)
+      tabViews[i].setTextColor(ACCENT_DEEP)
       tabViews[i].setTypeface(Typeface.DEFAULT_BOLD)
-      tabViews[i].setBackground(rounded(0xffdff3f0, nil, 10))
+      tabViews[i].setBackground(rounded(ACCENT_WASH, nil, 10))
     else
       tabViews[i].setTextColor(MUTED)
       tabViews[i].setTypeface(Typeface.DEFAULT)
@@ -325,8 +344,8 @@ local function buildInfoPage()
   save.setText("保存属性")
   save.setTextSize(14)
   save.setGravity(Gravity.CENTER)
-  save.setTextColor(0xff0b6f6a)
-  save.setBackground(rounded(0xffdff3f0, 0xffbfe6e1, 12))
+  save.setTextColor(ACCENT_DEEP)
+  save.setBackground(rounded(ACCENT_WASH, ACCENT_LINE, 12))
   local saveParams = LinearLayout.LayoutParams(-1, dp(44))
   saveParams.topMargin = dp(18)
   box.addView(save, saveParams)
@@ -444,17 +463,17 @@ end
 
 local function fileTag(file)
   if file.isDirectory() then
-    return "夹", 0xff7a6a56, 0xfff0e4d4
+    return "夹", WARM_INK, WARM_WASH
   end
   local name = file.getName():lower()
   if name:sub(-4) == ".lua" then
-    return "L", 0xff0b6f6a, 0xffdff3f0
+    return "L", ACCENT_DEEP, ACCENT_WASH
   elseif name:match("%.png$") or name:match("%.jpe?g$") or name:match("%.webp$") then
-    return "图", 0xff4a6fa5, 0xffe2ecf8
+    return "图", BLUE_INK, BLUE_WASH
   elseif name:match("%.alp$") or name:match("%.apk$") then
-    return "包", 0xff8a5a2b, 0xfff7e6d2
+    return "包", BROWN_INK, BROWN_WASH
   end
-  return "文", 0xff5f6f7c, 0xffeceff2
+  return "文", MUTED, PAPER_LINE
 end
 
 -- 目录内容指纹：文件名 + 大小 + 修改时间，用来判断是否需要刷新
@@ -841,9 +860,9 @@ function buildDirPage(keepPage)
     if index == #crumbs then
       chip.setTextColor(INK)
       chip.setTypeface(Typeface.DEFAULT_BOLD)
-      chip.setBackground(rounded(0xfff2ece0, nil, 8))
+      chip.setBackground(rounded(PAPER_SOFT, nil, 8))
     else
-      chip.setTextColor(0xff0b6f6a)
+      chip.setTextColor(ACCENT_DEEP)
       chip.setBackground(rounded(0x00000000, nil, 8))
     end
     chip.setPadding(dp(7), dp(4), dp(7), dp(4))
@@ -922,10 +941,10 @@ function buildDirPage(keepPage)
     local button = TextView(activity)
     button.setText(text)
     button.setTextSize(12)
-    button.setTextColor(0xff0b6f6a)
+    button.setTextColor(ACCENT_DEEP)
     button.setGravity(Gravity.CENTER)
     button.setPadding(dp(9), dp(6), dp(9), dp(6))
-    button.setBackground(rounded(0xffdff3f0, 0xffbfe6e1, 9))
+    button.setBackground(rounded(ACCENT_WASH, ACCENT_LINE, 9))
     local params = LinearLayout.LayoutParams(-2, -2)
     params.rightMargin = dp(7)
     actions.addView(button, params)
@@ -1048,7 +1067,7 @@ local function buildPermissionPage()
   note.setText("勾选的权限会在打包时写进成品清单，未勾选的不会出现。默认至少保留存储与联网，用于日志与基础功能。")
   note.setTextSize(12.5)
   note.setTextColor(MUTED)
-  note.setBackground(rounded(0xfff3f6f9, 0xffd8e3ec, 10))
+  note.setBackground(rounded(INFO_BG, INFO_LINE, 10))
   note.setPadding(dp(12), dp(10), dp(12), dp(10))
   box.addView(note, LinearLayout.LayoutParams(-1, -2))
 
@@ -1060,7 +1079,7 @@ local function buildPermissionPage()
     caption.setText(group.title)
     caption.setTextSize(13)
     caption.setTypeface(Typeface.DEFAULT_BOLD)
-    caption.setTextColor(0xff16324a)
+    caption.setTextColor(INFO_TEXT)
     caption.setPadding(dp(2), dp(16), 0, dp(6))
     box.addView(caption)
 
@@ -1110,8 +1129,8 @@ local function buildPermissionPage()
   save.setText("保存权限注入")
   save.setTextSize(14)
   save.setGravity(Gravity.CENTER)
-  save.setTextColor(0xff0b6f6a)
-  save.setBackground(rounded(0xffdff3f0, 0xffbfe6e1, 12))
+  save.setTextColor(ACCENT_DEEP)
+  save.setBackground(rounded(ACCENT_WASH, ACCENT_LINE, 12))
   local saveParams = LinearLayout.LayoutParams(-1, dp(44))
   saveParams.topMargin = dp(18)
   box.addView(save, saveParams)
@@ -1192,9 +1211,9 @@ local function buildLogPage()
   local symbol = TextView(activity)
   symbol.setText("志")
   symbol.setTextSize(20)
-  symbol.setTextColor(0xff7a6a56)
+  symbol.setTextColor(WARM_INK)
   symbol.setGravity(Gravity.CENTER)
-  symbol.setBackground(rounded(0xfff2ece0, nil, 14))
+  symbol.setBackground(rounded(PAPER_SOFT, nil, 14))
   card.addView(symbol, LinearLayout.LayoutParams(dp(52), dp(52)))
 
   local title = TextView(activity)
@@ -1292,8 +1311,8 @@ local function barButton(text, primary, handler)
   button.setTextSize(14)
   button.setGravity(Gravity.CENTER)
   if primary then
-    button.setTextColor(0xff0b6f6a)
-    button.setBackground(rounded(0xffdff3f0, 0xffbfe6e1, 12))
+    button.setTextColor(ACCENT_DEEP)
+    button.setBackground(rounded(ACCENT_WASH, ACCENT_LINE, 12))
   else
     button.setTextColor(INK)
     button.setBackground(rounded(CARD, LINE, 12))

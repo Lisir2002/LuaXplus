@@ -16,16 +16,24 @@ import "autotheme"
 
 activity.setTheme(autotheme())
 
-local PAPER = 0xfffbf6ec
-local PANEL = 0xff1b232c
-local PANEL_SOFT = 0xff232d38
-local PANEL_LINE = 0xff33404d
-local TEXT_MAIN = 0xffe8eef4
-local TEXT_MUTED = 0xff90a0ae
-local ACCENT = 0xff0fa8a0
-local INK = 0xff1c2b3a
-local CARD = 0xFFFFFDF8
-local LINE = 0xffe6dbc8
+local theme = require "luaxplus.theme"
+local C = theme.colors
+local PAPER = C.paper
+local PANEL = C.panel
+local PANEL_SOFT = C.panelSoft
+local PANEL_LINE = C.panelLine
+local TEXT_MAIN = C.panelText
+local TEXT_MUTED = C.panelMuted
+local ACCENT = C.accent
+local INK = C.ink
+local CARD = C.card
+local LINE = C.line
+local PANEL_DEEP = C.panelDeep
+local PANEL_KEY = C.panelKey
+local PANEL_TEXT_SOFT = C.panelTextSoft
+local EDITOR_DARK_BG = C.editorDarkBg
+local ON_ACCENT_DEEP = C.onAccentDeep
+local SUCCESS_TEXT = C.successText
 
 local args = {...}
 local filePath = args[1]
@@ -115,6 +123,7 @@ local root = LinearLayout(activity)
 root.setOrientation(LinearLayout.VERTICAL)
 root.setBackgroundColor(PANEL)
 root.setFitsSystemWindows(true)
+theme.apply(activity, { background = PANEL, statusBar = PANEL, navigationBar = PANEL, root = root, dark = true })
 activity.setContentView(root)
 
 -- ===== 顶部操作栏 =====
@@ -203,7 +212,7 @@ findBtn.setTextColor(TEXT_MUTED)
 
 local saveBtn = barButton("保存")
 saveBtn.setTextSize(12)
-saveBtn.setTextColor(0xff07130f)
+saveBtn.setTextColor(ON_ACCENT_DEEP)
 saveBtn.setBackground(rounded(ACCENT, nil, 8))
 local saveParams = LinearLayout.LayoutParams(-2, -2)
 saveParams.leftMargin = dp(4)
@@ -235,7 +244,7 @@ editor.requestFocus()
 local wrapEnabled = false
 local function refreshWrapButton()
   if wrapEnabled then
-    wrapBtn.setTextColor(0xff07130f)
+    wrapBtn.setTextColor(ON_ACCENT_DEEP)
     wrapBtn.setBackground(rounded(ACCENT, nil, 8))
   else
     wrapBtn.setTextColor(TEXT_MUTED)
@@ -268,7 +277,7 @@ local function panelInput(hint, panel)
   input.setTextColor(TEXT_MAIN)
   input.setHintTextColor(TEXT_MUTED)
   input.setSingleLine(true)
-  input.setBackground(rounded(0xff141b22, PANEL_LINE, 8))
+  input.setBackground(rounded(PANEL_DEEP, PANEL_LINE, 8))
   input.setPadding(dp(8), dp(5), dp(8), dp(5))
   panel.addView(input, LinearLayout.LayoutParams(0, -2, 1))
   return input
@@ -294,7 +303,7 @@ local function smallButton(text, parent)
   view.setTextColor(TEXT_MAIN)
   view.setGravity(Gravity.CENTER)
   view.setPadding(dp(8), dp(5), dp(8), dp(5))
-  view.setBackground(rounded(0xff2b3744, PANEL_LINE, 7))
+  view.setBackground(rounded(PANEL_KEY, PANEL_LINE, 7))
   local params = LinearLayout.LayoutParams(-2, -2)
   params.leftMargin = dp(4)
   parent.addView(view, params)
@@ -377,7 +386,7 @@ root.addView(stripScroll, LinearLayout.LayoutParams(-1, -2))
 local statusBar = LinearLayout(activity)
 statusBar.setOrientation(LinearLayout.HORIZONTAL)
 statusBar.setGravity(Gravity.CENTER_VERTICAL)
-statusBar.setBackgroundColor(0xff141b22)
+statusBar.setBackgroundColor(PANEL_DEEP)
 statusBar.setPadding(dp(10), dp(2), dp(8), dp(3))
 
 local statusText = TextView(activity)
@@ -463,7 +472,7 @@ refreshStatus = function()
   statusText.setText("行 " .. line .. "/" .. total .. " · 列 " .. column .. " · " .. TextUtil.length(text) .. " 字符")
   if text == savedText then
     dirtyText.setText("已保存")
-    dirtyText.setTextColor(0xff6fbf9a)
+    dirtyText.setTextColor(SUCCESS_TEXT)
     titleText.setText(fileName)
   else
     dirtyText.setText("未保存")
@@ -929,8 +938,8 @@ local function menuActions(action)
     darkMode = not darkMode
     editor.setDark(darkMode)
     if darkMode then
-      editor.setBackgroundColor(0xff141a20)
-      editor.setTextColor(0xffd6dde5)
+      editor.setBackgroundColor(EDITOR_DARK_BG)
+      editor.setTextColor(PANEL_TEXT_SOFT)
     else
       editor.setBackgroundColor(PAPER)
       editor.setTextColor(INK)

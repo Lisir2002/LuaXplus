@@ -23,11 +23,14 @@ pcall(function()
   end
 end)
 
-local BG = 0xfff2f2f7
-local CARD = 0xffffffff
-local INK = 0xff1c1c1e
-local MUTED = 0xff8e8e93
-local ACCENT = 0xff0a84ff
+local theme = require "luaxplus.theme"
+local C = theme.colors
+local BG = C.paper
+local CARD = C.card
+local INK = C.ink
+local MUTED = C.muted
+local LINE = C.line
+local ACCENT = C.accent
 
 local function dp(n)
   return math.floor(n * activity.getResources().getDisplayMetrics().density + 0.5)
@@ -59,7 +62,7 @@ local function section(title, body)
   local box = LinearLayout(activity)
   box.setOrientation(LinearLayout.VERTICAL)
   box.setPadding(dp(16), dp(14), dp(16), dp(14))
-  box.setBackground(rounded(CARD, 0xffe5e5ea, 14))
+  box.setBackground(rounded(CARD, LINE, 14))
 
   local heading = label(title, 14, INK, true)
   box.addView(heading)
@@ -119,7 +122,7 @@ local hero = LinearLayout(activity)
 hero.setOrientation(LinearLayout.VERTICAL)
 hero.setGravity(Gravity.CENTER)
 hero.setPadding(dp(20), dp(22), dp(20), dp(22))
-hero.setBackground(rounded(CARD, 0xffe5e5ea, 18))
+hero.setBackground(rounded(CARD, LINE, 18))
 content.addView(hero, LinearLayout.LayoutParams(-1, -2))
 
 hero.addView(label("Mini-LuaXPLUS", 21, INK, true))
@@ -147,4 +150,5 @@ footer.setGravity(Gravity.CENTER)
 footer.setPadding(0, dp(24), 0, 0)
 content.addView(footer, LinearLayout.LayoutParams(-1, -2))
 
+theme.apply(activity, { background = BG, root = root, dark = false })
 activity.setContentView(root)

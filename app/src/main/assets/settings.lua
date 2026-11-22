@@ -23,11 +23,14 @@ pcall(function()
   end
 end)
 
-local BG = 0xfff2f2f7
-local CARD = 0xffffffff
-local INK = 0xff1c1c1e
-local MUTED = 0xff8e8e93
-local ACCENT = 0xff0a84ff
+local theme = require "luaxplus.theme"
+local C = theme.colors
+local BG = C.paper
+local CARD = C.card
+local INK = C.ink
+local MUTED = C.muted
+local LINE = C.line
+local ACCENT = C.accent
 
 local function dp(n)
   return math.floor(n * activity.getResources().getDisplayMetrics().density + 0.5)
@@ -113,7 +116,7 @@ content.addView(intro, LinearLayout.LayoutParams(-1, -2))
 
 local group = LinearLayout(activity)
 group.setOrientation(LinearLayout.VERTICAL)
-group.setBackground(rounded(CARD, 0xffe5e5ea, 14))
+group.setBackground(rounded(CARD, LINE, 14))
 content.addView(group, LinearLayout.LayoutParams(-1, -2))
 
 local items = {
@@ -141,7 +144,7 @@ for index = 1, #items do
   end
   if index < #items then
     local line = View(activity)
-    line.setBackgroundColor(0xffe5e5ea)
+    line.setBackgroundColor(LINE)
     local lineParams = LinearLayout.LayoutParams(-1, dp(1))
     lineParams.leftMargin = dp(16)
     group.addView(line, lineParams)
@@ -153,4 +156,5 @@ note.setGravity(Gravity.CENTER)
 note.setPadding(0, dp(18), 0, 0)
 content.addView(note, LinearLayout.LayoutParams(-1, -2))
 
+theme.apply(activity, { background = BG, root = root, dark = false })
 activity.setContentView(root)

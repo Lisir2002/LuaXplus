@@ -5,6 +5,7 @@ import "android.webkit.*"
 import "com.androlua.*"
 import "android.app.*"
 import "autotheme"
+local theme = require "luaxplus.theme"
 
 -- 手册页面放在安装包内置资源里，用 android_asset 地址读取，
 -- 避免直接访问应用私有目录被浏览器内核拒绝
@@ -50,7 +51,7 @@ settings.setBuiltInZoomControls(false)
 settings.setDisplayZoomControls(false)
 settings.setTextZoom(100)
 
-doc_web.setBackgroundColor(0xfff2f2f7)
+doc_web.setBackgroundColor(theme.colors.paper)
 doc_web.loadUrl(HOME)
 
 doc_web.setOnKeyListener(View.OnKeyListener{
@@ -63,4 +64,5 @@ doc_web.setOnKeyListener(View.OnKeyListener{
   end
 })
 
+theme.apply(activity, { background = theme.colors.paper, dark = false })
 activity.setContentView(doc_web)

@@ -32,12 +32,24 @@ pcall(function()
   end
 end)
 
-local PAPER = 0xfff7f1e6
-local CARD = 0xFFFFFDF8
-local INK = 0xff1c2b3a
-local MUTED = 0xff5f6f7c
-local ACCENT = 0xff0f9e97
-local LINE = 0xffe6dbc8
+local theme = require "luaxplus.theme"
+local C = theme.colors
+local PAPER = C.paper
+local CARD = C.card
+local INK = C.ink
+local MUTED = C.muted
+local ACCENT = C.accent
+local LINE = C.line
+local ACCENT_DEEP = C.accentDeep
+local ACCENT_WASH = C.accentWash
+local ACCENT_LINE = C.accentLine
+local PAPER_SOFT = C.paperSoft
+local MUTED_SOFT = C.mutedSoft
+local MUTED_LIGHT = C.mutedLight
+local WARM_INK = C.warmInk
+local WARM_WASH = C.warmWash
+local INFO_INK = C.infoInk
+local INFO_WASH = C.infoWash
 
 local projectRoot = activity.getLuaExtDir("project")
 local examplesRoot = activity.getLuaExtDir("examples")
@@ -188,10 +200,10 @@ header.addView(editorBtn)
 local newBtn = TextView(activity)
 newBtn.setText("新建")
 newBtn.setTextSize(13)
-newBtn.setTextColor(0xff0b6f6a)
+newBtn.setTextColor(ACCENT_DEEP)
 newBtn.setGravity(Gravity.CENTER)
 newBtn.setPadding(dp(13), dp(7), dp(13), dp(7))
-newBtn.setBackground(rounded(0xffdff3f0, 0xffbfe6e1, 10))
+newBtn.setBackground(rounded(ACCENT_WASH, ACCENT_LINE, 10))
 local newParams = LinearLayout.LayoutParams(-2, -2)
 newParams.leftMargin = dp(8)
 header.addView(newBtn, newParams)
@@ -228,6 +240,7 @@ scroll.addView(list, LinearLayout.LayoutParams(-1, -2))
 root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1))
 
 drawerLayout.addView(root, DrawerLayout.LayoutParams(-1, -1))
+theme.apply(activity, { background = PAPER, root = drawerLayout, dark = false })
 activity.setContentView(drawerLayout)
 
 local projects = {}
@@ -313,7 +326,7 @@ local function buildCard(info)
     icon.setImageResource(R.drawable.icon)
   end
   icon.setScaleType(ImageView.ScaleType.CENTER_CROP)
-  icon.setBackground(rounded(0xfff2ece0, nil, 12))
+  icon.setBackground(rounded(PAPER_SOFT, nil, 12))
   card.addView(icon, LinearLayout.LayoutParams(dp(50), dp(50)))
 
   local texts = LinearLayout(activity)
@@ -339,7 +352,7 @@ local function buildCard(info)
   local desc = TextView(activity)
   desc.setText((info.description and info.description ~= "") and info.description or "未填写简介")
   desc.setTextSize(12.5)
-  desc.setTextColor(0xff7d8b96)
+  desc.setTextColor(MUTED_SOFT)
   desc.setMaxLines(1)
   desc.setPadding(0, dp(4), 0, 0)
   texts.addView(desc)
@@ -347,7 +360,7 @@ local function buildCard(info)
   local arrow = TextView(activity)
   arrow.setText("›")
   arrow.setTextSize(18)
-  arrow.setTextColor(0xff9fb0ba)
+  arrow.setTextColor(MUTED_LIGHT)
   card.addView(arrow)
 
   card.setOnClickListener(View.OnClickListener{
@@ -705,7 +718,7 @@ local function sideEntry(badgeText, badgeColor, badgeBg, titleText, hintText, ha
   return row
 end
 
-sideEntry("例", 0xff0b6f6a, 0xffdff3f0, "官方示例", "内置完整组件示例，可编辑运行", function()
+sideEntry("例", ACCENT_DEEP, ACCENT_WASH, "官方示例", "内置完整组件示例，可编辑运行", function()
   local ok, err = pcall(function()
     activity.newActivity("examples")
   end)
@@ -713,7 +726,7 @@ sideEntry("例", 0xff0b6f6a, 0xffdff3f0, "官方示例", "内置完整组件示�
     Toast.makeText(activity, "示例页启动失败：" .. tostring(err), Toast.LENGTH_SHORT).show()
   end
 end)
-sideEntry("册", 0xff0b6f6a, 0xffdff3f0, "使用手册", "从快速开始查到打包排错", function()
+sideEntry("册", ACCENT_DEEP, ACCENT_WASH, "使用手册", "从快速开始查到打包排错", function()
   local ok, err = pcall(function()
     activity.newActivity("luadoc")
   end)
@@ -721,7 +734,7 @@ sideEntry("册", 0xff0b6f6a, 0xffdff3f0, "使用手册", "从快速开始查到�
     Toast.makeText(activity, "手册启动失败：" .. tostring(err), Toast.LENGTH_SHORT).show()
   end
 end)
-sideEntry("J", 0xff1f5f8b, 0xffe3f0fa, "Java 浏览器", "浏览类、方法、字段与事件说明", function()
+sideEntry("J", INFO_INK, INFO_WASH, "Java 浏览器", "浏览类、方法、字段与事件说明", function()
   local ok, err = pcall(function()
     activity.newActivity("javaapi/main")
   end)
@@ -729,8 +742,8 @@ sideEntry("J", 0xff1f5f8b, 0xffe3f0fa, "Java 浏览器", "浏览类、方法、�
     Toast.makeText(activity, "Java 浏览器启动失败：" .. tostring(err), Toast.LENGTH_SHORT).show()
   end
 end)
-sideEntry("关", 0xff0b6f6a, 0xffdff3f0, "关于", "版本信息与开发说明", showAbout)
-sideEntry("设", 0xff7a6a56, 0xfff0e4d4, "设置", "偏好与行为配置", showSettings)
+sideEntry("关", ACCENT_DEEP, ACCENT_WASH, "关于", "版本信息与开发说明", showAbout)
+sideEntry("设", WARM_INK, WARM_WASH, "设置", "偏好与行为配置", showSettings)
 
 local sideFooter = TextView(activity)
 sideFooter.setText(appVersion ~= "" and appVersion or "1.0.0-rc9")

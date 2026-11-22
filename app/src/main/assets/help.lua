@@ -6,6 +6,7 @@ import "android.net.*"
 import "android.content.*"
 import "androidx.appcompat.app.AppCompatDialog"
 import "autotheme"
+local theme = require "luaxplus.theme"
 
 help=[===[
 @关于@
@@ -1280,6 +1281,7 @@ newTimer(func, arg)
 ]===]
 activity.setTitle("帮助")
 activity.setTheme(autotheme())
+theme.apply(activity, { background = theme.colors.paper, dark = false })
 activity.getSupportActionBar().setDisplayHomeAsUpEnabled(true)
 import "themeutil"
 import "res"

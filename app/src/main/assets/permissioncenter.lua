@@ -10,6 +10,8 @@ import "autotheme"
 
 activity.setTheme(autotheme())
 local ui = require "luaxplus.ui"
+local theme = require "luaxplus.theme"
+theme.install(ui, "light")
 local P = luajava.bindClass("com.mini.luaxplus.Permissions")
 local Build = luajava.bindClass("android.os.Build")
 local Toast = luajava.bindClass("android.widget.Toast")

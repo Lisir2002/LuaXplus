@@ -690,15 +690,23 @@ local function textView(text, size, color, bold)
   return view
 end
 
-local function applySystemBars(dark)
+local function applySystemBars(dark, background, statusBar, navigationBar)
   local current = activity
   if not current then
     return
   end
   pcall(function()
     local window = current.getWindow()
-    window.setStatusBarColor(colors().bg)
-    window.setNavigationBarColor(colors().bg)
+    local params = luajava.bindClass("android.view.WindowManager$LayoutParams")
+    window.addFlags(params.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+    window.clearFlags(params.FLAG_TRANSLUCENT_STATUS)
+    window.clearFlags(params.FLAG_TRANSLUCENT_NAVIGATION)
+  end)
+  pcall(function()
+    local window = current.getWindow()
+    window.setStatusBarColor(statusBar or background)
+    window.setNavigationBarColor(navigationBar or background)
+    window.setBackgroundDrawable(ColorDrawable(background))
   end)
   pcall(function()
     local decor = current.getWindow().getDecorView()
@@ -708,6 +716,14 @@ local function applySystemBars(dark)
         flags = flags & ~8192
       else
         flags = flags | 8192
+      end
+      decor.setSystemUiVisibility(flags)
+    end
+    if Build.VERSION.SDK_INT >= 26 then
+      if dark then
+        flags = flags & ~16
+      else
+        flags = flags | 16
       end
       decor.setSystemUiVisibility(flags)
     end
@@ -937,7 +953,13 @@ function M.page(options)
       supportBar.hide()
     end
   end)
-  applySystemBars(dark)
+  local background = parseColor(options.background or palette.bg)
+  local statusBar = parseColor(options.statusBarBackground or palette.bg)
+  local navigationBar = parseColor(options.navigationBarBackground or palette.bg)
+  if not dark and Build.VERSION.SDK_INT < 23 then
+    statusBar = palette.ink
+  end
+  applySystemBars(dark, background, statusBar, navigationBar)
 
   local frame = FrameLayout(current)
   frame.setFitsSystemWindows(true)
@@ -963,7 +985,7 @@ function M.page(options)
   frame.addView(root, FrameLayout.LayoutParams(-1, -1))
 
   local nav = FrameLayout(current)
-  nav.setBackgroundColor(options.navBackground or palette.surface)
+  nav.setBackgroundColor(options.navBackground or palette.bg)
   root.addView(nav, LinearLayout.LayoutParams(-1, dp(K.navHeight)))
 
   local navTitle = textView(options.title or "", TY.body.size, palette.label, true)

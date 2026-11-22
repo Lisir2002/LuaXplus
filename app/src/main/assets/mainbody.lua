@@ -22,6 +22,7 @@ import "com.google.android.material.textfield.TextInputLayout"
 import "bin"
 import "autotheme"
 import "DialogHelper"
+local chrome = require "luaxplus.theme"
 
 --首先添加一下，避免后期重复添加
 local classes = require "javaapi.android"
@@ -708,6 +709,7 @@ end
 --activity.setTheme(android.R.style.Theme_Holo_Light)
 local version = Build.VERSION.SDK_INT;
 local h = tonumber(os.date("%H"))
+local editorDark = h <= 6 or h >= 22
 function ext(f)
   local f=io.open(f)
   if f then
@@ -1016,7 +1018,7 @@ function read(path)
   f:close()
   if str~="" then
     local c=string.byte(str);
-    if c <= 0x1c and c>= 0x1a and c!=" " and c!="\t" then
+    if c == 0x1b then
       Toast.makeText(activity, "不能打开已编译文件." .. path, Toast.LENGTH_LONG ).show()
       return
     end
@@ -1676,6 +1678,12 @@ function onMenuItemSelected(id, item)
 end
 
 activity.setContentView(loadlayout(layout.main))
+chrome.apply(activity, {
+  background = editorDark and chrome.colors.panel or chrome.colors.paper,
+  statusBar = editorDark and chrome.colors.panel or chrome.colors.paper,
+  navigationBar = editorDark and chrome.colors.panel or chrome.colors.paper,
+  dark = editorDark,
+})
 
 function onCreate(s)
   pcall(function()
@@ -1705,10 +1713,10 @@ function onNewIntent(intent)
   local uri = intent.getData()
   if uri and uri.getPath():find("%.alp$") then
     local data = intent.getData();
-    if (data ~= nil)
+    if (data ~= nil) then
       local path = data.getPath();
-      if (path ~= null)
-        if ("content" == (data.getScheme()))
+      if (path ~= null) then
+        if ("content" == (data.getScheme())) then
           local ins = activity.getContentResolver().openInputStream(data);
           local path2 = activity.getLuaExtPath("cache", File(data.getPath()).getName());
           local out = FileOutputStream(path2);
@@ -1718,7 +1726,7 @@ function onNewIntent(intent)
           return ;
         end
         local idx = path.indexOf("/storage/emulated/");
-        if (idx > 0)
+        if (idx > 0) then
           path = path.substring(idx);
         end
         imports(path,data);

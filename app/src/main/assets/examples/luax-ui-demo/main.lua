@@ -10,6 +10,8 @@ import "android.graphics.drawable.*"
 -- 说明：这个工程只使用公开的 ui 模块与普通 View，不修改任何原生 Lua 写法。
 
 local ui = require "luaxplus.ui"
+local theme = require "luaxplus.theme"
+theme.install(ui, "light")
 local dp = ui.dp
 
 local TAB_TITLES = {"快速", "控件", "表单", "弹窗", "进阶", "关于"}
@@ -238,7 +240,7 @@ ui.show{
     title = "项目信息",
     items = {
       { label = "包名", value = "com.mini.luaxplus" },
-      { label = "当前版本", value = "1.0.0-rc22" },
+      { label = "当前版本", value = "1.0.0-rc23" },
       { label = "构建渠道", value = "Release" },
     },
     footer = "键值列表适合详情页、设置摘要和订单信息。",
@@ -249,11 +251,11 @@ ui.show{
     subtitle = "点击标题展开",
     expanded = false,
     content = function(body)
-      local note = TextView(activity)
-      note.setText("折叠容器可以放任意 View；内部仍然使用普通布局。")
-      note.setTextSize("13px")
-      note.setTextColor(palette().secondary)
-      body.addView(note)
+      body.addView(ui.text({
+        text = "折叠容器可以放任意 View；内部仍然使用普通布局。",
+        type = "footnote",
+        color = palette().secondary,
+      }))
     end,
     onToggle = function(expanded)
       toast(expanded and "已展开" or "已收起")
@@ -1081,10 +1083,11 @@ local function buildAdvanced()
     title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL))
     box.addView(title)
 
-    local note = TextView(activity)
-    note.setText("ui.background 支持封面裁切、圆角、遮罩和内容叠加。")
-    note.setTextSize("13px")
-    note.setTextColor(ui.withAlpha(ui.tokens.color.onAccent, "82%"))
+    local note = ui.text({
+      text = "ui.background 支持封面裁切、圆角、遮罩和内容叠加。",
+      type = "footnote",
+      color = ui.withAlpha(ui.tokens.color.onAccent, "82%"),
+    })
     note.setPadding(0, dp(4), 0, 0)
     box.addView(note)
 
@@ -1114,10 +1117,11 @@ local function buildAdvanced()
     })
     box.addView(thumb, LinearLayout.LayoutParams(-1, dp(104)))
 
-    local alphaLabel = TextView(activity)
-    alphaLabel.setText("withAlpha 支持 0-1 和 0-255 两种透明度")
-    alphaLabel.setTextSize("13px")
-    alphaLabel.setTextColor(palette().secondary)
+    local alphaLabel = ui.text({
+      text = "withAlpha 支持 0-1 和 0-255 两种透明度",
+      type = "footnote",
+      color = palette().secondary,
+    })
     alphaLabel.setPadding(0, dp(8), 0, 0)
     box.addView(alphaLabel)
 
@@ -1127,7 +1131,7 @@ local function buildAdvanced()
     for _, value in ipairs({ 0.08, 0.24, 0.48, 0.72 }) do
       local tile = TextView(activity)
       tile.setText(string.format("%.0f%%", value * 100))
-      tile.setTextSize("11px")
+      tile.setTextSize(ui.tokens.type.caption.size)
       tile.setTextColor(palette().label)
       tile.setGravity(Gravity.CENTER)
       local tileBackground = GradientDrawable()

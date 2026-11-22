@@ -29,12 +29,20 @@ pcall(function()
   end
 end)
 
-local PAPER = 0xfff7f1e6
-local CARD = 0xFFFFFDF8
-local INK = 0xff1c2b3a
-local MUTED = 0xff5f6f7c
-local LINE = 0xffe6dbc8
-local ACCENT = 0xff0f9e97
+local theme = require "luaxplus.theme"
+local C = theme.colors
+local PAPER = C.paper
+local CARD = C.card
+local INK = C.ink
+local MUTED = C.muted
+local LINE = C.line
+local ACCENT = C.accent
+local ACCENT_DEEP = C.accentDeep
+local ACCENT_WASH = C.accentWash
+local ACCENT_LINE = C.accentLine
+local PAPER_SOFT = C.paperSoft
+local MUTED_SOFT = C.mutedSoft
+local MUTED_LIGHT = C.mutedLight
 
 local dp = function(n)
   return math.floor(n * activity.getResources().getDisplayMetrics().density + 0.5)
@@ -271,10 +279,10 @@ titleBox.addView(subtitle)
 local restore = TextView(activity)
 restore.setText("恢复")
 restore.setTextSize(12)
-restore.setTextColor(0xff0b6f6a)
+restore.setTextColor(ACCENT_DEEP)
 restore.setGravity(Gravity.CENTER)
 restore.setPadding(dp(11), dp(6), dp(11), dp(6))
-restore.setBackground(rounded(0xffdff3f0, 0xffbfe6e1, 10))
+restore.setBackground(rounded(ACCENT_WASH, ACCENT_LINE, 10))
 header.addView(restore)
 
 root.addView(header, LinearLayout.LayoutParams(-1, -2))
@@ -294,6 +302,7 @@ list.setPadding(dp(16), dp(4), dp(16), dp(24))
 scroll.addView(list, LinearLayout.LayoutParams(-1, -2))
 root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1))
 
+theme.apply(activity, { background = PAPER, root = root, dark = false })
 activity.setContentView(root)
 
 -- ===== 卡片 =====
@@ -339,7 +348,7 @@ local function buildIcon(info)
     local icon = ImageView(activity)
     icon.setImageBitmap(loadbitmap(iconFile.getAbsolutePath()))
     icon.setScaleType(ImageView.ScaleType.CENTER_CROP)
-    icon.setBackground(rounded(0xfff2ece0, nil, 12))
+    icon.setBackground(rounded(PAPER_SOFT, nil, 12))
     return icon
   end
 
@@ -347,9 +356,9 @@ local function buildIcon(info)
   glyph.setText("UI")
   glyph.setTextSize(15)
   glyph.setTypeface(Typeface.DEFAULT_BOLD)
-  glyph.setTextColor(0xffffffff)
+  glyph.setTextColor(C.onAccent)
   glyph.setGravity(Gravity.CENTER)
-  glyph.setBackground(rounded(0xff0f9e97, nil, 12))
+  glyph.setBackground(rounded(ACCENT, nil, 12))
   return glyph
 end
 
@@ -383,10 +392,10 @@ local function buildCard(info)
   local badge = TextView(activity)
   badge.setText("官方")
   badge.setTextSize(10)
-  badge.setTextColor(0xff0b6f6a)
+  badge.setTextColor(ACCENT_DEEP)
   badge.setGravity(Gravity.CENTER)
   badge.setPadding(dp(6), dp(2), dp(6), dp(2))
-  badge.setBackground(rounded(0xffdff3f0, nil, 8))
+  badge.setBackground(rounded(ACCENT_WASH, nil, 8))
   local badgeParams = LinearLayout.LayoutParams(-2, -2)
   badgeParams.leftMargin = dp(7)
   nameRow.addView(badge, badgeParams)
@@ -401,7 +410,7 @@ local function buildCard(info)
   local desc = TextView(activity)
   desc.setText((info.description and info.description ~= "") and info.description or "官方示例工程")
   desc.setTextSize(12.5)
-  desc.setTextColor(0xff7d8b96)
+  desc.setTextColor(MUTED_SOFT)
   desc.setMaxLines(2)
   desc.setPadding(0, dp(4), 0, 0)
   texts.addView(desc)
@@ -409,7 +418,7 @@ local function buildCard(info)
   local arrow = TextView(activity)
   arrow.setText("›")
   arrow.setTextSize(18)
-  arrow.setTextColor(0xff9fb0ba)
+  arrow.setTextColor(MUTED_LIGHT)
   card.addView(arrow)
 
   card.setOnClickListener(View.OnClickListener{
