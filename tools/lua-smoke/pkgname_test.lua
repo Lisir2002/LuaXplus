@@ -26,25 +26,26 @@ local function valid(package)
   end
 end
 
-assert(pkgname.slug("My Notes") == "my_notes", pkgname.slug("My Notes"))
-assert(pkgname.slug("123") == "app_123", pkgname.slug("123"))
+assert(pkgname.slug("My Notes") == "mynotes", pkgname.slug("My Notes"))
+assert(pkgname.slug("123") == "app123", pkgname.slug("123"))
 assert(pkgname.slug("!!!"):match("^app%d+$"), "纯符号名称未生成哈希")
 assert(pkgname.pinyin("记账本") == "ji zhang ben", "中文没有转成拼音")
-assert(pkgname.slug("记账本") == "ji_zhang_ben", pkgname.slug("记账本"))
-assert(pkgname.slug("报表") == "bao_biao", pkgname.slug("报表"))
+assert(pkgname.slug("记账本") == "jizhangben", pkgname.slug("记账本"))
+assert(pkgname.slug("报表") == "baobiao", pkgname.slug("报表"))
 assert(#pkgname.slug(string.rep("A", 80)) <= 32, "包名段过长")
 
 valid(pkgname.generate("My Notes", {}))
 assert(pkgname.generate("Notes", {}) == "com.mini.notes")
 
-local used = { ["com.mini.notes"] = true, ["com.mini.notes_2"] = true }
+local used = { ["com.mini.notes"] = true, ["com.mini.notes.v2"] = true }
 local generated = pkgname.generate("Notes", used)
-assert(generated == "com.mini.notes_3", "重复包名未递增：" .. generated)
+assert(generated == "com.mini.notes.v3", "重复包名未递增：" .. generated)
+assert(not generated:find("_", 1, true), "包名不应包含下划线：" .. generated)
 valid(generated)
 
 local generatedChinese = pkgname.generate("记账本", {})
 valid(generatedChinese)
-assert(generatedChinese == "com.mini.ji_zhang_ben", generatedChinese)
+assert(generatedChinese == "com.mini.jizhangben", generatedChinese)
 
 -- ICU 不可用时仍必须给出合法的哈希兜底包名。
 luajava.bindClass = function()

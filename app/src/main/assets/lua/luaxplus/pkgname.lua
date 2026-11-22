@@ -1,5 +1,6 @@
 -- 把应用名称转成合法的 Android 包名。
--- 规则：每段只允许小写字母、数字、下划线；每段以字母开头；总长度可控。
+-- 规则：每段只允许小写字母和数字；每段以字母开头；总长度可控。
+-- 包名不强制使用下划线，这里用连续小写字母，阅读更干净。
 local M = {}
 
 local function trim(value)
@@ -65,21 +66,17 @@ function M.slug(name)
   name = trim(name)
   local pinyin = M.pinyin(name)
   local source = pinyin or name
-  local slug = source:lower()
-    :gsub("[^a-z0-9_]+", "_")
-    :gsub("_+", "_")
-    :gsub("^_", "")
-    :gsub("_$", "")
+  local slug = source:lower():gsub("[^a-z0-9]+", "")
 
   -- 拼音不可用、纯符号或空名称没有可用的 ASCII 字符，用稳定哈希保证可重复。
   if slug == "" then
     slug = "app" .. stableHash(name)
   elseif not slug:match("^[a-z]") then
-    slug = "app_" .. slug
+    slug = "app" .. slug
   end
 
   if #slug > 32 then
-    slug = slug:sub(1, 32):gsub("_$", "")
+    slug = slug:sub(1, 32)
   end
   return slug
 end
@@ -92,10 +89,10 @@ function M.generate(name, used)
   end
 
   local index = 2
-  local candidate = base .. "_" .. index
+  local candidate = base .. ".v" .. index
   while used[candidate] do
     index = index + 1
-    candidate = base .. "_" .. index
+    candidate = base .. ".v" .. index
   end
   return candidate
 end
