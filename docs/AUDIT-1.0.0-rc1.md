@@ -506,3 +506,18 @@
 验证：`luac5.3 -p` 检查组件库与教程内 19 段示例全部通过；`:app:assembleRelease` 构建成功；APK 内确认包含 `assets/luaxplus/ui.lua`、`assets/luadoc/uikit.html` 与 `IosSwitch` 类，v1/v2/v3 签名校验通过。
 
 已知限制：组件库不做虚拟列表，超长列表继续使用原生 `RecyclerView` 或 `LuaAdapter`；旧成品不会自动获得组件库，需要重新打包。
+
+## 三十六、官方示例入口与全量组件示例
+
+需求：侧边栏新增「官方示例」，进入后显示类似项目列表的卡片；卡片进入后与普通工程一样可以看属性、编辑文件、运行和打包；示例工程需要覆盖 LuaX-UI 全部组件。
+
+隔离设计：
+
+- 自建工程固定在 `LuaXPlus/project`，官方示例固定在 `LuaXPlus/examples`。
+- 首页项目列表显式排除 examples 路径；示例页只读取带 `official=true` 标记的工程。
+- 示例文件首次打开从 `assets/examples` 铺设到 examples 目录，之后改动保留；应用版本变化或手动恢复时才用内置版本覆盖。
+- 编辑示例属性时会保留 `official` 标记，避免保存后从示例页消失。
+
+示例内容：`assets/examples/luax-ui-demo`，四个页签覆盖页面骨架、分组行、按钮样式、表单、搜索、分段、卡片、弹窗、操作菜单、空态、加载、头像、徽标、分割线、间距、标签栏和明暗主题。
+
+验证：新增脚本通过 `luac5.3 -p`；release 构建成功；APK 内确认包含 `assets/examples.lua` 与示例工程文件。

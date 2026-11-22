@@ -114,6 +114,9 @@ local function writeInfo()
     table.insert(permissions, string.format("%q", item))
   end
   table.insert(lines, "user_permission={" .. table.concat(permissions, ",\n  ") .. "}")
+  if info.official then
+    table.insert(lines, "official=true")
+  end
   if info.strict_permissions then
     table.insert(lines, "strict_permissions=true")
   end

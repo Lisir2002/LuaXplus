@@ -534,6 +534,8 @@ function M.button(spec)
 
   local button = textView(spec.text or "按钮", spec.textSize or 17, textColor, true)
   button.setGravity(Gravity.CENTER)
+  button.setPadding(dp(14), dp(12), dp(14), dp(12))
+  button.setMinimumHeight(dp(46))
   button.setBackground(ripple(fill, spec.radius or 12, rippleColor))
   if spec.enabled == false then
     button.setAlpha(0.45)

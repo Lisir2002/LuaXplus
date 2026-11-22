@@ -39,6 +39,7 @@ local ACCENT = 0xff0f9e97
 local LINE = 0xffe6dbc8
 
 local projectRoot = activity.getLuaExtDir("project")
+local examplesRoot = activity.getLuaExtDir("examples")
 
 local function dp(n)
   return math.floor(n * activity.getResources().getDisplayMetrics().density + 0.5)
@@ -82,6 +83,9 @@ local function writeInfo(info)
     table.insert(permissions, string.format("%q", item))
   end
   table.insert(lines, "user_permission={" .. table.concat(permissions, ",\n  ") .. "}")
+  if info.official then
+    table.insert(lines, "official=true")
+  end
   if info.strict_permissions then
     table.insert(lines, "strict_permissions=true")
   end
@@ -397,8 +401,11 @@ function refresh(keyword)
   local dirs = File(projectRoot).listFiles()
   if dirs then
     for i = 0, #dirs - 1 do
-      if dirs[i].isDirectory() then
-        local info = readInfo(dirs[i].getAbsolutePath())
+      local path = dirs[i].getAbsolutePath()
+      local inExamples = examplesRoot ~= nil and examplesRoot ~= ""
+        and (path == examplesRoot or path:find(examplesRoot .. "/", 1, true) == 1)
+      if dirs[i].isDirectory() and not inExamples then
+        local info = readInfo(path)
         if info then
           info.mtime = dirs[i].lastModified()
           table.insert(projects, info)
@@ -698,6 +705,14 @@ local function sideEntry(badgeText, badgeColor, badgeBg, titleText, hintText, ha
   return row
 end
 
+sideEntry("例", 0xff0b6f6a, 0xffdff3f0, "官方示例", "内置完整组件示例，可编辑运行", function()
+  local ok, err = pcall(function()
+    activity.newActivity("examples")
+  end)
+  if not ok then
+    Toast.makeText(activity, "示例页启动失败：" .. tostring(err), Toast.LENGTH_SHORT).show()
+  end
+end)
 sideEntry("关", 0xff0b6f6a, 0xffdff3f0, "关于", "版本信息与开发说明", showAbout)
 sideEntry("设", 0xff7a6a56, 0xfff0e4d4, "设置", "偏好与行为配置", showSettings)
 
