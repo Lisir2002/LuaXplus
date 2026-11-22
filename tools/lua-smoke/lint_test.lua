@@ -197,6 +197,27 @@ local partial = lint.applyRepair("page:add(ui.text{ text = 'x' })\n", missingBot
 expect(not partial.ok, "只修 require 仍留下 page 未定义，复检却通过了")
 expect(partial.reason == "lint", "部分修复没有以 lint 原因阻断")
 
+-- 页面对象已经创建但忘记 show 时，也要提示并补在文件末尾。
+local pageDefined = [[local ui = require "luaxplus.ui"
+local page = ui.page{
+  title = "邮箱和备注",
+}
+local email = ui.field{ label = "邮箱" }
+page:add(email.view, 12)
+]]
+local pageDefinedReport = lint.audit(pageDefined, { file = "main.lua" })
+expect(issueKinds(pageDefinedReport).page_not_shown, "已创建页面但没有 show 时没有提示")
+expect(pageDefinedReport.issues[1].code == "LX1009", "page_not_shown 诊断码不对")
+expect(#pageDefinedReport.actions == 1, "page_not_shown 没有生成修复动作")
+local pageDefinedResult = lint.applyRepair(pageDefined, pageDefinedReport)
+expect(pageDefinedResult.ok, "page:show 补全没有通过复检")
+expect(pageDefinedResult.text:match("page:show%(%)"), "page:show 没有补到文件末尾")
+local pageDefinedAfter = lint.audit(pageDefinedResult.text, { file = "main.lua" })
+expect(#pageDefinedAfter.issues == 0, "补 page:show 后仍有问题")
+
+local alreadyShown = lint.audit(pageDefined .. "page:show()\n", { file = "main.lua" })
+expect(not issueKinds(alreadyShown).page_not_shown, "已有 page:show 时不应重复提示")
+
 -- 未知表成员不生成自动修复，避免凭空创建错误对象。
 local ambiguous = lint.audit("foo.bar()\n", { file = "main.lua" })
 expect(#ambiguous.actions == 0, "未知表成员不应生成自动修复")

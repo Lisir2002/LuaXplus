@@ -856,6 +856,32 @@ local function analyze(tokens, source)
   return facts
 end
 
+local function findUIPageBindings(tokens)
+  local result = {}
+  for index, token in ipairs(tokens) do
+    if token.value == "local" then
+      local nameToken = tokens[index + 1]
+      local equalsToken = tokens[index + 2]
+      local baseToken = tokens[index + 3]
+      local dotToken = tokens[index + 4]
+      local pageToken = tokens[index + 5]
+      if nameToken and nameToken.type == "name"
+          and equalsToken and equalsToken.value == "="
+          and baseToken and baseToken.value == "ui"
+          and dotToken and dotToken.value == "."
+          and pageToken and pageToken.value == "page" then
+        result[#result + 1] = {
+          name = nameToken.value,
+          line = nameToken.line,
+          column = nameToken.column,
+          offset = nameToken.offset,
+        }
+      end
+    end
+  end
+  return result
+end
+
 local function scanDefinitions(tokens)
   local definitions = {}
   local blocks = {
@@ -1061,6 +1087,7 @@ local ISSUE_CODES = {
   late_local = "LX1006",
   page_object = "LX1007",
   undefined_function = "LX1008",
+  page_not_shown = "LX1009",
 }
 
 local function addIssue(report, issue)
@@ -1145,6 +1172,7 @@ function M.audit(source, options)
   source = tostring(source or "")
   local tokens = tokenize(source)
   local facts = analyze(tokens, source)
+  local pageBindings = findUIPageBindings(tokens)
 
   local definitions = options.projectDefinitions
   if not definitions and options.projectRoot then
@@ -1403,6 +1431,44 @@ function M.audit(source, options)
             .. " 行前插入 local function " .. name .. "(...)",
         })
       end
+    end
+  end
+
+  for _, binding in ipairs(pageBindings) do
+    local shown = false
+    for _, use in ipairs(facts.uses) do
+      if use.name == binding.name and use.memberCall and use.memberName == "show" then
+        shown = true
+        break
+      end
+    end
+    if not shown then
+      addIssue(report, {
+        severity = "warning",
+        kind = "page_not_shown",
+        name = binding.name,
+        line = binding.line,
+        column = binding.column,
+        offset = binding.offset,
+        message = "页面对象 " .. binding.name .. " 已创建，但没有调用 "
+          .. binding.name .. ":show()，运行后不会显示",
+      })
+      local prefix = source:sub(-1) == "\n" and "" or "\n"
+      addAction(report, seenActions, {
+        code = ISSUE_CODES.page_not_shown,
+        kind = "quickfix",
+        confidence = "guided",
+        name = binding.name,
+        title = "补页面显示 " .. binding.name .. ":show()",
+        edits = {
+          {
+            startOffset = #source,
+            endOffset = #source,
+            text = prefix .. binding.name .. ":show()\n",
+          },
+        },
+        preview = "在文件末尾补 " .. binding.name .. ":show()",
+      })
     end
   end
 
@@ -1690,6 +1756,7 @@ function M.applyRepair(source, report, options)
   local runtimeBlocking = {
     page_object = true,
     undefined_function = true,
+    page_not_shown = true,
   }
   for _, issue in ipairs(after.issues) do
     if selectedKeys[(issue.code or "") .. "\0" .. (issue.name or "")]

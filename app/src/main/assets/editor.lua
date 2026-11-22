@@ -19,6 +19,7 @@ activity.setTheme(autotheme())
 local theme = require "luaxplus.theme"
 local icons = require "luaxplus.icons"
 local lint = require "luaxplus.lint"
+local EditorPalette = luajava.bindClass("com.mini.luaxplus.editor.EditorPalette")
 local C = theme.colors
 local PAPER = C.paper
 local PANEL = C.panel
@@ -250,24 +251,8 @@ local editor = LuaEditor(activity)
 
 -- 高亮色不能只依赖编辑器默认配色，否则标识符会和深色背景混在一起。
 local function applyEditorColors(isDark)
-  editor.setDark(isDark)
-  if isDark then
-    editor.setBackgroundColor(EDITOR_DARK_BG)
-    editor.setTextColor(0xFFE8EEF4)
-    editor.setBasewordColor(0xFFE8EEF4)
-    editor.setUserwordColor(0xFF8FD3F4)
-    editor.setCommentColor(0xFF8A9AA6)
-    editor.setKeywordColor(0xFFC792EA)
-    editor.setStringColor(0xFFF48FB1)
-  else
-    editor.setBackgroundColor(PAPER)
-    editor.setTextColor(INK)
-    editor.setBasewordColor(INK)
-    editor.setUserwordColor(0xFF1F5F8B)
-    editor.setCommentColor(0xFF6F7F72)
-    editor.setKeywordColor(0xFF7A3E9D)
-    editor.setStringColor(0xFFB03A5B)
-  end
+  EditorPalette.apply(editor, isDark)
+  editor.setBackgroundColor(isDark and EDITOR_DARK_BG or PAPER)
   pcall(function()
     editor.respan()
   end)
