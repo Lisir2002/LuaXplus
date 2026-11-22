@@ -103,11 +103,11 @@ public final class RuntimeWatcher {
     }
 
 
-    /** 兜底：页面若呈现运行时错误文本，直接截取整段内容存成快照 */
+    /** 兜底：页面上出现任何错误文本（含语法错误）都截取整页文字存快照 */
     private static void snapshotErrorScreen(Activity activity) {
         try {
             View root = activity.getWindow().getDecorView();
-            String text = findErrorText(root);
+            String text = collectErrorText(root);
             if (text == null) {
                 return;
             }
@@ -124,27 +124,43 @@ public final class RuntimeWatcher {
         }
     }
 
-    private static String findErrorText(View view) {
+    /** 收集整棵视图树的文字，命中错误特征时返回整段内容 */
+    private static String collectErrorText(View view) {
+        StringBuilder builder = new StringBuilder();
+        collect(view, builder);
+        String text = builder.toString().trim();
+        if (text.isEmpty()) {
+            return null;
+        }
+        if (text.contains("Syntax error") || text.contains("Runtime error")
+                || text.contains("stack traceback") || text.contains("LuaException")
+                || text.contains("Invalid method call") || text.contains("is not a field")
+                || text.contains("attempt to ") || text.contains("module '")
+                || text.startsWith("error")) {
+            if (text.length() > 6000) {
+                return text.substring(0, 6000) + "\n…（内容过长已截断）";
+            }
+            return text;
+        }
+        return null;
+    }
+
+    private static void collect(View view, StringBuilder builder) {
+        if (view == null) {
+            return;
+        }
         if (view instanceof TextView) {
             CharSequence content = ((TextView) view).getText();
-            if (content != null) {
-                String text = content.toString();
-                if (text.contains("Runtime error") || text.startsWith("error")
-                        || text.contains("stack traceback")) {
-                    return text;
-                }
+            if (content != null && content.length() > 0) {
+                builder.append(content).append('\n');
             }
         }
         if (view instanceof ViewGroup) {
             ViewGroup group = (ViewGroup) view;
             for (int index = 0; index < group.getChildCount(); index++) {
-                String text = findErrorText(group.getChildAt(index));
-                if (text != null) {
-                    return text;
-                }
+                collect(group.getChildAt(index), builder);
             }
         }
-        return null;
     }
 
     private static Intent getIntent(Activity activity) {

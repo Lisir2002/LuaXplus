@@ -57,6 +57,7 @@ public final class AssetBootstrap {
             writeMarker(marker, stamp + "|" + files[0] + "|" + start);
         } catch (Exception exception) {
             LogCore.e(TAG, "脚本铺设失败: " + exception);
+            LogCore.luaError("脚本铺设失败", exception.toString());
             return false;
         }
         long cost = System.currentTimeMillis() - start;

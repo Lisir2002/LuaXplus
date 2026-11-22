@@ -48,6 +48,22 @@ local function toast(text)
   Toast.makeText(activity, text, Toast.LENGTH_SHORT).show()
 end
 
+-- 运行前先编译校验，语法错误也能落快照，而不是只弹一个错误页
+local function runScript(filePath)
+  local ok, err = loadfile(filePath)
+  if not ok then
+    pcall(function()
+      luajava.bindClass("com.mini.luaxplus.LogCore")
+        .luaError("脚本语法错误 " .. tostring(filePath), tostring(err))
+    end)
+    toast("语法错误：" .. tostring(err))
+    return
+  end
+  pcall(function()
+    activity.newActivity(filePath)
+  end)
+end
+
 local info = { path = projectDir }
 pcall(function()
   local chunk = loadfile(projectDir .. "/init.lua", "bt", info)
@@ -325,9 +341,7 @@ local function showFileMenu(filePath, isDir)
       elseif choice == "编辑" then
         openEditor(filePath)
       elseif choice == "运行" then
-        pcall(function()
-          activity.newActivity(filePath)
-        end)
+        runScript(filePath)
       elseif choice == "删除" then
         deleteFile(filePath)
       end
@@ -583,19 +597,27 @@ local function buildPermissionPage()
       label.setTextColor(INK)
       row.addView(label, LinearLayout.LayoutParams(0, -2, 1))
 
-      local switch = MaterialSwitch(activity)
-      switch.setChecked(current[entry[2]] and true or false)
-      row.addView(switch)
-      switch.setOnCheckedChangeListener{
-        onCheckedChanged = function(view, checked)
-          switches[entry[2]] = checked
+      local toggle = MaterialSwitch(activity)
+      if current[entry[2]] then
+        toggle.setChecked(true)
+      else
+        toggle.setChecked(false)
+      end
+      row.addView(toggle)
+      toggle.setOnCheckedChangeListener(CompoundButton.OnCheckedChangeListener{
+        onCheckedChanged = function(button, state)
+          switches[entry[2]] = state
         end
-      }
-      switches[entry[2]] = current[entry[2]] and true or false
+      })
+      if current[entry[2]] then
+        switches[entry[2]] = true
+      else
+        switches[entry[2]] = false
+      end
 
       row.setOnClickListener(View.OnClickListener{
         onClick = function()
-          switch.setChecked(not switch.isChecked())
+          toggle.setChecked(not toggle.isChecked())
         end
       })
     end
@@ -788,16 +810,21 @@ barButton("运行", false, function()
     toast("缺少 main.lua")
     return
   end
-  pcall(function()
-    activity.newActivity(entry)
-  end)
+  runScript(entry)
 end)
 
 barButton("打包", true, function()
-  pcall(function()
+  local ok, err = pcall(function()
     local bin = require "bin"
     bin(projectDir .. "/")
   end)
+  if not ok then
+    pcall(function()
+      luajava.bindClass("com.mini.luaxplus.LogCore")
+        .luaError("打包调用失败 " .. projectDir, tostring(err))
+    end)
+    toast("打包失败：" .. tostring(err))
+  end
 end)
 
 barButton("编辑器", false, function()

@@ -413,8 +413,13 @@ local function binapk(luapath, apkpath)
         return "打包成功:" .. apkpath
     else
         os.remove(tmp)
-        this.update("打包出错:\n " .. table.concat(errbuffer, "\n"));
-        return "打包出错:\n " .. table.concat(errbuffer, "\n")
+        local message = table.concat(errbuffer, "\n")
+        pcall(function()
+            luajava.bindClass("com.mini.luaxplus.LogCore")
+                .luaError("打包失败 " .. tostring(apkpath), message)
+        end)
+        this.update("打包出错:\n " .. message);
+        return "打包出错:\n " .. message
     end
 end
 
@@ -424,6 +429,10 @@ local function bin(path)
     local p = {}
     local e, s = pcall(loadfile(path .. "init.lua", "bt", p))
     if e then
+        pcall(function()
+            luajava.bindClass("com.mini.luaxplus.LogCore")
+                .luaError("打包配置读取失败 " .. tostring(path), tostring(s))
+        end)
         create_error_dlg2()
         create_bin_dlg()
         bin_dlg.show()
