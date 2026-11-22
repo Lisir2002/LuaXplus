@@ -231,18 +231,18 @@ LuaX-UI：
 
 ---
 
-## 7. 验收清单
+## 7. 验收清单（当前状态）
 
-- [ ] arm64/armv7 `libluajava.so` 均显示 Lua 5.5.1。
-- [ ] 118 个 JNI native 符号齐全。
-- [ ] 88 个 Lua 文件全部通过 5.5 编译。
-- [ ] `tools/lua-check/run.sh` 全绿。
-- [ ] `tools/lua-smoke` 全部通过。
-- [ ] 编辑器打开、保存、语法阻断、lint 修复正常。
-- [ ] LuaX-UI 示例与长页无回归。
-- [ ] 成品包安装启动，`.luac` 为 5.5 字节码。
-- [ ] 所有随包原生模块可 `require`。
-- [ ] APK 签名 v1/v2/v3 通过，版本号正确。
+- [x] arm64/armv7 `libluajava.so` 均显示 Lua 5.5.1。
+- [x] 118 个 JNI native 符号齐全。
+- [x] 74 个门禁文件与 92 个全量 Lua 文件全部通过 5.5 编译。
+- [x] `tools/lua-check/run.sh` 全绿。
+- [x] `tools/lua-smoke` 全部通过。
+- [ ] 编辑器打开、保存、语法阻断、lint 修复正常（待真机）。
+- [ ] LuaX-UI 示例与长页无回归（待真机）。
+- [ ] 成品包安装启动，`.luac` 为 5.5 字节码（待云端构建与真机）。
+- [ ] 所有随包原生模块可 `require`（待真机）。
+- [ ] APK 签名 v1/v2/v3 通过，版本号正确（待云端构建）。
 
 ---
 
@@ -312,5 +312,5 @@ LuaX-UI：
 
 - 本地语法与冒烟：`LUA_BIN=/path/to/lua-5.5.1/src/lua LUA_INIT=@app/src/main/resources/lua/lua55_compat.lua bash tools/lua-check/run.sh`
 - 本地单元测试：`./gradlew :app:testDebugUnitTest --no-daemon`
-- 云端全量打包：待 GitHub Actions 工作流与签名 Secrets 就绪后执行。
+- 云端全量打包：`.github/workflows/release.yml` 已就绪，待仓库远端与签名 Secrets 配置后执行。
 

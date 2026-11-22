@@ -5,23 +5,40 @@ on:
     paths:
       - 'app/src/main/assets/**/*.lua'
       - 'app/src/main/resources/**/*.lua'
+      - 'androlua/src/main/resources/**/*.lua'
       - 'tools/lua-check/**'
       - 'tools/lua-smoke/**'
       - 'app/build.gradle'
+      - 'androlua/build.gradle'
   pull_request:
     paths:
       - 'app/src/main/assets/**/*.lua'
       - 'app/src/main/resources/**/*.lua'
+      - 'androlua/src/main/resources/**/*.lua'
       - 'tools/lua-check/**'
       - 'tools/lua-smoke/**'
       - 'app/build.gradle'
+      - 'androlua/build.gradle'
+
+permissions:
+  contents: read
 
 jobs:
   lua:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Lua 5.3
-        run: sudo apt-get update && sudo apt-get install -y lua5.3
+
+      - name: Build Lua 5.5.1
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libreadline-dev
+          curl -fsSL https://www.lua.org/ftp/lua-5.5.1.tar.gz -o "$RUNNER_TEMP/lua-5.5.1.tar.gz"
+          tar -xzf "$RUNNER_TEMP/lua-5.5.1.tar.gz" -C "$RUNNER_TEMP"
+          make -C "$RUNNER_TEMP/lua-5.5.1" linux -j"$(nproc)"
+          "$RUNNER_TEMP/lua-5.5.1/src/lua" -v
+
       - name: Run Lua syntax and contract checks
+        env:
+          LUA_BIN: ${{ runner.temp }}/lua-5.5.1/src/lua
         run: bash tools/lua-check/run.sh

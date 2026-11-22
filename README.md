@@ -32,6 +32,7 @@ app/                     编辑器应用模块
   src/main/java/         扩展 Java 类
   src/main/res/          主题、颜色、图标
   src/main/jniLibs/      LuaJava 原生库（arm64-v8a 发布；armeabi-v7a 仅保留源码兼容）
+.github/workflows/         Lua 门禁与 arm64 正式包构建
 androlua/                 运行时封装模块（jar + 原生库 + 少量桥接类）
 version.properties        版本号唯一来源
 keystore.properties       本地签名配置（不入库）
@@ -158,14 +159,22 @@ keyPassword=****
 
 ## 构建
 
+本地只跑单元测试与 Lua 门禁，不执行全量编译和打包：
+
 ```bash
-./gradlew :app:assembleRelease
+./gradlew :app:testDebugUnitTest
 ```
 
-- 产物：`app/build/outputs/apk/release/app-release.apk`
-- 需要 JDK 17 与 Android SDK Platform 34
-- 构建前自动执行 `:app:luaCheck`：Lua 语法检查 + JavaAPI 严格契约测试，不需要模拟器
-- 单独运行：`./gradlew :app:luaCheck`；详细说明见 `tools/lua-check/README.md`
+- 本地需要 JDK 17 与 Android SDK Platform 34。
+- 构建前自动执行 `:app:luaCheck`：Lua 5.5 语法检查 + JavaAPI 严格契约测试，不需要模拟器。
+- 单独运行：`./gradlew :app:luaCheck`；详细说明见 `tools/lua-check/README.md`。
+
+正式 APK 只通过 GitHub Actions 构建：
+
+- 工作流：`.github/workflows/release.yml`，支持手动触发或推送 `v*` 标签。
+- 只打 `arm64-v8a`，构建后检查 APK 不含 32 位/x86 库，并核对内置 `libluajava.so` 为 Lua 5.5.1。
+- 签名使用 Secrets：`MINI_LUAXPLUS_KEYSTORE_BASE64`、`MINI_LUAXPLUS_KEYSTORE_PASSWORD`、`MINI_LUAXPLUS_KEY_ALIAS`、`MINI_LUAXPLUS_KEY_PASSWORD`。
+- 推送标签时自动生成 Release；手动触发只上传 APK Artifact。
 
 ## 应用内打包预检
 
