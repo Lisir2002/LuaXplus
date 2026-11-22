@@ -271,6 +271,21 @@ expect(customResult.ok, "自研库规则生成的修复没有通过复检")
 expect(customResult.text:match("pane:add%(name%.view%)"), "自研包装表没有改成 name.view")
 expect(customResult.text:match("pane:show%(%)"), "自研对象没有补 pane:show")
 
+-- 语法错误必须直接阻断保存，不能只报未使用变量。
+local syntaxError = lint.audit([[
+local ui = require "luaxplus.ui"
+local page = ui.page{ title = "邮箱和备注" }
+local note = ui.textArea{
+  label = "备注",
+page:show()
+]], { file = "main.lua" })
+expect(syntaxError.blocking, "语法错误没有标记为阻断保存")
+expect(syntaxError.hasErrors, "语法错误没有标记为错误")
+expect(#syntaxError.issues == 1 and syntaxError.issues[1].kind == "syntax_error",
+  "语法错误被其他提示淹没")
+expect(syntaxError.issues[1].code == "LX1012", "语法错误诊断码不对")
+expect(#syntaxError.actions == 0, "语法错误不应生成不完整的一键修复")
+
 -- 未知表成员不生成自动修复，避免凭空创建错误对象。
 local ambiguous = lint.audit("foo.bar()\n", { file = "main.lua" })
 expect(#ambiguous.actions == 0, "未知表成员不应生成自动修复")

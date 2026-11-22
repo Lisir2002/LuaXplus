@@ -1188,6 +1188,7 @@ local ISSUE_CODES = {
   page_not_shown = "LX1009",
   view_wrapper = "LX1010",
   object_not_called = "LX1011",
+  syntax_error = "LX1012",
 }
 
 local function addIssue(report, issue)
@@ -1267,9 +1268,63 @@ local function dedupeAndSort(report)
   report.issues = result
 end
 
+local function syntaxIssue(source)
+  local loader = rawget(_G, "loadstring") or rawget(_G, "load")
+  if not loader then
+    return nil
+  end
+  local ok, result, message = pcall(loader, source)
+  local text
+  if not ok then
+    text = tostring(result)
+  elseif type(result) ~= "function" then
+    text = tostring(message or result or "Lua 语法错误")
+  else
+    return nil
+  end
+  local line = tonumber(text:match(":(%d+):")) or 1
+  local openLine = tonumber(text:match("to close '{' at line (%d+)"))
+    or tonumber(text:match("to close 'function' at line (%d+)"))
+  local hint = openLine and ("；请检查第 " .. openLine .. " 行开始的代码块是否缺少闭合符号") or ""
+  return {
+    severity = "error",
+    kind = "syntax_error",
+    name = "syntax",
+    line = line,
+    column = 1,
+    blocker = true,
+    message = "语法错误，代码无法运行：" .. text .. hint,
+  }
+end
+
 function M.audit(source, options)
   options = options or {}
   source = tostring(source or "")
+
+  local report = {
+    issues = {},
+    fixes = {},
+    actions = {},
+    source = source,
+    file = options.file,
+    projectRoot = options.projectRoot,
+    fixable = 0,
+    blocking = false,
+  }
+
+  local syntax = syntaxIssue(source)
+  if syntax then
+    addIssue(report, syntax)
+    report.blocking = true
+    report.hasErrors = true
+    report.hasWarnings = false
+    report.infoCount = 0
+    report.actionCount = 0
+    report.safeCount = 0
+    report.guidedCount = 0
+    return report
+  end
+
   local tokens = tokenize(source)
   local facts = analyze(tokens, source)
   local factoryObjects, wrapperBindings = findFactoryBindings(tokens, facts)
@@ -1302,15 +1357,6 @@ function M.audit(source, options)
     end
   end
 
-  local report = {
-    issues = {},
-    fixes = {},
-    actions = {},
-    source = source,
-    file = options.file,
-    projectRoot = options.projectRoot,
-    fixable = 0,
-  }
   local fixableNames = {}
   local seenActions = {}
   local insertAt = insertOffset(source, facts)
@@ -1943,6 +1989,7 @@ function M.applyRepair(source, report, options)
     page_not_shown = true,
     view_wrapper = true,
     object_not_called = true,
+    syntax_error = true,
   }
   for _, issue in ipairs(after.issues) do
     if selectedKeys[(issue.code or "") .. "\0" .. (issue.name or "")]

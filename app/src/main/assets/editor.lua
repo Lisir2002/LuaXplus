@@ -593,7 +593,9 @@ local function auditMessage(report)
     lines[#lines + 1] = "还有 " .. (total - maxLines) .. " 条未展开。"
   end
   local actions = report.actions or {}
-  if #actions > 0 then
+  if report.blocking then
+    lines[#lines + 1] = "语法错误会让代码无法运行，本次保存已阻止。请先补全括号、引号或代码块。"
+  elseif #actions > 0 then
     local safe = report.safeCount or 0
     local guided = report.guidedCount or 0
     lines[#lines + 1] = "其中 " .. #actions .. " 项可一键修复"
@@ -718,6 +720,20 @@ local function saveWithAudit(commit)
   end
 
   auditDialogShowing = true
+  if report.blocking then
+    MaterialAlertDialogBuilder(activity)
+      .setTitle("无法保存：语法错误")
+      .setMessage(auditMessage(report))
+      .setPositiveButton("返回修改", function()
+        auditDialogShowing = false
+      end)
+      .setOnCancelListener(function()
+        auditDialogShowing = false
+      end)
+      .show()
+    return false
+  end
+
   local builder = MaterialAlertDialogBuilder(activity)
     .setTitle("保存前检查")
     .setMessage(auditMessage(report))
