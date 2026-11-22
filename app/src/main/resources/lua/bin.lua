@@ -70,6 +70,20 @@ local function binapk(luapath, apkpath)
     if not initOk then
         return "打包配置异常：" .. tostring(initErr)
     end
+
+    -- 先只读预检：入口文件、Lua 语法、.aly 布局语法一次查完。
+    -- 这里不执行工程代码，运行期 JavaAPI 契约错误仍需单独的契约测试覆盖。
+    local preflightOk, preflight = pcall(function()
+        local module = require "packcheck"
+        return module.check(luapath)
+    end)
+    if not preflightOk then
+        return "打包前检查异常：" .. tostring(preflight)
+    end
+    if preflight and #preflight > 0 then
+        return "打包前检查失败：\n" .. table.concat(preflight, "\n")
+    end
+
     compile "mao"
     compile "sign"
     import "java.util.zip.*"

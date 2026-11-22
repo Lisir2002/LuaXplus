@@ -5,7 +5,7 @@
 - 应用名称：Mini-LuaXPLUS
 - 应用包名：`com.mini.luaxplus`
 - 运行平台：Android 5.0（API 21）及以上，目标版本 Android 12（API 31）
-- 当前版本：`1.0.0-rc27`
+- 当前版本：`1.0.0-rc28`
 
 ## 技术架构
 
@@ -149,6 +149,17 @@ keyPassword=****
 - 需要 JDK 17 与 Android SDK Platform 34
 - 构建前自动执行 `:app:luaCheck`：Lua 语法检查 + JavaAPI 严格契约测试，不需要模拟器
 - 单独运行：`./gradlew :app:luaCheck`；详细说明见 `tools/lua-check/README.md`
+
+## 应用内打包预检
+
+应用内点“打包”时，`bin.lua` 会先调用 `packcheck` 只读检查工程，再进入压缩、签名和安装：
+
+- 必须存在入口 `main.lua`
+- 所有 `.lua` 文件必须通过语法编译
+- 所有 `.aly` 布局必须能解析成 Lua 布局表
+- 任一检查失败都会直接返回错误清单，不生成 APK
+
+预检只拦语法问题；JavaAPI 这类运行期方法调用错误由构建阶段的 `luaCheck` 契约测试覆盖。
 
 ## Android 12 及以上适配
 

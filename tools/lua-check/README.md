@@ -1,9 +1,10 @@
 # Lua 检查门禁
 
-`run.sh` 是构建和 CI 共用的入口，包含两项检查：
+`run.sh` 是构建和 CI 共用的入口，包含三项检查：
 
 1. **语法检查**：对 `app/src/main/assets` 和 `app/src/main/resources` 下的所有 `.lua` 文件执行 `loadfile`，只编译不执行。
 2. **JavaAPI 契约测试**：用严格 mock 运行 `javaapi/main.lua`，覆盖页面加载、类搜索、类加载失败、详情构建、成员搜索、长按复制、弹窗关闭和重开。
+3. **打包预检回归**：用临时工程验证 `packcheck` 能发现缺失入口、Lua 语法错误、布局语法错误，并正确跳过隐藏文件与子目录合法文件。
 
 ## 为什么需要严格 mock
 
@@ -32,6 +33,16 @@ Gradle 任务：
 ## 历史例外
 
 `tools/lua-check/known-legacy.txt` 记录暂不纳入语法检查的文件。目前只有 `mainbody.lua`：它是早期编辑器壳，当前入口不使用，文件内保留了 C 风格的 `switch/case` 伪代码。修复或删除该文件后，应同步删除例外行，避免例外长期累积。
+
+## 应用内打包预检
+
+`app/src/main/resources/lua/packcheck.lua` 会在应用内打包开始前只读扫描工程：
+
+- `main.lua` 是否存在；
+- 所有 `.lua` 能否通过 `loadfile` 语法编译；
+- 所有 `.aly` 能否按 `local layout=<内容>` 的方式解析。
+
+发现问题时 `bin.lua` 直接返回“打包前检查失败”清单，不进入压缩、签名和 APK 分发。它只做语法预检，不能发现 JavaAPI 这类运行期方法契约错误。
 
 ## 测试数据
 
