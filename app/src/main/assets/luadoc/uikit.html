@@ -566,8 +566,8 @@ t.motion.slow</pre>
   <table>
     <thead><tr><th>分类</th><th>用途</th></tr></thead>
     <tbody>
-      <tr><td><code>color</code></td><td>背景、表面、文字、分隔线、强调色、成功/警告/危险、遮罩和禁用色。</td></tr>
-      <tr><td><code>spacing</code></td><td>页面、卡片、行、间距和图标尺寸的 dp 数值，数字键可直接访问。</td></tr>
+      <tr><td><code>color</code></td><td>背景、表面、文字、分隔线、强调色、成功/警告/危险、遮罩、透明色和禁用色。</td></tr>
+      <tr><td><code>spacing</code></td><td>页面、卡片、行、间距和图标尺寸的 dp 数值，数字键可直接访问；另有 label/helper/checkbox/tab/kv/motion 语义别名。</td></tr>
       <tr><td><code>radius</code></td><td>卡片、按钮、输入框、标签和胶囊圆角。</td></tr>
       <tr><td><code>type</code></td><td>display/title/body/callout/footnote 等字号、字重和行高。</td></tr>
       <tr><td><code>control</code></td><td>导航、按钮、输入框、标签栏、悬浮按钮、头像、步进器和弹窗动作高度。</td></tr>
@@ -598,7 +598,7 @@ t.motion.slow</pre>
   </table>
 
   <h3>数值无级调节</h3>
-  <p>所有需要尺寸、字号、圆角、透明度的字段都走同一个解析器。除了数字，还可以写带单位的字符串：<code>"10px"</code>、<code>"12dp"</code>、<code>"15sp"</code>、<code>"18pt"</code>，以及透明度百分比 <code>"35%"</code>。没有单位的字符串按数字处理。</p>
+  <p>所有需要尺寸、字号、圆角、透明度的字段都走同一个解析器；原子组件的文本字重、字距、内边距、输入框最小高度、表面高程和透明底色也都从令牌读取。除了数字，还可以写带单位的字符串：<code>"10px"</code>、<code>"12dp"</code>、<code>"15sp"</code>、<code>"18pt"</code>，以及透明度百分比 <code>"35%"</code>。没有单位的字符串按数字处理。</p>
 <pre>ui.button({
   text = "保存",
   textSize = "15px",      -- 字号
@@ -917,6 +917,7 @@ page:add(ui.pagination({
   </div>
 
   <h2>二十三、原子组件：把每一类拆到最小</h2>
+  <p>原子组件的视觉值全部收口到令牌：<code>spacing.labelX/labelY</code>、<code>spacing.helperX/helperTop</code>、<code>spacing.checkboxX/checkboxY/checkboxGap</code>、<code>spacing.tabTop/tabBottom/tabGap</code>、<code>spacing.kvX/kvY</code>、<code>spacing.motionY</code>，透明底色使用 <code>color.transparent</code>。</p>
   <p>复合组件解决“一个完整场景”，原子组件解决“一个最小视觉单元”。新增的原子层覆盖布局、排版、图标、表单、选择、反馈、导航、数据和动效，复杂页面可以按需组合，不必被现成组件的参数限制。</p>
   <table>
     <thead><tr><th>分类</th><th>原子组件</th><th>作用</th></tr></thead>
@@ -990,7 +991,7 @@ end))</pre>
 
 page:add(ui.cell({ text = "名称", header = true }))
 page:add(ui.cell({ text = "Mini-LuaXPLUS" }))
-page:add(ui.kvRow({ label = "版本", value = "1.0.0-rc19" }))
+page:add(ui.kvRow({ label = "版本", value = "1.0.0-rc20" }))
 
 ui.fadeIn(view)
 ui.slideIn(view, { duration = "200ms" })
@@ -1009,7 +1010,7 @@ ui.scaleIn(view, { duration = "220ms" })</pre>
   </ul>
 
   <footer>
-    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc19
+    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc20
   </footer>
 </div>
 

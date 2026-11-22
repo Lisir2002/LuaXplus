@@ -1,5 +1,15 @@
 # 更新日志
 
+## 1.0.0-rc20
+
+### 改进
+- **原子令牌补齐**：标签、帮助文本、复选框、标签项和键值行的内边距改用 `spacing.labelX`、`helperX`、`checkboxX`、`tabTop`、`kvX` 等语义令牌。
+- **透明与高程**：新增 `color.transparent`；`surface` 默认读取 `elevation.card`，`control.statusDot` 保持尺寸令牌。
+- **文本令牌**：`text` 现在会读取 `type` 里的字重和字距，`type="headline"` 不再丢失字重；显式 `bold` 仍可覆盖。
+- **输入框**：`input` 默认最小高度改为 `control.inputHeight`，不再只在传入 height 时才设置。
+
+---
+
 ## 1.0.0-rc19
 
 ### 新功能

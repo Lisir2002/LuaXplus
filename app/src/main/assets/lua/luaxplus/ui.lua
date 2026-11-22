@@ -118,6 +118,19 @@ local BASE = {
     buttonY = 12,
     navX = 12,
     navY = 7,
+    labelX = 4,
+    labelY = 2,
+    helperX = 4,
+    helperTop = 4,
+    checkboxX = 4,
+    checkboxY = 6,
+    checkboxGap = 8,
+    tabTop = 4,
+    tabBottom = 2,
+    tabGap = 2,
+    kvX = 16,
+    kvY = 10,
+    motionY = 14,
   },
   radius = {
     [0] = 0,
@@ -233,6 +246,7 @@ local BASE = {
 
 local LIGHT = normalizeColors({
   color = {
+    transparent = "#00000000",
     bg = "#F2F2F7",
     surface = "#FFFFFF",
     surfaceRaised = "#FFFFFF",
@@ -264,6 +278,7 @@ local LIGHT = normalizeColors({
 
 local DARK = normalizeColors({
   color = {
+    transparent = "#00000000",
     bg = "#000000",
     surface = "#1C1C1E",
     surfaceRaised = "#2C2C2E",
@@ -1277,7 +1292,7 @@ function M.button(spec)
 
   local button = textView(spec.text or "按钮", spec.textSize or TY.body.size, textColor, true)
   button.setGravity(Gravity.CENTER)
-  button.setPadding(dp(space(14)), dp(space(12)), dp(space(14)), dp(space(12)))
+  button.setPadding(dp(space("buttonX")), dp(space("buttonY")), dp(space("buttonX")), dp(space("buttonY")))
   button.setMinimumHeight(dp(K.buttonHeight))
   button.setBackground(ripple(fill, spec.radius or R.button, rippleColor))
   if spec.enabled == false then
@@ -2012,7 +2027,7 @@ function M.checkRow(spec)
   row.setOrientation(LinearLayout.HORIZONTAL)
   row.setGravity(Gravity.CENTER_VERTICAL)
   row.setMinimumHeight(dp(K.buttonHeight))
-  row.setPadding(dp(space(16)), dp(space(7)), dp(space(14)), dp(space(7)))
+  row.setPadding(dp(space(16)), dp(space(7)), dp(space("buttonX")), dp(space(7)))
   row.setBackground(ripple(0x00000000, 0, palette.press))
 
   local textBox = LinearLayout(activity)
@@ -2034,7 +2049,7 @@ function M.checkRow(spec)
   local function apply()
     mark.setText(checked and "✓" or "")
     mark.setTextColor(checked and palette.onAccent or palette.tertiary)
-    mark.setBackground(checked and roundRect(palette.accent, R.check) or shape(0x00000000, palette.tertiary, R.check))
+    mark.setBackground(checked and roundRect(palette.accent, R.check) or shape(palette.transparent, palette.tertiary, R.check))
   end
 
   local function setChecked(value, notify)
@@ -2297,7 +2312,7 @@ function M.banner(spec)
   local palette = colors()
   local card = LinearLayout(activity)
   card.setOrientation(LinearLayout.VERTICAL)
-  card.setPadding(dp(space(14)), dp(space(13)), dp(space(14)), dp(space(13)))
+  card.setPadding(dp(space("buttonX")), dp(space(13)), dp(space("buttonX")), dp(space(13)))
   card.setBackground(roundRect(parseColor(spec.background or palette.accentSoft), R.banner))
 
   local header = LinearLayout(activity)
@@ -2421,19 +2436,30 @@ function M.text(spec)
   end
   spec = spec or {}
   local palette = colors()
-  local weight = numberValue(spec.weight, 0)
-  local bold = spec.bold == true or weight >= 600
+  local typeToken = type(spec.type) == "string" and TY[spec.type] or nil
+  local fontSize = spec.size or spec.textSize or (typeToken and typeToken.size) or TY.body.size
+  local weight = numberValue(spec.weight, typeToken and typeToken.weight or 0)
+  local bold
+  if spec.bold ~= nil then
+    bold = spec.bold == true
+  else
+    bold = weight >= 600
+  end
   local view = textView(
     spec.text or spec.value or "",
-    spec.type or spec.size or spec.textSize or TY.body.size,
+    fontSize,
     parseColor(spec.color or palette.label),
     bold
   )
   if spec.mono then
     view.setTypeface(Typeface.MONOSPACE)
   end
-  if spec.tracking then
-    view.setLetterSpacing(numberValue(spec.tracking, 0))
+  local tracking = spec.tracking
+  if tracking == nil and typeToken then
+    tracking = typeToken.tracking
+  end
+  if tracking then
+    view.setLetterSpacing(numberValue(tracking, 0))
   end
   if spec.lines then
     view.setMaxLines(math.max(1, math.floor(numberValue(spec.lines, 1))))
@@ -2494,6 +2520,9 @@ function M.icon(spec)
     local padding = dp(space(spec.padding))
     view.setPadding(padding, padding, padding, padding)
   end
+  if spec.alpha then
+    view.setAlpha(alphaValue(spec.alpha))
+  end
   view.setLayoutParams(LinearLayout.LayoutParams(dp(size), dp(size)))
   if spec.onClick then
     view.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
@@ -2516,8 +2545,12 @@ function M.surface(spec, content)
   local padding = spec.padding or S.card
   local paddingValue = dp(space(padding))
   box.setPadding(paddingValue, paddingValue, paddingValue, paddingValue)
-  if spec.elevation then
-    box.setElevation(dp(space(spec.elevation)))
+  local elevation = spec.elevation
+  if elevation == nil then
+    elevation = EL.card
+  end
+  if elevation ~= false then
+    box.setElevation(dp(dimension(elevation, EL.card)))
   end
   if spec.onClick then
     box.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
@@ -2621,7 +2654,6 @@ end
 -- 居中容器：快速把单个 View 或自定义内容放到页面中间。
 function M.center(spec, content)
   spec = spec or {}
-  local palette = colors()
   local frame = FrameLayout(activity)
   if spec.background then
     frame.setBackground(shape(parseColor(spec.background), nil, spec.radius or R.card))
@@ -2651,9 +2683,7 @@ function M.input(spec)
   if spec.background ~= false then
     input.setBackground(roundRect(parseColor(spec.background or palette.surface), spec.radius or R.input))
   end
-  if spec.height then
-    input.setMinimumHeight(dp(space(spec.height)))
-  end
+  input.setMinimumHeight(dp(space(spec.height or K.inputHeight)))
   return input
 end
 
@@ -2673,7 +2703,7 @@ function M.label(spec)
     color = spec.color or colors().secondary,
     bold = spec.bold == true,
   })
-  view.setPadding(dp(space(4)), dp(space(2)), dp(space(4)), dp(space(2)))
+  view.setPadding(dp(space("labelX")), dp(space("labelY")), dp(space("labelX")), dp(space("labelY")))
   return view
 end
 
@@ -2688,7 +2718,7 @@ function M.helper(spec)
     type = spec.type or "footnote",
     color = spec.error and palette.danger or (spec.color or palette.secondary),
   })
-  view.setPadding(dp(space(4)), dp(space(4)), dp(space(4)), 0)
+  view.setPadding(dp(space("helperX")), dp(space("helperTop")), dp(space("helperX")), dp(space(0)))
   return view
 end
 
@@ -2703,7 +2733,7 @@ function M.checkMark(spec)
   if checked then
     mark.setBackground(roundRect(palette.accent, R.check))
   else
-    mark.setBackground(shape(0x00000000, palette.tertiary, R.check))
+    mark.setBackground(shape(palette.transparent, palette.tertiary, R.check))
   end
   mark.setLayoutParams(LinearLayout.LayoutParams(dp(size), dp(size)))
   if spec.onClick then
@@ -2719,7 +2749,7 @@ function M.checkbox(spec)
   local row = LinearLayout(activity)
   row.setOrientation(LinearLayout.HORIZONTAL)
   row.setGravity(Gravity.CENTER_VERTICAL)
-  row.setPadding(dp(space(4)), dp(space(6)), dp(space(4)), dp(space(6)))
+  row.setPadding(dp(space("checkboxX")), dp(space("checkboxY")), dp(space("checkboxX")), dp(space("checkboxY")))
   local mark = M.checkMark({ checked = checked, size = spec.size })
   row.addView(mark)
   local label = M.text({
@@ -2727,13 +2757,13 @@ function M.checkbox(spec)
     type = spec.type or "body",
     color = spec.color or palette.label,
   })
-  label.setPadding(dp(space(8)), 0, 0, 0)
+  label.setPadding(dp(space("checkboxGap")), 0, 0, 0)
   row.addView(label, LinearLayout.LayoutParams(0, -2, 1))
   local function apply(value)
     checked = value
     mark.setText(checked and "✓" or "")
     mark.setTextColor(checked and palette.onAccent or palette.tertiary)
-    mark.setBackground(checked and roundRect(palette.accent, R.check) or shape(0x00000000, palette.tertiary, R.check))
+    mark.setBackground(checked and roundRect(palette.accent, R.check) or shape(palette.transparent, palette.tertiary, R.check))
     if spec.onChange then
       spec.onChange(checked)
     end
@@ -2775,6 +2805,9 @@ function M.statusDot(spec)
   local dot = View(activity)
   dot.setBackground(roundRect(parseColor(spec.color or palette.success), size / 2))
   dot.setLayoutParams(LinearLayout.LayoutParams(dp(size), dp(size)))
+  if spec.alpha then
+    dot.setAlpha(alphaValue(spec.alpha))
+  end
   return dot
 end
 
@@ -2787,8 +2820,8 @@ function M.tabItem(spec)
   item.setOrientation(LinearLayout.VERTICAL)
   item.setGravity(Gravity.CENTER)
   item.setMinimumHeight(dp(K.tabHeight))
-  item.setPadding(0, dp(space(4)), 0, dp(space(2)))
-  item.setBackground(ripple(0x00000000, 0, palette.press))
+  item.setPadding(dp(space(0)), dp(space("tabTop")), dp(space(0)), dp(space("tabBottom")))
+  item.setBackground(ripple(palette.transparent, 0, palette.press))
   local glyph = textView(spec.glyph or spec.icon or "●", TY.icon.size,
     selected and palette.accent or palette.secondary, false)
   glyph.setGravity(Gravity.CENTER)
@@ -2796,7 +2829,8 @@ function M.tabItem(spec)
   local title = textView(spec.title or spec.text or "", TY.caption.size,
     selected and palette.accent or palette.secondary, false)
   title.setGravity(Gravity.CENTER)
-  title.setPadding(0, dp(space(2)), 0, 0)
+  title.setPadding(0, dp(space("tabGap")), 0, 0)
+  title.setLetterSpacing(numberValue(TY.caption.tracking, 0))
   item.addView(title)
   if spec.onClick then
     item.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
@@ -2836,7 +2870,7 @@ function M.kvRow(spec)
   local row = LinearLayout(activity)
   row.setOrientation(LinearLayout.HORIZONTAL)
   row.setGravity(Gravity.CENTER_VERTICAL)
-  row.setPadding(dp(space(16)), dp(space(10)), dp(space(16)), dp(space(10)))
+  row.setPadding(dp(space("kvX")), dp(space("kvY")), dp(space("kvX")), dp(space("kvY")))
   local label = M.text({ text = spec.label or spec.key or "", type = "subhead", color = palette.secondary })
   row.addView(label, LinearLayout.LayoutParams(0, -2, 1))
   if type(spec.value) == "userdata" then
@@ -3465,15 +3499,16 @@ function M.animate(view, spec)
 
   local preset = spec.preset or "up"
   local duration = timeValue(spec.duration or MO.slow, 260)
+  local motionOffset = dp(space("motionY"))
   view.setAlpha(0)
   local enterScale = numberValue(MO.enterScale, 0.92)
   if preset == "scale" then
     view.setScaleX(enterScale)
     view.setScaleY(enterScale)
   elseif preset == "down" then
-    view.setTranslationY(-dp(space(14)))
+    view.setTranslationY(-motionOffset)
   elseif preset ~= "fade" then
-    view.setTranslationY(dp(space(14)))
+    view.setTranslationY(motionOffset)
   end
 
   local animator = ValueAnimator.ofFloat(float{0, 1})
@@ -3492,9 +3527,9 @@ function M.animate(view, spec)
         view.setScaleX(enterScale + (1 - enterScale) * progress)
         view.setScaleY(enterScale + (1 - enterScale) * progress)
       elseif preset == "down" then
-        view.setTranslationY(-dp(space(14)) * (1 - progress))
+        view.setTranslationY(-motionOffset * (1 - progress))
       elseif preset ~= "fade" then
-        view.setTranslationY(dp(space(14)) * (1 - progress))
+        view.setTranslationY(motionOffset * (1 - progress))
       end
     end,
   })
