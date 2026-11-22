@@ -32,7 +32,7 @@ pcall(function()
 end)
 
 local PAPER = 0xfff7f1e6
-local CARD = 0xfffdf8
+local CARD = 0xFFFFFDF8
 local INK = 0xff1c2b3a
 local MUTED = 0xff5f6f7c
 local ACCENT = 0xff0f9e97
@@ -57,20 +57,39 @@ end
 
 -- 统一的工程信息落盘，避免局部修改把其它字段冲掉
 local function writeInfo(info)
-  local file = io.open(info.path .. "/init.lua", "w")
-  file:write("appname=" .. string.format("%q", info.appname or "未命名") .. "\n")
-  file:write("appver=" .. string.format("%q", info.appver or "1.0") .. "\n")
-  file:write("packagename=" .. string.format("%q", info.packagename or "com.mini.app") .. "\n")
-  file:write("developer=" .. string.format("%q", info.developer or "") .. "\n")
-  file:write("description=" .. string.format("%q", info.description or "") .. "\n")
+  local function str(value)
+    return string.format("%q", tostring(value or ""))
+  end
+  if info.debugmode == nil then
+    info.debugmode = true
+  end
+  local lines = {
+    "appname=" .. str(info.appname or "未命名"),
+    "appver=" .. str(info.appver or "1.0"),
+    "appcode=" .. str(info.appcode or "1"),
+    "appsdk=" .. str(info.appsdk or "15"),
+    "path_pattern=" .. str(info.path_pattern or ""),
+    "packagename=" .. str(info.packagename or "com.mini.app"),
+    "theme=" .. str(info.theme or "Theme_Material_Light"),
+    "app_key=" .. str(info.app_key or ""),
+    "app_channel=" .. str(info.app_channel or ""),
+    "developer=" .. str(info.developer or ""),
+    "description=" .. str(info.description or ""),
+    "debugmode=" .. (info.debugmode and "true" or "false"),
+  }
   local permissions = {}
   for _, item in ipairs(info.user_permission or {}) do
     table.insert(permissions, string.format("%q", item))
   end
-  file:write("user_permission={" .. table.concat(permissions, ",") .. "}\n")
+  table.insert(lines, "user_permission={" .. table.concat(permissions, ",\n  ") .. "}")
   if info.strict_permissions then
-    file:write("strict_permissions=true\n")
+    table.insert(lines, "strict_permissions=true")
   end
+  local file = io.open(info.path .. "/init.lua", "w")
+  if not file then
+    return
+  end
+  file:write(table.concat(lines, "\n") .. "\n")
   file:close()
 end
 
@@ -619,25 +638,56 @@ dividerParams.topMargin = dp(14)
 dividerParams.bottomMargin = dp(8)
 sidePanel.addView(divider, dividerParams)
 
-local function sideEntry(titleText, hintText, handler)
+local sectionLabel = TextView(activity)
+sectionLabel.setText("菜单")
+sectionLabel.setTextSize(10.5)
+sectionLabel.setTextColor(MUTED)
+sectionLabel.setPadding(dp(12), dp(4), 0, dp(2))
+sidePanel.addView(sectionLabel)
+
+local function sideEntry(badgeText, badgeColor, badgeBg, titleText, hintText, handler)
   local row = LinearLayout(activity)
-  row.setOrientation(LinearLayout.VERTICAL)
-  row.setPadding(dp(12), dp(11), dp(12), dp(11))
-  row.setBackground(rounded(0x00ffffff, nil, 10))
-  sidePanel.addView(row, LinearLayout.LayoutParams(-1, -2))
+  row.setOrientation(LinearLayout.HORIZONTAL)
+  row.setGravity(Gravity.CENTER_VERTICAL)
+  row.setPadding(dp(10), dp(10), dp(12), dp(10))
+  row.setBackground(rounded(0xFFF3ECDE, nil, 12))
+
+  local badge = TextView(activity)
+  badge.setText(badgeText)
+  badge.setTextSize(12)
+  badge.setGravity(Gravity.CENTER)
+  badge.setTextColor(badgeColor)
+  badge.setBackground(rounded(badgeBg, nil, 9))
+  row.addView(badge, LinearLayout.LayoutParams(dp(30), dp(30)))
+
+  local textBox = LinearLayout(activity)
+  textBox.setOrientation(LinearLayout.VERTICAL)
+  local textParams = LinearLayout.LayoutParams(0, -2, 1)
+  textParams.leftMargin = dp(11)
+  row.addView(textBox, textParams)
 
   local entryTitle = TextView(activity)
   entryTitle.setText(titleText)
-  entryTitle.setTextSize(14)
+  entryTitle.setTextSize(14.5)
   entryTitle.setTextColor(INK)
-  row.addView(entryTitle)
+  textBox.addView(entryTitle)
 
   local entryHint = TextView(activity)
   entryHint.setText(hintText)
   entryHint.setTextSize(11)
   entryHint.setTextColor(MUTED)
   entryHint.setPadding(0, dp(3), 0, 0)
-  row.addView(entryHint)
+  textBox.addView(entryHint)
+
+  local arrow = TextView(activity)
+  arrow.setText("›")
+  arrow.setTextSize(16)
+  arrow.setTextColor(MUTED)
+  row.addView(arrow)
+
+  local rowParams = LinearLayout.LayoutParams(-1, -2)
+  rowParams.topMargin = dp(6)
+  sidePanel.addView(row, rowParams)
 
   row.setOnClickListener(View.OnClickListener{
     onClick = function()
@@ -648,8 +698,8 @@ local function sideEntry(titleText, hintText, handler)
   return row
 end
 
-sideEntry("关于", "版本信息与开发说明", showAbout)
-sideEntry("设置", "偏好与行为配置", showSettings)
+sideEntry("关", 0xff0b6f6a, 0xffdff3f0, "关于", "版本信息与开发说明", showAbout)
+sideEntry("设", 0xff7a6a56, 0xfff0e4d4, "设置", "偏好与行为配置", showSettings)
 
 local sideFooter = TextView(activity)
 sideFooter.setText(appVersion ~= "" and appVersion or "1.0.0-rc1")
@@ -658,9 +708,16 @@ sideFooter.setTextColor(MUTED)
 sideFooter.setPadding(dp(12), dp(20), 0, 0)
 sidePanel.addView(sideFooter)
 
-local sideParams = DrawerLayout.LayoutParams(dp(272), -1)
+pcall(function()
+  sidePanel.setElevation(dp(14))
+end)
+
+local sideParams = DrawerLayout.LayoutParams(dp(284), -1)
 sideParams.gravity = Gravity.LEFT
 drawerLayout.addView(sidePanel, sideParams)
+pcall(function()
+  drawerLayout.setDrawerElevation(dp(14))
+end)
 
 menuBtn.setOnClickListener(View.OnClickListener{
   onClick = function()

@@ -23,7 +23,7 @@ local TEXT_MAIN = 0xffe8eef4
 local TEXT_MUTED = 0xff90a0ae
 local ACCENT = 0xff0fa8a0
 local INK = 0xff1c2b3a
-local CARD = 0xfffdf8
+local CARD = 0xFFFFFDF8
 local LINE = 0xffe6dbc8
 
 local args = {...}

@@ -3,6 +3,7 @@ import "android.app.*"
 import "android.os.*"
 import "android.widget.*"
 import "android.view.*"
+import "android.text.*"
 import "android.graphics.drawable.*"
 import "android.graphics.Typeface"
 import "java.io.File"
@@ -30,7 +31,7 @@ pcall(function()
 end)
 
 local PAPER = 0xfff7f1e6
-local CARD = 0xfffdf8
+local CARD = 0xFFFFFDF8
 local INK = 0xff1c2b3a
 local MUTED = 0xff5f6f7c
 local LINE = 0xffe6dbc8
@@ -88,21 +89,42 @@ end)
 info.path = projectDir
 
 local function writeInfo()
-  local file = io.open(projectDir .. "/init.lua", "w")
-  file:write("appname=" .. string.format("%q", info.appname or "未命名") .. "\n")
-  file:write("appver=" .. string.format("%q", info.appver or "1.0") .. "\n")
-  file:write("packagename=" .. string.format("%q", info.packagename or "com.mini.app") .. "\n")
-  file:write("developer=" .. string.format("%q", info.developer or "") .. "\n")
-  file:write("description=" .. string.format("%q", info.description or "") .. "\n")
+  local function str(value)
+    return string.format("%q", tostring(value or ""))
+  end
+  if info.debugmode == nil then
+    info.debugmode = true
+  end
+  local lines = {
+    "appname=" .. str(info.appname or "未命名"),
+    "appver=" .. str(info.appver or "1.0"),
+    "appcode=" .. str(info.appcode or "1"),
+    "appsdk=" .. str(info.appsdk or "15"),
+    "path_pattern=" .. str(info.path_pattern or ""),
+    "packagename=" .. str(info.packagename or "com.mini.app"),
+    "theme=" .. str(info.theme or "Theme_Material_Light"),
+    "app_key=" .. str(info.app_key or ""),
+    "app_channel=" .. str(info.app_channel or ""),
+    "developer=" .. str(info.developer or ""),
+    "description=" .. str(info.description or ""),
+    "debugmode=" .. (info.debugmode and "true" or "false"),
+  }
   local permissions = {}
   for _, item in ipairs(info.user_permission or {}) do
     table.insert(permissions, string.format("%q", item))
   end
-  file:write("user_permission={" .. table.concat(permissions, ",") .. "}\n")
+  table.insert(lines, "user_permission={" .. table.concat(permissions, ",\n  ") .. "}")
   if info.strict_permissions then
-    file:write("strict_permissions=true\n")
+    table.insert(lines, "strict_permissions=true")
   end
+  local file = io.open(projectDir .. "/init.lua", "w")
+  if not file then
+    toast("写入失败，请检查存储权限")
+    return false
+  end
+  file:write(table.concat(lines, "\n") .. "\n")
   file:close()
+  return true
 end
 
 activity.setTitle(info.appname or "应用详情")
@@ -175,7 +197,11 @@ local function makeScroll()
   return scroll, box
 end
 
+local currentTab = 1
+local dirSyncNow
+
 local function switchTab(index)
+  currentTab = index
   for i = 1, #tabViews do
     if i == index then
       tabViews[i].setTextColor(0xff0b6f6a)
@@ -189,6 +215,9 @@ local function switchTab(index)
   end
   pageHolder.removeAllViews()
   pageHolder.addView(pages[index], FrameLayout.LayoutParams(-1, -1))
+  if index == 2 and dirSyncNow then
+    dirSyncNow()
+  end
 end
 
 -- ===== 属性页 =====
@@ -196,18 +225,30 @@ local function buildInfoPage()
   local scroll, box = makeScroll()
   pages[1] = scroll
 
-  local function field(label, value, multiline)
+  local function section(title)
+    local caption = TextView(activity)
+    caption.setText(title)
+    caption.setTextSize(11)
+    caption.setTextColor(MUTED)
+    caption.setTypeface(Typeface.DEFAULT_BOLD)
+    caption.setPadding(dp(2), dp(18), 0, dp(2))
+    box.addView(caption)
+  end
+
+  local function field(label, value, hint, multiline, numeric)
     local caption = TextView(activity)
     caption.setText(label)
     caption.setTextSize(12.5)
     caption.setTextColor(MUTED)
-    caption.setPadding(dp(2), dp(10), 0, dp(4))
+    caption.setPadding(dp(2), dp(9), 0, dp(4))
     box.addView(caption)
 
     local input = EditText(activity)
-    input.setText(value or "")
+    input.setText(tostring(value or ""))
+    input.setHint(hint or "")
     input.setTextSize(14)
     input.setTextColor(INK)
+    input.setHintTextColor(0xFFA79B88)
     input.setBackground(rounded(CARD, LINE, 10))
     input.setPadding(dp(12), dp(9), dp(12), dp(9))
     if multiline then
@@ -217,19 +258,101 @@ local function buildInfoPage()
     else
       input.setSingleLine(true)
     end
+    if numeric then
+      input.setInputType(2)
+    end
     box.addView(input, LinearLayout.LayoutParams(-1, -2))
     return input
   end
 
-  local nameInput = field("应用名称", info.appname)
-  local pkgInput = field("包名", info.packagename)
-  local verInput = field("版本号", info.appver)
-  local developerInput = field("开发者", info.developer)
-  local descInput = field("简介", info.description, true)
+  section("基本信息")
+  local nameInput = field("应用名称", info.appname, "显示在桌面上的名称")
+  local pkgInput = field("包名", info.packagename, "例如 com.mini.demo")
+  local verInput = field("版本号", info.appver, "例如 1.0")
+  local codeInput = field("版本码", info.appcode, "整数，随版本递增", false, true)
+  local sdkInput = field("最低 SDK", info.appsdk, "整数，例如 15", false, true)
+
+  section("打包与运行")
+  local themeInput = field("主题", info.theme, "Theme_Material_Light")
+  local localThemeRow = LinearLayout(activity)
+  localThemeRow.setOrientation(LinearLayout.HORIZONTAL)
+  localThemeRow.setPadding(dp(2), dp(8), 0, 0)
+  box.addView(localThemeRow)
+  local presets = {
+    { "浅色", "Theme_Material_Light" },
+    { "深色", "Theme_Material_Dark" },
+    { "跟随系统", "Theme_DeviceDefault_DayNight" },
+  }
+  for _, preset in ipairs(presets) do
+    local chip = TextView(activity)
+    chip.setText(preset[1])
+    chip.setTextSize(12)
+    chip.setTextColor(0xff0b6f6a)
+    chip.setGravity(Gravity.CENTER)
+    chip.setPadding(dp(10), dp(5), dp(10), dp(5))
+    chip.setBackground(rounded(0xffdff3f0, 0xffbfe6e1, 9))
+    local chipParams = LinearLayout.LayoutParams(-2, -2)
+    chipParams.rightMargin = dp(8)
+    localThemeRow.addView(chip, chipParams)
+    chip.setOnClickListener(View.OnClickListener{
+      onClick = function()
+        themeInput.setText(preset[2])
+      end
+    })
+  end
+
+  local debugSwitch = MaterialSwitch(activity)
+  debugSwitch.setText("调试模式（输出运行日志）")
+  debugSwitch.setTextSize(13.5)
+  debugSwitch.setTextColor(INK)
+  debugSwitch.setChecked(info.debugmode ~= false)
+  debugSwitch.setPadding(dp(2), dp(12), dp(2), dp(8))
+  box.addView(debugSwitch)
+
+  local channelInput = field("渠道标识", info.app_channel, "例如 official")
+  local keyInput = field("应用密钥", info.app_key, "打包用的 app_key，可留空")
+  local patternInput = field("路径匹配", info.path_pattern, "关联文件后缀，例如 alp")
+
+  section("说明")
+  local developerInput = field("开发者", info.developer, "署名或团队名称")
+  local descInput = field("简介", info.description, "一句话介绍这个应用", true)
+
+  section("权限")
+  local permRow = LinearLayout(activity)
+  permRow.setOrientation(LinearLayout.HORIZONTAL)
+  permRow.setGravity(Gravity.CENTER_VERTICAL)
+  permRow.setPadding(dp(12), dp(11), dp(12), dp(11))
+  permRow.setBackground(rounded(CARD, LINE, 10))
+  box.addView(permRow, LinearLayout.LayoutParams(-1, -2))
+
+  local permText = LinearLayout(activity)
+  permText.setOrientation(LinearLayout.VERTICAL)
+  permRow.addView(permText, LinearLayout.LayoutParams(0, -2, 1))
+  local permTitle = TextView(activity)
+  permTitle.setText("权限注入")
+  permTitle.setTextSize(13.5)
+  permTitle.setTextColor(INK)
+  permText.addView(permTitle)
+  local permHint = TextView(activity)
+  permHint.setText("已选 " .. tostring(#(info.user_permission or {})) .. " 项，点此调整")
+  permHint.setTextSize(11.5)
+  permHint.setTextColor(MUTED)
+  permHint.setPadding(0, dp(3), 0, 0)
+  permText.addView(permHint)
+  local permArrow = TextView(activity)
+  permArrow.setText("›")
+  permArrow.setTextSize(16)
+  permArrow.setTextColor(MUTED)
+  permRow.addView(permArrow)
+  permRow.setOnClickListener(View.OnClickListener{
+    onClick = function()
+      switchTab(3)
+    end
+  })
 
   local pathCaption = TextView(activity)
   pathCaption.setText("工程目录：" .. projectDir)
-  pathCaption.setTextSize(12)
+  pathCaption.setTextSize(11.5)
   pathCaption.setTextColor(MUTED)
   pathCaption.setPadding(dp(2), dp(16), 0, 0)
   box.addView(pathCaption)
@@ -243,24 +366,105 @@ local function buildInfoPage()
   local saveParams = LinearLayout.LayoutParams(-1, dp(44))
   saveParams.topMargin = dp(18)
   box.addView(save, saveParams)
+
+  local function textOf(input)
+    return tostring(input.getText().toString()):match("^%s*(.-)%s*$")
+  end
+
   save.setOnClickListener(View.OnClickListener{
     onClick = function()
-      info.appname = nameInput.getText().toString()
-      info.packagename = pkgInput.getText().toString()
-      info.appver = verInput.getText().toString()
-      info.developer = developerInput.getText().toString()
-      info.description = descInput.getText().toString()
-      writeInfo()
-      nameView.setText(info.appname .. "  v" .. info.appver)
-      pkgView.setText(info.packagename)
-      toast("属性已保存")
+      local appname = textOf(nameInput)
+      local appver = textOf(verInput)
+      local packagename = textOf(pkgInput)
+      if appname == "" or appver == "" or packagename == "" then
+        toast("应用名称、版本号和包名不能为空")
+        return
+      end
+      local appcode = textOf(codeInput)
+      local appsdk = textOf(sdkInput)
+      if not appcode:match("^%d+$") or not appsdk:match("^%d+$") then
+        toast("版本码和最低 SDK 必须是整数")
+        return
+      end
+
+      info.appname = appname
+      info.appver = appver
+      info.packagename = packagename
+      info.appcode = appcode
+      info.appsdk = appsdk
+      info.theme = textOf(themeInput) ~= "" and textOf(themeInput) or "Theme_Material_Light"
+      info.app_channel = textOf(channelInput)
+      info.app_key = textOf(keyInput)
+      info.path_pattern = textOf(patternInput)
+      info.developer = textOf(developerInput)
+      info.description = textOf(descInput)
+      info.debugmode = debugSwitch.isChecked()
+      if writeInfo() then
+        nameView.setText(info.appname .. "  v" .. info.appver)
+        pkgView.setText(info.packagename)
+        activity.setTitle(info.appname)
+        toast("属性已保存")
+      end
     end
   })
   return scroll
 end
 
 -- ===== 目录页 =====
+local uiFile = projectDir .. "/.luaxplus.ui"
+local uiState = {}
+do
+  local file = io.open(uiFile, "r")
+  if file then
+    for line in file:lines() do
+      local key, value = line:match("^([%w_%-]+)=(.*)$")
+      if key then
+        uiState[key] = value
+      end
+    end
+    file:close()
+  end
+end
+
+local function saveUiState()
+  local file = io.open(uiFile, "w")
+  if not file then
+    return
+  end
+  local lines = {}
+  for key, value in pairs(uiState) do
+    table.insert(lines, key .. "=" .. tostring(value))
+  end
+  file:write(table.concat(lines, "\n") .. "\n")
+  file:close()
+end
+
+local SORT_MODES = {
+  { key = "name", label = "名称" },
+  { key = "time", label = "时间" },
+  { key = "size", label = "大小" },
+  { key = "type", label = "类型" },
+}
+
+local function sortLabel()
+  for _, mode in ipairs(SORT_MODES) do
+    if mode.key == uiState.sort then
+      return mode.label
+    end
+  end
+  return "名称"
+end
+
 local currentDir = projectDir
+if uiState.lastDir and uiState.lastDir ~= ""
+  and uiState.lastDir:sub(1, #projectDir) == projectDir
+  and File(uiState.lastDir).isDirectory() then
+  currentDir = uiState.lastDir
+end
+
+local dirQuery = ""
+local lastDirSignature = nil
+local dirRefresh
 
 local function humanSize(bytes)
   if bytes < 1024 then
@@ -271,10 +475,106 @@ local function humanSize(bytes)
   return string.format("%.1f MB", bytes / 1024 / 1024)
 end
 
+local function humanTime(millis)
+  if not millis or millis <= 0 then
+    return "未知时间"
+  end
+  local date = os.date("%Y-%m-%d %H:%M", math.floor(millis / 1000))
+  return tostring(date)
+end
+
+local function fileTag(file)
+  if file.isDirectory() then
+    return "夹", 0xff7a6a56, 0xfff0e4d4
+  end
+  local name = file.getName():lower()
+  if name:sub(-4) == ".lua" then
+    return "L", 0xff0b6f6a, 0xffdff3f0
+  elseif name:match("%.png$") or name:match("%.jpe?g$") or name:match("%.webp$") then
+    return "图", 0xff4a6fa5, 0xffe2ecf8
+  elseif name:match("%.alp$") or name:match("%.apk$") then
+    return "包", 0xff8a5a2b, 0xfff7e6d2
+  end
+  return "文", 0xff5f6f7c, 0xffeceff2
+end
+
+-- 目录内容指纹：文件名 + 大小 + 修改时间，用来判断是否需要刷新
+local function dirSignature(dir)
+  local files = File(dir).listFiles()
+  if not files then
+    return ""
+  end
+  local parts = {}
+  for i = 0, #files - 1 do
+    table.insert(parts, files[i].getName() .. ":" .. files[i].length() .. ":" .. files[i].lastModified())
+  end
+  table.sort(parts)
+  return table.concat(parts, "|")
+end
+
+local function collectEntries()
+  local files = File(currentDir).listFiles()
+  local entries = {}
+  if files then
+    for i = 0, #files - 1 do
+      local name = files[i].getName()
+      if name:sub(1, 1) ~= "." then
+        table.insert(entries, files[i])
+      end
+    end
+  end
+  if dirQuery ~= "" then
+    local keyword = dirQuery:lower()
+    local filtered = {}
+    for _, item in ipairs(entries) do
+      if item.getName():lower():find(keyword, 1, true) then
+        table.insert(filtered, item)
+      end
+    end
+    entries = filtered
+  end
+  local mode = uiState.sort or "name"
+  table.sort(entries, function(a, b)
+    if a.isDirectory() ~= b.isDirectory() then
+      return a.isDirectory()
+    end
+    if mode == "time" then
+      if a.lastModified() ~= b.lastModified() then
+        return a.lastModified() > b.lastModified()
+      end
+    elseif mode == "size" then
+      if a.length() ~= b.length() then
+        return a.length() > b.length()
+      end
+    elseif mode == "type" then
+      local ea = a.getName():match("%.([%w]+)$") or ""
+      local eb = b.getName():match("%.([%w]+)$") or ""
+      if ea ~= eb then
+        return ea < eb
+      end
+    end
+    return a.getName():lower() < b.getName():lower()
+  end)
+  return entries
+end
+
 local function openEditor(filePath)
   pcall(function()
     activity.newActivity("editor", {filePath})
   end)
+end
+
+local function removePath(path)
+  local file = File(path)
+  if file.isDirectory() then
+    local children = file.listFiles()
+    if children then
+      for i = 0, #children - 1 do
+        removePath(children[i].getAbsolutePath())
+      end
+    end
+  end
+  file.delete()
 end
 
 local function deleteFile(filePath)
@@ -283,31 +583,77 @@ local function deleteFile(filePath)
     .setMessage("确定删除 " .. File(filePath).getName() .. "？")
     .setNegativeButton("取消", nil)
     .setPositiveButton("删除", function()
-      local function drop(path)
-        local file = File(path)
-        if file.isDirectory() then
-          local children = file.listFiles()
-          if children then
-            for i = 0, #children - 1 do
-              drop(children[i].getAbsolutePath())
-            end
-          end
-        end
-        file.delete()
-      end
-      drop(filePath)
+      removePath(filePath)
       toast("已删除")
-      buildDirPage(true)
+      dirRefresh(true)
     end)
     .show()
+end
+
+local function renameFile(filePath)
+  local input = EditText(activity)
+  input.setText(File(filePath).getName())
+  input.setSingleLine(true)
+  MaterialAlertDialogBuilder(activity)
+    .setTitle("重命名")
+    .setView(input)
+    .setNegativeButton("取消", nil)
+    .setPositiveButton("确定", function()
+      local name = tostring(input.getText().toString()):match("^%s*(.-)%s*$")
+      if name == "" then
+        toast("名称不能为空")
+        return
+      end
+      local target = File(filePath).getParentFile().getAbsolutePath() .. "/" .. name
+      if File(target).exists() then
+        toast("同名文件已存在")
+        return
+      end
+      if File(filePath).renameTo(File(target)) then
+        toast("已重命名")
+        dirRefresh(true)
+      else
+        toast("重命名失败")
+      end
+    end)
+    .show()
+end
+
+local function showDetails(filePath)
+  local file = File(filePath)
+  local message = "名称：" .. file.getName()
+    .. "\n路径：" .. file.getAbsolutePath()
+  if file.isDirectory() then
+    local children = file.listFiles()
+    message = message .. "\n类型：文件夹（" .. tostring(children and #children or 0) .. " 项）"
+  else
+    message = message .. "\n大小：" .. humanSize(file.length())
+  end
+  message = message .. "\n修改时间：" .. humanTime(file.lastModified())
+  MaterialAlertDialogBuilder(activity)
+    .setTitle("文件详情")
+    .setMessage(message)
+    .setPositiveButton("知道了", nil)
+    .show()
+end
+
+local function goUp()
+  local parent = File(currentDir).getParentFile()
+  if parent and File(parent.getAbsolutePath()).isDirectory()
+    and parent.getAbsolutePath():sub(1, #projectDir) == projectDir then
+    currentDir = parent.getAbsolutePath()
+    uiState.lastDir = currentDir
+    saveUiState()
+    dirRefresh()
+  end
 end
 
 local function showFileMenu(filePath, isDir)
   local options
   if isDir then
-    options = { "进入", "删除" }
+    options = { "进入", "重命名", "详情", "删除" }
   else
-    options = { "编辑", "运行", "删除" }
+    options = { "编辑", "运行", "重命名", "详情", "删除" }
   end
   MaterialAlertDialogBuilder(activity)
     .setTitle(File(filePath).getName())
@@ -315,11 +661,17 @@ local function showFileMenu(filePath, isDir)
       local choice = options[which + 1]
       if choice == "进入" then
         currentDir = filePath
-        buildDirPage()
+        uiState.lastDir = currentDir
+        saveUiState()
+        dirRefresh()
       elseif choice == "编辑" then
         openEditor(filePath)
       elseif choice == "运行" then
         runScript(filePath)
+      elseif choice == "重命名" then
+        renameFile(filePath)
+      elseif choice == "详情" then
+        showDetails(filePath)
       elseif choice == "删除" then
         deleteFile(filePath)
       end
@@ -327,146 +679,102 @@ local function showFileMenu(filePath, isDir)
     .show()
 end
 
-local dirScroll
-function buildDirPage(keepPage)
-  local scroll, box = makeScroll()
-  if not keepPage or not pages[2] then
-    pages[2] = scroll
-  else
-    local old = pages[2]
-    pages[2] = scroll
-    if pageHolder.getChildAt(0) == old then
-      pageHolder.removeAllViews()
-      pageHolder.addView(scroll, FrameLayout.LayoutParams(-1, -1))
-    end
-  end
-  dirScroll = scroll
-
-  local breadcrumb = TextView(activity)
-  local crumb = currentDir:gsub(projectDir, "工程根目录")
-  breadcrumb.setText((crumb))
-  breadcrumb.setTextSize(12)
-  breadcrumb.setTextColor(MUTED)
-  breadcrumb.setPadding(dp(2), dp(6), dp(2), dp(10))
-  box.addView(breadcrumb)
-
-  local actions = LinearLayout(activity)
-  actions.setOrientation(LinearLayout.HORIZONTAL)
-  box.addView(actions, LinearLayout.LayoutParams(-1, -2))
-
-  local function actionButton(text, handler)
-    local button = TextView(activity)
-    button.setText(text)
-    button.setTextSize(13)
-    button.setTextColor(0xff0b6f6a)
-    button.setGravity(Gravity.CENTER)
-    button.setPadding(dp(12), dp(7), dp(12), dp(7))
-    button.setBackground(rounded(0xffdff3f0, 0xffbfe6e1, 10))
-    local params = LinearLayout.LayoutParams(-2, -2)
-    params.rightMargin = dp(8)
-    actions.addView(button, params)
-    button.setOnClickListener(View.OnClickListener{
-      onClick = handler
-    })
-    return button
-  end
-
-  if currentDir ~= projectDir then
-    actionButton("返回上级", function()
-      currentDir = File(currentDir).getParent()
-      buildDirPage()
-    end)
-  end
-
-  actionButton("新建文件", function()
-    local input = EditText(activity)
-    input.setHint("文件名，例如 page.lua")
-    MaterialAlertDialogBuilder(activity)
-      .setTitle("新建文件")
-      .setView(input)
-      .setNegativeButton("取消", nil)
-      .setPositiveButton("创建", function()
-        local name = tostring(input.getText().toString())
-        if name == "" then
-          return
-        end
-        local target = currentDir .. "/" .. name
-        if File(target).exists() then
-          toast("同名文件已存在")
-          return
-        end
+local function promptCreate(title, hint, isDir)
+  local input = EditText(activity)
+  input.setHint(hint)
+  input.setSingleLine(true)
+  MaterialAlertDialogBuilder(activity)
+    .setTitle(title)
+    .setView(input)
+    .setNegativeButton("取消", nil)
+    .setPositiveButton("创建", function()
+      local name = tostring(input.getText().toString()):match("^%s*(.-)%s*$")
+      if name == "" then
+        return
+      end
+      local target = currentDir .. "/" .. name
+      if File(target).exists() then
+        toast("同名" .. (isDir and "文件夹" or "文件") .. "已存在")
+        return
+      end
+      local ok
+      if isDir then
+        ok = File(target).mkdirs()
+      else
         local out = io.open(target, "w")
-        if not out then
-          toast("创建失败，请检查存储权限")
-          return
+        if out then
+          out:write("")
+          out:close()
+          ok = true
         end
-        out:write("")
-        out:close()
-        buildDirPage(true)
+      end
+      if ok then
         toast("已创建 " .. name)
-      end)
-      .show()
-  end)
+        dirRefresh(true)
+      else
+        toast("创建失败，请检查存储权限")
+      end
+    end)
+    .show()
+end
 
-  actionButton("新建文件夹", function()
-    local input = EditText(activity)
-    input.setHint("文件夹名")
-    MaterialAlertDialogBuilder(activity)
-      .setTitle("新建文件夹")
-      .setView(input)
-      .setNegativeButton("取消", nil)
-      .setPositiveButton("创建", function()
-        local name = tostring(input.getText().toString())
-        if name == "" then
-          return
-        end
-        local target = File(currentDir .. "/" .. name)
-        if target.exists() then
-          toast("同名文件夹已存在")
-          return
-        end
-        if target.mkdirs() then
-          buildDirPage(true)
-          toast("已创建 " .. name)
-        else
-          toast("创建失败，请检查存储权限")
-        end
-      end)
-      .show()
-  end)
+local dirRows
+local dirEmpty
+local dirCount
 
-  local files = File(currentDir).listFiles()
-  local entries = {}
-  if files then
-    for i = 0, #files - 1 do
-      table.insert(entries, files[i])
-    end
+local function renderEntries()
+  if not dirRows then
+    return
   end
-  table.sort(entries, function(a, b)
-    if a.isDirectory() ~= b.isDirectory() then
-      return a.isDirectory()
-    end
-    return a.getName():lower() < b.getName():lower()
-  end)
+  dirRows.removeAllViews()
+  local entries = collectEntries()
+  if dirCount then
+    dirCount.setText("共 " .. #entries .. " 项 · 按" .. sortLabel() .. "排序")
+  end
 
-  for i = 1, #entries do
-    local item = entries[i]
+  if #entries == 0 then
+    if not dirEmpty then
+      dirEmpty = LinearLayout(activity)
+      dirEmpty.setOrientation(LinearLayout.VERTICAL)
+      dirEmpty.setGravity(Gravity.CENTER)
+      dirEmpty.setPadding(0, dp(28), 0, dp(28))
+      local emptyTitle = TextView(activity)
+      emptyTitle.setText(dirQuery ~= "" and "没有匹配的文件" or "这里还没有文件")
+      emptyTitle.setTextSize(14)
+      emptyTitle.setTextColor(INK)
+      emptyTitle.setGravity(Gravity.CENTER)
+      dirEmpty.addView(emptyTitle)
+      local emptyHint = TextView(activity)
+      emptyHint.setText(dirQuery ~= "" and "换个关键词，或清空搜索" or "用上方按钮新建文件或文件夹")
+      emptyHint.setTextSize(11.5)
+      emptyHint.setTextColor(MUTED)
+      emptyHint.setGravity(Gravity.CENTER)
+      emptyHint.setPadding(0, dp(6), 0, 0)
+      dirEmpty.addView(emptyHint)
+    end
+    dirRows.addView(dirEmpty, LinearLayout.LayoutParams(-1, -2))
+    return
+  end
+
+  for _, item in ipairs(entries) do
+    local path = item.getAbsolutePath()
     local row = LinearLayout(activity)
     row.setOrientation(LinearLayout.HORIZONTAL)
     row.setGravity(Gravity.CENTER_VERTICAL)
-    row.setPadding(dp(12), dp(11), dp(12), dp(11))
+    row.setPadding(dp(11), dp(10), dp(11), dp(10))
     row.setBackground(rounded(CARD, LINE, 12))
     local rowParams = LinearLayout.LayoutParams(-1, -2)
-    rowParams.topMargin = dp(8)
-    box.addView(row, rowParams)
+    rowParams.topMargin = dp(7)
+    dirRows.addView(row, rowParams)
 
-    local symbol = TextView(activity)
-    symbol.setText(item.isDirectory() and "夹" or "文")
-    symbol.setTextSize(11)
-    symbol.setGravity(Gravity.CENTER)
-    symbol.setTextColor(0xff7a6a56)
-    symbol.setBackground(rounded(0xfff2ece0, nil, 8))
-    row.addView(symbol, LinearLayout.LayoutParams(dp(26), dp(26)))
+    local tagText, tagColor, tagBg = fileTag(item)
+    local badge = TextView(activity)
+    badge.setText(tagText)
+    badge.setTextSize(11)
+    badge.setGravity(Gravity.CENTER)
+    badge.setTextColor(tagColor)
+    badge.setBackground(rounded(tagBg, nil, 8))
+    row.addView(badge, LinearLayout.LayoutParams(dp(28), dp(28)))
 
     local label = LinearLayout(activity)
     label.setOrientation(LinearLayout.VERTICAL)
@@ -478,37 +786,256 @@ function buildDirPage(keepPage)
     fileName.setText(item.getName())
     fileName.setTextSize(13.5)
     fileName.setTextColor(INK)
+    fileName.setSingleLine(true)
+    fileName.setEllipsize(TextUtils.TruncateAt.END)
     label.addView(fileName)
 
     local meta = TextView(activity)
     if item.isDirectory() then
-      meta.setText("文件夹")
+      meta.setText("文件夹 · " .. humanTime(item.lastModified()))
     else
-      meta.setText(humanSize(item.length()))
+      meta.setText(humanSize(item.length()) .. " · " .. humanTime(item.lastModified()))
     end
-    meta.setTextSize(11.5)
+    meta.setTextSize(11)
     meta.setTextColor(MUTED)
+    meta.setPadding(0, dp(3), 0, 0)
     label.addView(meta)
+
+    local more = TextView(activity)
+    more.setText("⋯")
+    more.setTextSize(15)
+    more.setTextColor(MUTED)
+    more.setGravity(Gravity.CENTER)
+    more.setPadding(dp(6), dp(4), dp(2), dp(4))
+    row.addView(more)
 
     row.setOnClickListener(View.OnClickListener{
       onClick = function()
         if item.isDirectory() then
-          currentDir = item.getAbsolutePath()
-          buildDirPage()
+          currentDir = path
+          uiState.lastDir = currentDir
+          saveUiState()
+          dirRefresh()
         else
-          showFileMenu(item.getAbsolutePath(), false)
+          openEditor(path)
         end
       end
     })
     row.setOnLongClickListener(View.OnLongClickListener{
       onLongClick = function()
-        showFileMenu(item.getAbsolutePath(), item.isDirectory())
+        showFileMenu(path, item.isDirectory())
         return true
       end
     })
+    more.setOnClickListener(View.OnClickListener{
+      onClick = function()
+        showFileMenu(path, item.isDirectory())
+      end
+    })
+  end
+end
+
+function buildDirPage(keepPage)
+  local previousScroll = 0
+  if keepPage and pages[2] then
+    pcall(function()
+      previousScroll = pages[2].getScrollY()
+    end)
+  end
+  local scroll, box = makeScroll()
+  dirEmpty = nil
+  if not keepPage or not pages[2] then
+    pages[2] = scroll
+  else
+    local old = pages[2]
+    pages[2] = scroll
+    if pageHolder.getChildAt(0) == old then
+      pageHolder.removeAllViews()
+      pageHolder.addView(scroll, FrameLayout.LayoutParams(-1, -1))
+    end
   end
 
+  -- 面包屑
+  local crumbScroll = HorizontalScrollView(activity)
+  crumbScroll.setHorizontalScrollBarEnabled(false)
+  box.addView(crumbScroll, LinearLayout.LayoutParams(-1, -2))
+  local crumbRow = LinearLayout(activity)
+  crumbRow.setOrientation(LinearLayout.HORIZONTAL)
+  crumbRow.setGravity(Gravity.CENTER_VERTICAL)
+  crumbScroll.addView(crumbRow, LinearLayout.LayoutParams(-2, -2))
+
+  local crumbs = { { "工程", projectDir } }
+  local relative = currentDir:sub(#projectDir + 1):gsub("^/+", "")
+  if relative ~= "" then
+    local path = projectDir
+    for segment in relative:gmatch("[^/]+") do
+      path = path .. "/" .. segment
+      table.insert(crumbs, { segment, path })
+    end
+  end
+
+  for index, crumb in ipairs(crumbs) do
+    local chip = TextView(activity)
+    chip.setText(crumb[1])
+    chip.setTextSize(12)
+    chip.setSingleLine(true)
+    if index == #crumbs then
+      chip.setTextColor(INK)
+      chip.setTypeface(Typeface.DEFAULT_BOLD)
+      chip.setBackground(rounded(0xfff2ece0, nil, 8))
+    else
+      chip.setTextColor(0xff0b6f6a)
+      chip.setBackground(rounded(0x00000000, nil, 8))
+    end
+    chip.setPadding(dp(7), dp(4), dp(7), dp(4))
+    local chipParams = LinearLayout.LayoutParams(-2, -2)
+    chipParams.rightMargin = dp(2)
+    crumbRow.addView(chip, chipParams)
+    local target = crumb[2]
+    chip.setOnClickListener(View.OnClickListener{
+      onClick = function()
+        currentDir = target
+        uiState.lastDir = currentDir
+        saveUiState()
+        dirRefresh()
+      end
+    })
+    if index < #crumbs then
+      local sep = TextView(activity)
+      sep.setText("/")
+      sep.setTextSize(11)
+      sep.setTextColor(MUTED)
+      crumbRow.addView(sep)
+    end
+  end
+
+  crumbScroll.post(luajava.new(luajava.bindClass("java.lang.Runnable"), {
+    run = function()
+      crumbScroll.fullScroll(View.FOCUS_RIGHT)
+    end
+  }))
+
+  -- 搜索框
+  local searchRow = LinearLayout(activity)
+  searchRow.setOrientation(LinearLayout.HORIZONTAL)
+  searchRow.setGravity(Gravity.CENTER_VERTICAL)
+  searchRow.setBackground(rounded(CARD, LINE, 10))
+  searchRow.setPadding(dp(10), 0, dp(10), 0)
+  local searchParams = LinearLayout.LayoutParams(-1, dp(38))
+  searchParams.topMargin = dp(10)
+  box.addView(searchRow, searchParams)
+
+  local searchIcon = TextView(activity)
+  searchIcon.setText("⌕")
+  searchIcon.setTextSize(15)
+  searchIcon.setTextColor(MUTED)
+  searchRow.addView(searchIcon)
+
+  local searchInput = EditText(activity)
+  searchInput.setHint("搜索当前目录")
+  searchInput.setText(dirQuery)
+  searchInput.setTextSize(13)
+  searchInput.setTextColor(INK)
+  searchInput.setHintTextColor(0xFFA79B88)
+  searchInput.setBackgroundColor(0x00000000)
+  searchInput.setSingleLine(true)
+  searchInput.setPadding(dp(6), 0, dp(4), 0)
+  searchRow.addView(searchInput, LinearLayout.LayoutParams(0, -1, 1))
+  searchInput.addTextChangedListener(TextWatcher{
+    beforeTextChanged = function()
+    end,
+    onTextChanged = function()
+    end,
+    afterTextChanged = function(editable)
+      dirQuery = tostring(editable.toString())
+      renderEntries()
+    end
+  })
+
+  -- 操作条
+  local actions = LinearLayout(activity)
+  actions.setOrientation(LinearLayout.HORIZONTAL)
+  local actionsParams = LinearLayout.LayoutParams(-1, -2)
+  actionsParams.topMargin = dp(10)
+  box.addView(actions, actionsParams)
+
+  local function actionButton(text, handler)
+    local button = TextView(activity)
+    button.setText(text)
+    button.setTextSize(12)
+    button.setTextColor(0xff0b6f6a)
+    button.setGravity(Gravity.CENTER)
+    button.setPadding(dp(9), dp(6), dp(9), dp(6))
+    button.setBackground(rounded(0xffdff3f0, 0xffbfe6e1, 9))
+    local params = LinearLayout.LayoutParams(-2, -2)
+    params.rightMargin = dp(7)
+    actions.addView(button, params)
+    button.setOnClickListener(View.OnClickListener{
+      onClick = handler
+    })
+    return button
+  end
+
+  if currentDir ~= projectDir then
+    actionButton("↑ 上级", function()
+      goUp()
+    end)
+  end
+  actionButton("+ 文件", function()
+    promptCreate("新建文件", "例如 page.lua", false)
+  end)
+  actionButton("+ 文件夹", function()
+    promptCreate("新建文件夹", "例如 pages", true)
+  end)
+  actionButton("刷新", function()
+    dirRefresh(true)
+  end)
+  actionButton("排序", function()
+    local currentKey = uiState.sort or "name"
+    local nextKey = "name"
+    for index, mode in ipairs(SORT_MODES) do
+      if mode.key == currentKey then
+        nextKey = SORT_MODES[(index % #SORT_MODES) + 1].key
+        break
+      end
+    end
+    uiState.sort = nextKey
+    saveUiState()
+    renderEntries()
+    toast("已按" .. sortLabel() .. "排序")
+  end)
+
+  dirCount = TextView(activity)
+  dirCount.setTextSize(10.5)
+  dirCount.setTextColor(MUTED)
+  dirCount.setPadding(dp(2), dp(10), 0, 0)
+  box.addView(dirCount)
+
+  dirRows = LinearLayout(activity)
+  dirRows.setOrientation(LinearLayout.VERTICAL)
+  box.addView(dirRows, LinearLayout.LayoutParams(-1, -2))
+
+  -- 操作后的统一刷新入口，保证页面可见时立即更新
+  dirRefresh = function(keepPage)
+    buildDirPage(true)
+  end
+
+  lastDirSignature = dirSignature(currentDir)
+  renderEntries()
+  if previousScroll > 0 then
+    scroll.post(luajava.new(luajava.bindClass("java.lang.Runnable"), {
+      run = function()
+        scroll.scrollTo(0, previousScroll)
+      end
+    }))
+  end
   return scroll
+end
+
+dirSyncNow = function()
+  if pages[2] and lastDirSignature and dirSignature(currentDir) ~= lastDirSignature then
+    buildDirPage(true)
+  end
 end
 
 -- ===== 权限页 =====
@@ -752,6 +1279,45 @@ pages[1] = buildInfoPage()
 pages[2] = buildDirPage()
 pages[3] = buildPermissionPage()
 pages[4] = buildLogPage()
+
+-- 停留目录页时轮询指纹，外部改动（其他 App、电脑拷入）也能立刻刷新
+local dirHandler = Handler(Looper.getMainLooper())
+local dirTicker
+dirTicker = luajava.new(luajava.bindClass("java.lang.Runnable"), {
+  run = function()
+    local alive = true
+    pcall(function()
+      alive = not activity.isFinishing()
+    end)
+    if not alive then
+      return
+    end
+    if currentTab == 2 then
+      dirSyncNow()
+    end
+    pcall(function()
+      dirHandler.postDelayed(dirTicker, 1500)
+    end)
+  end
+})
+pcall(function()
+  dirHandler.postDelayed(dirTicker, 1500)
+end)
+
+pcall(function()
+  local BackGuard = luajava.bindClass("com.mini.luaxplus.BackGuard")
+  BackGuard.install(activity)
+  BackGuard.setHandler(activity, luajava.new(luajava.bindClass("java.lang.Runnable"), {
+    run = function()
+      if currentTab == 2 and currentDir ~= projectDir then
+        goUp()
+      else
+        activity.finish()
+      end
+    end
+  }))
+end)
+
 switchTab(1)
 
 -- 底部操作条
