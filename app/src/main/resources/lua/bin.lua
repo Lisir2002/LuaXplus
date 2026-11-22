@@ -50,9 +50,21 @@ local function create_error_dlg2()
     error_dlg.setPositiveButton("确定", nil)
 end
 
+-- 项目显式选择了权限注入时，只保留勾选项与基础必需项
+local MANDATORY_PERMISSIONS = {
+    "INTERNET",
+    "WRITE_EXTERNAL_STORAGE",
+    "READ_EXTERNAL_STORAGE",
+    "MANAGE_EXTERNAL_STORAGE",
+}
+
 local function binapk(luapath, apkpath)
     require "import"
     import "console"
+    local pinfo = {}
+    pcall(function()
+        loadfile(luapath .. "init.lua", "bt", pinfo)()
+    end)
     compile "mao"
     compile "sign"
     import "java.util.zip.*"
@@ -327,12 +339,27 @@ local function binapk(luapath, apkpath)
                     req[".*\\\\.alp"] = ".*\\\\."..path_pattern
                     req["application/alp"] = "application/"..path_pattern
                 end
-                -- 成品包继承模板的完整权限清单，不再按项目声明裁剪，
-                -- 否则存储、摄像头等权限会丢失，用户也无法在系统设置里授权
+                -- 默认继承模板的完整权限清单；项目勾选了权限注入时按勾选裁剪，
+                -- 并始终保留日志与基础功能所需的权限
+                local keep = nil
+                if pinfo.strict_permissions then
+                    keep = {}
+                    for _, item in ipairs(pinfo.user_permission or {}) do
+                        keep[(item:gsub("android%.permission%.", ""))] = true
+                    end
+                    for _, item in ipairs(MANDATORY_PERMISSIONS) do
+                        keep[item] = true
+                    end
+                end
                 for n = 0, list.size() - 1 do
                     local v = list.get(n)
                     if req[v] then
                         list.set(n, req[v])
+                    elseif keep then
+                        local p = v:match("%.permission%.([%w_]+)$")
+                        if p and (not keep[p]) then
+                            list.set(n, "android.permission.UNKNOWN")
+                        end
                     end
                 end
                 local pt = activity.getLuaPath(".tmp")

@@ -21,7 +21,7 @@ if log then
 end
 
 local ok, result = xpcall(function()
-  return require "mainbody"
+  return require "home"
 end, record)
 
 if not ok then
