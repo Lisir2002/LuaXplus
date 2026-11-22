@@ -273,7 +273,11 @@ classList.onItemClick = function(list_, view_, position_, index_)
     Toast.makeText(activity, "当前运行环境无法加载这个类：" .. entry.name, Toast.LENGTH_SHORT).show()
     return
   end
-  showClassDetail(entry, class)
+  local detailOk, detailError = pcall(showClassDetail, entry, class)
+  if not detailOk then
+    print("JavaAPI detail error: " .. tostring(detailError))
+    Toast.makeText(activity, "详情加载失败：" .. entry.simple, Toast.LENGTH_SHORT).show()
+  end
 end
 
 classList.onItemLongClick = function(list_, view_, position_, index_)
@@ -390,7 +394,7 @@ local function buildMembers(class, entry)
     end
   end
   table.sort(methods, function(a, b)
-    return a:getName() < b:getName()
+    return tostring(a.getName()) < tostring(b.getName())
   end)
 
   local events = {}
