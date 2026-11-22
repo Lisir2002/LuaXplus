@@ -32,3 +32,5 @@ icons.button("add", "新建", { background = ACCENT_WASH, stroke = ACCENT_LINE, 
 ## 覆盖范围
 
 首页、编辑器、项目页、设置、关于、示例列表、Java 浏览器、手册 Activity、LuaX-UI 组件库和组件示例都使用同一套图标。新增图标时先加 SVG 源稿和生成脚本定义，再在 `icons.lua` 注册名称。
+
+预览板：`docs/icons-preview.png`。
