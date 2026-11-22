@@ -247,9 +247,33 @@ root.addView(bar, LinearLayout.LayoutParams(-1, -2))
 
 -- ===== 代码区 =====
 local editor = LuaEditor(activity)
-editor.setDark(darkMode)
-editor.setBackgroundColor(PAPER)
-editor.setTextColor(INK)
+
+-- 高亮色不能只依赖编辑器默认配色，否则标识符会和深色背景混在一起。
+local function applyEditorColors(isDark)
+  editor.setDark(isDark)
+  if isDark then
+    editor.setBackgroundColor(EDITOR_DARK_BG)
+    editor.setTextColor(0xFFE8EEF4)
+    editor.setBasewordColor(0xFFE8EEF4)
+    editor.setUserwordColor(0xFF8FD3F4)
+    editor.setCommentColor(0xFF8A9AA6)
+    editor.setKeywordColor(0xFFC792EA)
+    editor.setStringColor(0xFFF48FB1)
+  else
+    editor.setBackgroundColor(PAPER)
+    editor.setTextColor(INK)
+    editor.setBasewordColor(INK)
+    editor.setUserwordColor(0xFF1F5F8B)
+    editor.setCommentColor(0xFF6F7F72)
+    editor.setKeywordColor(0xFF7A3E9D)
+    editor.setStringColor(0xFFB03A5B)
+  end
+  pcall(function()
+    editor.respan()
+  end)
+end
+
+applyEditorColors(darkMode)
 editor.setShowLineNumbers(true)
 editor.setHighlightCurrentRow(true)
 editor.setWordWrap(false)
@@ -441,6 +465,7 @@ local function applyAutoLanguage()
 end
 
 applyAutoLanguage()
+applyEditorColors(darkMode)
 
 -- ===== 保存与状态 =====
 local function currentText()
@@ -586,7 +611,7 @@ local function auditMessage(report)
   if #actions > 0 then
     local safe = report.safeCount or 0
     local guided = report.guidedCount or 0
-    lines[#lines + 1] = "其中 " .. #actions .. " 项可进入修复方案"
+    lines[#lines + 1] = "其中 " .. #actions .. " 项可一键修复"
     if guided > 0 then
       lines[#lines + 1] = "安全项 " .. safe .. " 个，需确认项 " .. guided .. " 个。"
     else
@@ -629,7 +654,7 @@ local function showRepairPlan(report, commit)
   scroll.addView(content)
 
   local builder = MaterialAlertDialogBuilder(activity)
-    .setTitle("修复方案")
+    .setTitle("一键修复")
     .setView(scroll)
     .setNegativeButton("取消", function()
       auditDialogShowing = false
@@ -720,7 +745,7 @@ local function saveWithAudit(commit)
 
   local actions = report.actions or {}
   if #actions > 0 then
-    builder.setPositiveButton("查看修复方案", function()
+    builder.setPositiveButton("一键修复", function()
       auditDialogShowing = false
       showRepairPlan(report, commit)
     end)
@@ -754,7 +779,7 @@ local function showLintReport()
     .setMessage(auditMessage(report))
     .setPositiveButton("关闭", nil)
   if #(report.actions or {}) > 0 then
-    builder.setNeutralButton("修复方案", function()
+    builder.setNeutralButton("一键修复", function()
       showRepairPlan(report, doSave)
     end)
   end
@@ -1201,14 +1226,7 @@ local function menuActions(action)
     toast("字号 " .. size)
   elseif action == "theme" then
     darkMode = not darkMode
-    editor.setDark(darkMode)
-    if darkMode then
-      editor.setBackgroundColor(EDITOR_DARK_BG)
-      editor.setTextColor(PANEL_TEXT_SOFT)
-    else
-      editor.setBackgroundColor(PAPER)
-      editor.setTextColor(INK)
-    end
+    applyEditorColors(darkMode)
     pcall(function()
       editor.respan()
     end)
