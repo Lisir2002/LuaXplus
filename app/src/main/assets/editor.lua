@@ -86,6 +86,20 @@ local darkMode = false
 
 activity.setTitle(fileName)
 
+-- 页面自带操作栏，隐藏系统标题栏避免出现两层白条
+pcall(function()
+  local actionBar = activity.getActionBar()
+  if actionBar then
+    actionBar.hide()
+  end
+end)
+pcall(function()
+  local supportBar = activity.getSupportActionBar()
+  if supportBar then
+    supportBar.hide()
+  end
+end)
+
 if not fileExists then
   Toast.makeText(activity, "文件不存在，保存后会创建", Toast.LENGTH_SHORT).show()
 end
@@ -146,6 +160,11 @@ pathText.setSingleLine(true)
 pathText.setEllipsize(TextUtils.TruncateAt.MIDDLE)
 titleBox.addView(pathText, LinearLayout.LayoutParams(-1, -2))
 
+local wrapBtn = barButton("换行")
+wrapBtn.setTextSize(11)
+wrapBtn.setTextColor(TEXT_MUTED)
+wrapBtn.setPadding(dp(9), dp(6), dp(9), dp(6))
+
 local findBtn = barButton("搜索")
 findBtn.setTextSize(12)
 findBtn.setTextColor(TEXT_MUTED)
@@ -176,9 +195,31 @@ editor.setWordWrap(false)
 editor.setAutoIndent(true)
 editor.setAutoIndentWidth(4)
 editor.setTabSpaces(4)
-editor.setTextSize(15)
+editor.setTextSize(17)
 editor.setText(savedText)
 editor.requestFocus()
+
+local wrapEnabled = false
+local function refreshWrapButton()
+  if wrapEnabled then
+    wrapBtn.setTextColor(0xff07130f)
+    wrapBtn.setBackground(rounded(ACCENT, nil, 8))
+  else
+    wrapBtn.setTextColor(TEXT_MUTED)
+    wrapBtn.setBackground(rounded(0x00000000, PANEL_LINE, 8))
+  end
+end
+
+wrapBtn.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    wrapEnabled = not wrapEnabled
+    editor.setWordWrap(wrapEnabled)
+    refreshWrapButton()
+    toast(wrapEnabled and "已开启自动换行" or "已关闭自动换行")
+  end
+})
+
+refreshWrapButton()
 
 -- ===== 查找替换 =====
 local findPanel = LinearLayout(activity)
@@ -259,7 +300,7 @@ stripScroll.addView(strip, LinearLayout.LayoutParams(-2, -2))
 local function stripChip(text, accent)
   local view = TextView(activity)
   view.setText(text)
-  view.setTextSize(12)
+  view.setTextSize(13)
   view.setTextColor(accent and ACCENT or TEXT_MUTED)
   view.setGravity(Gravity.CENTER)
   view.setPadding(dp(9), dp(4), dp(9), dp(4))
@@ -307,12 +348,12 @@ statusBar.setBackgroundColor(0xff141b22)
 statusBar.setPadding(dp(10), dp(2), dp(8), dp(3))
 
 local statusText = TextView(activity)
-statusText.setTextSize(10)
+statusText.setTextSize(11)
 statusText.setTextColor(TEXT_MUTED)
 statusBar.addView(statusText, LinearLayout.LayoutParams(0, -2, 1))
 
 local dirtyText = TextView(activity)
-dirtyText.setTextSize(10)
+dirtyText.setTextSize(11)
 dirtyText.setTextColor(ACCENT)
 statusBar.addView(dirtyText, LinearLayout.LayoutParams(-2, -2))
 
@@ -685,13 +726,11 @@ local MENU_ITEMS = {
   { name = "注释当前行", action = "comment" },
   { name = "当前行上移", action = "up" },
   { name = "当前行下移", action = "down" },
-  { name = "自动换行", action = "wrap" },
   { name = "字号加大", action = "bigger" },
   { name = "字号减小", action = "smaller" },
   { name = "切换明暗主题", action = "theme" },
   { name = "另存为", action = "saveas" },
-  { name = "文件信息", action = "info" },
-  { name = "运行脚本", action = "run" }
+  { name = "文件信息", action = "info" }
 }
 
 local function menuActions(action)
@@ -730,16 +769,12 @@ local function menuActions(action)
     moveLine(-1)
   elseif action == "down" then
     moveLine(1)
-  elseif action == "wrap" then
-    local wrap = not editor.isWordWrap()
-    editor.setWordWrap(wrap)
-    toast(wrap and "已开启自动换行" or "已关闭自动换行")
   elseif action == "bigger" or action == "smaller" then
     local size = 15
     if action == "bigger" then
-      size = math.min(24, math.floor(editor.getTextSize()) + 1)
+      size = math.min(28, math.floor(editor.getTextSize()) + 1)
     else
-      size = math.max(11, math.floor(editor.getTextSize()) - 1)
+      size = math.max(12, math.floor(editor.getTextSize()) - 1)
     end
     editor.setTextSize(size)
     toast("字号 " .. size)
@@ -791,13 +826,6 @@ local function menuActions(action)
       .setMessage(message)
       .setPositiveButton("知道了", nil)
       .show()
-  elseif action == "run" then
-    if isDirty() and not doSave() then
-      return
-    end
-    pcall(function()
-      activity.newActivity(filePath)
-    end)
   end
 end
 
