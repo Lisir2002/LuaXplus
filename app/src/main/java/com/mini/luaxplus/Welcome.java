@@ -1,16 +1,10 @@
 package com.mini.luaxplus;
 
-import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
-import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.SystemClock;
-import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -36,39 +30,14 @@ public class Welcome extends Activity {
         super.onCreate(savedInstanceState);
         LogCore.init(this);
         RuntimeWatcher.install(this);
-        requestExternalStorageIfNeeded();
+        if (!LogCore.OWNER_PACKAGE.equals(getPackageName())) {
+            // 成品包不再抢在首屏之前弹权限页，等应用界面显示后再申请
+            LaunchPermissions.arm(getApplication());
+        }
         LogCore.i("Welcome", "启动页创建 version=" + readVersionName()
                 + " 日志目录=" + LogCore.dir());
         setContentView(createSplashView());
         prepareAndStartEditor();
-    }
-
-    /**
-     * 打包成品同样需要外部存储写入权限，否则日志只能暂存在私有目录。
-     * 主程序由脚本层的存储自检负责，这里只处理成品包。
-     */
-    private void requestExternalStorageIfNeeded() {
-        if (LogCore.OWNER_PACKAGE.equals(getPackageName())) {
-            return;
-        }
-        try {
-            if (Build.VERSION.SDK_INT >= 30) {
-                if (!Environment.isExternalStorageManager()) {
-                    Intent intent = new Intent(
-                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                            Uri.parse("package:" + getPackageName()));
-                    startActivity(intent);
-                    LogCore.i("Welcome", "成品包申请所有文件访问权限");
-                }
-            } else if (Build.VERSION.SDK_INT >= 23
-                    && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                    != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 3001);
-                LogCore.i("Welcome", "成品包申请存储写入权限");
-            }
-        } catch (Exception exception) {
-            LogCore.w("Welcome", "申请存储权限失败: " + exception);
-        }
     }
 
     private void prepareAndStartEditor() {
@@ -108,7 +77,7 @@ public class Welcome extends Activity {
         root.addView(logo, new LinearLayout.LayoutParams(logoSize, logoSize));
 
         TextView title = new TextView(this);
-        title.setText("Mini-LuaXPLUS");
+        title.setText(getApplicationInfo().loadLabel(getPackageManager()));
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
         title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
         title.setTextColor(resolveThemeColor(android.R.attr.textColorPrimary));
@@ -119,7 +88,9 @@ public class Welcome extends Activity {
         root.addView(title, titleParams);
 
         TextView tagline = new TextView(this);
-        tagline.setText("在手机上用 Lua 写应用");
+        tagline.setText(LogCore.OWNER_PACKAGE.equals(getPackageName())
+                ? "在手机上用 Lua 写应用"
+                : "正在启动…");
         tagline.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         tagline.setTextColor(resolveThemeColor(android.R.attr.textColorSecondary));
         tagline.setGravity(Gravity.CENTER);
