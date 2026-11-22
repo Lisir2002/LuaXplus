@@ -857,4 +857,9 @@ function onDestroy()
   end)
 end
 
+-- 进入项目列表后按功能分组申请运行时权限，最后引导“所有文件访问”
+pcall(function()
+  luajava.bindClass("com.mini.luaxplus.StartupPermissions").request(activity)
+end)
+
 refresh()

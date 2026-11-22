@@ -275,47 +275,8 @@ local function buildInfoPage()
   local codeInput = field("版本码", info.appcode, "整数，随版本递增", false, true)
   local sdkInput = field("最低 SDK", info.appsdk, "整数，例如 15", false, true)
 
-  section("打包与运行")
-  local themeInput = field("主题", info.theme, "Theme_Material_Light")
-  local localThemeRow = LinearLayout(activity)
-  localThemeRow.setOrientation(LinearLayout.HORIZONTAL)
-  localThemeRow.setPadding(dp(2), dp(8), 0, 0)
-  box.addView(localThemeRow)
-  local presets = {
-    { "浅色", "Theme_Material_Light" },
-    { "深色", "Theme_Material_Dark" },
-    { "跟随系统", "Theme_DeviceDefault_DayNight" },
-  }
-  for _, preset in ipairs(presets) do
-    local chip = TextView(activity)
-    chip.setText(preset[1])
-    chip.setTextSize(12)
-    chip.setTextColor(0xff0b6f6a)
-    chip.setGravity(Gravity.CENTER)
-    chip.setPadding(dp(10), dp(5), dp(10), dp(5))
-    chip.setBackground(rounded(0xffdff3f0, 0xffbfe6e1, 9))
-    local chipParams = LinearLayout.LayoutParams(-2, -2)
-    chipParams.rightMargin = dp(8)
-    localThemeRow.addView(chip, chipParams)
-    chip.setOnClickListener(View.OnClickListener{
-      onClick = function()
-        themeInput.setText(preset[2])
-      end
-    })
-  end
-
-  local debugSwitch = MaterialSwitch(activity)
-  debugSwitch.setText("调试模式（输出运行日志）")
-  debugSwitch.setTextSize(13.5)
-  debugSwitch.setTextColor(INK)
-  debugSwitch.setChecked(info.debugmode ~= false)
-  debugSwitch.setPadding(dp(2), dp(12), dp(2), dp(8))
-  box.addView(debugSwitch)
-
-  local channelInput = field("渠道标识", info.app_channel, "例如 official")
-  local keyInput = field("应用密钥", info.app_key, "打包用的 app_key，可留空")
-  local patternInput = field("路径匹配", info.path_pattern, "关联文件后缀，例如 alp")
-
+  -- 主题、调试模式、渠道、密钥和路径匹配不再从属性页编辑，
+  -- 仍保留在工程配置中，避免旧工程字段被写丢。
   section("说明")
   local developerInput = field("开发者", info.developer, "署名或团队名称")
   local descInput = field("简介", info.description, "一句话介绍这个应用", true)
@@ -395,13 +356,8 @@ local function buildInfoPage()
       info.packagename = packagename
       info.appcode = appcode
       info.appsdk = appsdk
-      info.theme = textOf(themeInput) ~= "" and textOf(themeInput) or "Theme_Material_Light"
-      info.app_channel = textOf(channelInput)
-      info.app_key = textOf(keyInput)
-      info.path_pattern = textOf(patternInput)
       info.developer = textOf(developerInput)
       info.description = textOf(descInput)
-      info.debugmode = debugSwitch.isChecked()
       if writeInfo() then
         nameView.setText(info.appname .. "  v" .. info.appver)
         pkgView.setText(info.packagename)
