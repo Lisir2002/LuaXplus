@@ -6,6 +6,7 @@ import "com.androlua.*"
 import "android.app.*"
 import "autotheme"
 local theme = require "luaxplus.theme"
+local icons = require "luaxplus.icons"
 
 -- 手册页面放在安装包内置资源里，用 android_asset 地址读取，
 -- 避免直接访问应用私有目录被浏览器内核拒绝
@@ -13,13 +14,26 @@ local HOME = "file:///android_asset/luadoc/contents.html"
 
 activity.setTheme(autotheme())
 activity.setTitle("使用手册")
-activity.getSupportActionBar().setDisplayHomeAsUpEnabled(true)
+local actionBar = activity.getSupportActionBar()
+actionBar.setDisplayHomeAsUpEnabled(true)
+pcall(function()
+  local homeIcon = icons.drawable("chevron-left")
+  if homeIcon then
+    actionBar.setHomeAsUpIndicator(homeIcon)
+  end
+end)
 
 items = {"目录"}
 function onCreateOptionsMenu(menu)
   for k, v in ipairs(items) do
     local m = menu.add(v)
     m.setShowAsActionFlags(1)
+    pcall(function()
+      local menuIcon = icons.drawable("manual")
+      if menuIcon then
+        m.setIcon(menuIcon)
+      end
+    end)
   end
 end
 

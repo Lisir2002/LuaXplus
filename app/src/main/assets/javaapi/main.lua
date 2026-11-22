@@ -15,6 +15,7 @@ import "memberitem"
 activity.setTheme(autotheme())
 
 local ui = require "luaxplus.ui"
+local icons = require "luaxplus.icons"
 local theme = require "luaxplus.theme"
 theme.install(ui, "light")
 
@@ -140,13 +141,11 @@ local function makeSearch(hint, onChange)
   input.setBackgroundColor(0x00000000)
   input.setPadding(0, 0, 0, 0)
 
-  local clear = textView("✕", 17, C.muted, false)
-  clear.setGravity(Gravity.CENTER)
+  local clear = icons.view("close", { size = 15, color = C.muted })
   clear.setVisibility(View.GONE)
   clear.setPadding(dp(6), 0, dp(6), 0)
 
-  local glyph = textView("⌕", 18, C.muted, false)
-  glyph.setGravity(Gravity.CENTER)
+  local glyph = icons.view("search", { size = 17, color = C.muted })
 
   local box = ui.surface({
     background = C.card,
@@ -531,8 +530,7 @@ function showClassDetail(entry, class)
   })
   head.addView(copyLink)
 
-  local close = textView("✕", 19, C.muted, false)
-  close.setGravity(Gravity.CENTER)
+  local close = icons.view("close", { size = 17, color = C.muted })
   close.setPadding(dp(8), dp(6), dp(8), dp(6))
   close.setOnClickListener(View.OnClickListener{
     onClick = function()

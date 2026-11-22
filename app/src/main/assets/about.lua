@@ -24,6 +24,7 @@ pcall(function()
 end)
 
 local theme = require "luaxplus.theme"
+local icons = require "luaxplus.icons"
 local C = theme.colors
 local BG = C.paper
 local CARD = C.card
@@ -85,8 +86,7 @@ header.setGravity(Gravity.CENTER_VERTICAL)
 header.setPadding(dp(10), dp(14), dp(16), dp(8))
 root.addView(header, LinearLayout.LayoutParams(-1, -2))
 
-local back = label("‹", 28, INK)
-back.setGravity(Gravity.CENTER)
+local back = icons.view("chevron-left", { size = 20, color = INK })
 back.setOnClickListener(View.OnClickListener{
   onClick = function()
     activity.finish()

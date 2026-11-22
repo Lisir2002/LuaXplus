@@ -5,7 +5,7 @@
 - 应用名称：Mini-LuaXPLUS
 - 应用包名：`com.mini.luaxplus`
 - 运行平台：Android 5.0（API 21）及以上，目标版本 Android 12（API 31）
-- 当前版本：`1.0.0-rc31`
+- 当前版本：`1.0.0-rc32`
 
 ## 技术架构
 

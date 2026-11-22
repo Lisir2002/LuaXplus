@@ -17,6 +17,7 @@ import "autotheme"
 activity.setTheme(autotheme())
 
 local theme = require "luaxplus.theme"
+local icons = require "luaxplus.icons"
 local C = theme.colors
 local PAPER = C.paper
 local PANEL = C.panel
@@ -133,14 +134,32 @@ bar.setGravity(Gravity.CENTER_VERTICAL)
 bar.setBackgroundColor(PANEL_SOFT)
 bar.setPadding(dp(6), dp(4), dp(8), dp(4))
 
-local function barButton(text, width)
+local function setButtonIcon(view, name, color)
+  local id = icons.drawable(name)
+  if not id then
+    return
+  end
+  view.setCompoundDrawablesWithIntrinsicBounds(id, 0, 0, 0)
+  view.setCompoundDrawablePadding(dp(4))
+  pcall(function()
+    local drawable = view.getCompoundDrawables()[0]
+    if drawable then
+      drawable.setColorFilter(color or TEXT_MUTED)
+    end
+  end)
+end
+
+local function barButton(text, width, iconName)
   local view = TextView(activity)
   view.setText(text)
   view.setTextSize(13)
   view.setTextColor(TEXT_MAIN)
   view.setGravity(Gravity.CENTER)
-  view.setPadding(dp(10), dp(7), dp(10), dp(7))
+  view.setPadding(dp(9), dp(7), dp(9), dp(7))
   view.setBackground(rounded(0x00000000, nil, 8))
+  if iconName then
+    setButtonIcon(view, iconName, TEXT_MUTED)
+  end
   if width then
     bar.addView(view, LinearLayout.LayoutParams(dp(width), -2))
   else
@@ -149,9 +168,15 @@ local function barButton(text, width)
   return view
 end
 
-local backBtn = barButton("‹", 32)
-backBtn.setTextSize(22)
-backBtn.setTextColor(TEXT_MUTED)
+local function iconButton(name, width, size, color)
+  local view = icons.view(name, { size = size or 18, color = color or TEXT_MUTED })
+  view.setBackground(rounded(0x00000000, nil, 8))
+  local params = LinearLayout.LayoutParams(dp(width or 30), dp(34))
+  bar.addView(view, params)
+  return view
+end
+
+local backBtn = iconButton("chevron-left", 30, 19, TEXT_MUTED)
 
 local titleBox = LinearLayout(activity)
 titleBox.setOrientation(LinearLayout.VERTICAL)
@@ -176,12 +201,8 @@ pathText.setSingleLine(true)
 pathText.setEllipsize(TextUtils.TruncateAt.MIDDLE)
 titleBox.addView(pathText, LinearLayout.LayoutParams(-1, -2))
 
-local undoBtn = barButton("↶", 28)
-undoBtn.setTextSize(17)
-undoBtn.setTextColor(TEXT_MUTED)
-local redoBtn = barButton("↷", 28)
-redoBtn.setTextSize(17)
-redoBtn.setTextColor(TEXT_MUTED)
+local undoBtn = iconButton("undo", 28, 17, TEXT_MUTED)
+local redoBtn = iconButton("redo", 28, 17, TEXT_MUTED)
 
 undoBtn.setOnClickListener(View.OnClickListener{
   onClick = function()
@@ -201,27 +222,25 @@ redoBtn.setOnClickListener(View.OnClickListener{
   end
 })
 
-local wrapBtn = barButton("换行")
+local wrapBtn = barButton("换行", nil, "wrap")
 wrapBtn.setTextSize(11)
 wrapBtn.setTextColor(TEXT_MUTED)
-wrapBtn.setPadding(dp(9), dp(6), dp(9), dp(6))
 
-local findBtn = barButton("搜索")
+local findBtn = barButton("搜索", nil, "search")
 findBtn.setTextSize(12)
 findBtn.setTextColor(TEXT_MUTED)
 
-local saveBtn = barButton("保存")
+local saveBtn = barButton("保存", nil, "save")
 saveBtn.setTextSize(12)
 saveBtn.setTextColor(ON_ACCENT_DEEP)
 saveBtn.setBackground(rounded(ACCENT, nil, 8))
+setButtonIcon(saveBtn, "save", ON_ACCENT_DEEP)
 local saveParams = LinearLayout.LayoutParams(-2, -2)
 saveParams.leftMargin = dp(4)
 bar.removeView(saveBtn)
 bar.addView(saveBtn, saveParams)
 
-local moreBtn = barButton("⋮", 34)
-moreBtn.setTextSize(18)
-moreBtn.setTextColor(TEXT_MUTED)
+local moreBtn = iconButton("more", 32, 18, TEXT_MUTED)
 
 root.addView(bar, LinearLayout.LayoutParams(-1, -2))
 

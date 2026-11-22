@@ -35,6 +35,7 @@ end)
 
 local theme = require "luaxplus.theme"
 local pkgname = require "luaxplus.pkgname"
+local icons = require "luaxplus.icons"
 local C = theme.colors
 local PAPER = C.paper
 local CARD = C.card
@@ -190,13 +191,9 @@ header.setOrientation(LinearLayout.HORIZONTAL)
 header.setGravity(Gravity.CENTER_VERTICAL)
 header.setPadding(dp(10), dp(16), dp(14), dp(6))
 
-local menuBtn = TextView(activity)
-menuBtn.setText("≡")
-menuBtn.setTextSize(22)
-menuBtn.setTextColor(INK)
-menuBtn.setGravity(Gravity.CENTER)
+local menuBtn = icons.view("menu", { size = 22, color = INK })
 menuBtn.setPadding(0, 0, 0, 0)
-header.addView(menuBtn, LinearLayout.LayoutParams(dp(34), -2))
+header.addView(menuBtn, LinearLayout.LayoutParams(dp(34), dp(38)))
 
 local title = TextView(activity)
 title.setText("应用")
@@ -205,24 +202,29 @@ title.setTypeface(Typeface.DEFAULT_BOLD)
 title.setTextColor(INK)
 header.addView(title, LinearLayout.LayoutParams(0, -2, 1))
 
-local editorBtn = TextView(activity)
-editorBtn.setText("编辑器")
-editorBtn.setTextSize(13)
-editorBtn.setTextColor(INK)
-editorBtn.setGravity(Gravity.CENTER)
-editorBtn.setPadding(dp(12), dp(7), dp(12), dp(7))
-editorBtn.setBackground(rounded(CARD, LINE, 10))
+local editorBtn = icons.button("code", "编辑器", {
+  background = CARD,
+  stroke = LINE,
+  color = INK,
+  radius = 10,
+  iconSize = 16,
+  textSize = 13,
+})
 header.addView(editorBtn)
 
-local newBtn = TextView(activity)
-newBtn.setText("新建")
-newBtn.setTextSize(13)
-newBtn.setTextColor(ACCENT_DEEP)
-newBtn.setGravity(Gravity.CENTER)
-newBtn.setPadding(dp(13), dp(7), dp(13), dp(7))
-newBtn.setBackground(rounded(ACCENT_WASH, ACCENT_LINE, 10))
+local newBtn = icons.button("add", "新建", {
+  background = ACCENT_WASH,
+  stroke = ACCENT_LINE,
+  color = ACCENT_DEEP,
+  radius = 10,
+  iconSize = 16,
+  textSize = 13,
+  gap = 4,
+  paddingLeft = 10,
+  paddingRight = 11,
+})
 local newParams = LinearLayout.LayoutParams(-2, -2)
-newParams.leftMargin = dp(8)
+newParams.leftMargin = dp(7)
 header.addView(newBtn, newParams)
 
 root.addView(header, LinearLayout.LayoutParams(-1, -2))
@@ -237,6 +239,17 @@ search.setTextColor(INK)
 search.setSingleLine(true)
 search.setBackground(rounded(CARD, LINE, 12))
 search.setPadding(dp(14), dp(9), dp(14), dp(9))
+local searchIcon = icons.drawable("search")
+if searchIcon then
+  search.setCompoundDrawablesWithIntrinsicBounds(searchIcon, 0, 0, 0)
+  search.setCompoundDrawablePadding(dp(8))
+  pcall(function()
+    local drawable = search.getCompoundDrawables()[0]
+    if drawable then
+      drawable.setColorFilter(MUTED)
+    end
+  end)
+end
 searchWrap.addView(search, LinearLayout.LayoutParams(-1, -2))
 root.addView(searchWrap, LinearLayout.LayoutParams(-1, -2))
 
@@ -374,11 +387,8 @@ local function buildCard(info)
   desc.setPadding(0, dp(4), 0, 0)
   texts.addView(desc)
 
-  local arrow = TextView(activity)
-  arrow.setText("›")
-  arrow.setTextSize(18)
-  arrow.setTextColor(MUTED_LIGHT)
-  card.addView(arrow)
+  local arrow = icons.view("chevron-right", { size = 16, color = MUTED_LIGHT })
+  card.addView(arrow, LinearLayout.LayoutParams(dp(16), dp(16)))
 
   card.setOnClickListener(View.OnClickListener{
     onClick = function()
@@ -404,9 +414,14 @@ local function buildEmpty()
   box.setGravity(Gravity.CENTER)
   box.setPadding(dp(24), dp(60), dp(24), dp(40))
 
-  local icon = ImageView(activity)
-  icon.setImageResource(R.drawable.icon)
-  icon.setAlpha(0.5)
+  local icon = icons.chip("folder", {
+    size = 64,
+    iconSize = 30,
+    background = ACCENT_WASH,
+    color = ACCENT_DEEP,
+    radius = 20,
+  })
+  icon.setAlpha(0.92)
   box.addView(icon, LinearLayout.LayoutParams(dp(64), dp(64)))
 
   local text = TextView(activity)
@@ -688,13 +703,9 @@ brandHint.setTextSize(11)
 brandHint.setTextColor(MUTED)
 brandBox.addView(brandHint)
 
-local closeBtn = TextView(activity)
-closeBtn.setText("✕")
-closeBtn.setTextSize(16)
-closeBtn.setTextColor(MUTED)
-closeBtn.setGravity(Gravity.CENTER)
-closeBtn.setPadding(dp(8), dp(4), dp(8), dp(4))
-sideHeader.addView(closeBtn, LinearLayout.LayoutParams(dp(32), -2))
+local closeBtn = icons.view("close", { size = 16, color = MUTED })
+closeBtn.setPadding(dp(6), dp(4), dp(6), dp(4))
+sideHeader.addView(closeBtn, LinearLayout.LayoutParams(dp(32), dp(34)))
 
 local divider = View(activity)
 divider.setBackgroundColor(LINE)
@@ -710,19 +721,20 @@ sectionLabel.setTextColor(MUTED)
 sectionLabel.setPadding(dp(12), dp(4), 0, dp(2))
 sidePanel.addView(sectionLabel)
 
-local function sideEntry(badgeText, badgeColor, badgeBg, titleText, hintText, handler)
+local function sideEntry(iconName, badgeColor, badgeBg, titleText, hintText, handler)
   local row = LinearLayout(activity)
   row.setOrientation(LinearLayout.HORIZONTAL)
   row.setGravity(Gravity.CENTER_VERTICAL)
   row.setPadding(dp(10), dp(10), dp(12), dp(10))
   row.setBackground(rounded(0xFFF3ECDE, nil, 12))
 
-  local badge = TextView(activity)
-  badge.setText(badgeText)
-  badge.setTextSize(12)
-  badge.setGravity(Gravity.CENTER)
-  badge.setTextColor(badgeColor)
-  badge.setBackground(rounded(badgeBg, nil, 9))
+  local badge = icons.chip(iconName, {
+    size = 30,
+    iconSize = 17,
+    background = badgeBg,
+    color = badgeColor,
+    radius = 9,
+  })
   row.addView(badge, LinearLayout.LayoutParams(dp(30), dp(30)))
 
   local textBox = LinearLayout(activity)
@@ -744,11 +756,8 @@ local function sideEntry(badgeText, badgeColor, badgeBg, titleText, hintText, ha
   entryHint.setPadding(0, dp(3), 0, 0)
   textBox.addView(entryHint)
 
-  local arrow = TextView(activity)
-  arrow.setText("›")
-  arrow.setTextSize(16)
-  arrow.setTextColor(MUTED)
-  row.addView(arrow)
+  local arrow = icons.view("chevron-right", { size = 15, color = MUTED })
+  row.addView(arrow, LinearLayout.LayoutParams(dp(15), dp(15)))
 
   local rowParams = LinearLayout.LayoutParams(-1, -2)
   rowParams.topMargin = dp(6)
@@ -763,7 +772,7 @@ local function sideEntry(badgeText, badgeColor, badgeBg, titleText, hintText, ha
   return row
 end
 
-sideEntry("例", ACCENT_DEEP, ACCENT_WASH, "官方示例", "内置完整组件示例，可编辑运行", function()
+sideEntry("example", ACCENT_DEEP, ACCENT_WASH, "官方示例", "内置完整组件示例，可编辑运行", function()
   local ok, err = pcall(function()
     activity.newActivity("examples")
   end)
@@ -771,7 +780,7 @@ sideEntry("例", ACCENT_DEEP, ACCENT_WASH, "官方示例", "内置完整组件�
     Toast.makeText(activity, "示例页启动失败：" .. tostring(err), Toast.LENGTH_SHORT).show()
   end
 end)
-sideEntry("册", ACCENT_DEEP, ACCENT_WASH, "使用手册", "从快速开始查到打包排错", function()
+sideEntry("manual", ACCENT_DEEP, ACCENT_WASH, "使用手册", "从快速开始查到打包排错", function()
   local ok, err = pcall(function()
     activity.newActivity("luadoc")
   end)
@@ -779,7 +788,7 @@ sideEntry("册", ACCENT_DEEP, ACCENT_WASH, "使用手册", "从快速开始查�
     Toast.makeText(activity, "手册启动失败：" .. tostring(err), Toast.LENGTH_SHORT).show()
   end
 end)
-sideEntry("J", INFO_INK, INFO_WASH, "Java 浏览器", "浏览类、方法、字段与事件说明", function()
+sideEntry("code", INFO_INK, INFO_WASH, "Java 浏览器", "浏览类、方法、字段与事件说明", function()
   local ok, err = pcall(function()
     activity.newActivity("javaapi/main")
   end)
@@ -787,8 +796,8 @@ sideEntry("J", INFO_INK, INFO_WASH, "Java 浏览器", "浏览类、方法、字�
     Toast.makeText(activity, "Java 浏览器启动失败：" .. tostring(err), Toast.LENGTH_SHORT).show()
   end
 end)
-sideEntry("关", ACCENT_DEEP, ACCENT_WASH, "关于", "版本信息与开发说明", showAbout)
-sideEntry("设", WARM_INK, WARM_WASH, "设置", "偏好与行为配置", showSettings)
+sideEntry("info", ACCENT_DEEP, ACCENT_WASH, "关于", "版本信息与开发说明", showAbout)
+sideEntry("settings", WARM_INK, WARM_WASH, "设置", "偏好与行为配置", showSettings)
 
 local sideFooter = TextView(activity)
 sideFooter.setText(appVersion ~= "" and appVersion or "1.0.0-rc9")

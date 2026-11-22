@@ -250,14 +250,14 @@ ui.show{
     local tabs = ui.hstack({ gap = "4px", fill = true }, function(add)
       add(ui.tabItem({
         title = "首页",
-        glyph = "⌂",
-        src = drawableId("ic_tab_home"),
+        glyph = "home",
+        src = drawableId("ic_luax_home"),
         selected = true,
       }))
       add(ui.tabItem({
         title = "消息",
-        glyph = "✉",
-        src = drawableId("ic_tab_mail"),
+        glyph = "mail",
+        src = drawableId("ic_luax_mail"),
         onClick = function() toast("消息") end,
       }))
     end)
@@ -395,7 +395,7 @@ local function buildControls()
       end,
     }),
     ui.row({
-      icon = "✓",
+      icon = "check",
       iconBg = palette().accent,
       title = "选中状态",
       subtitle = "selected = true",

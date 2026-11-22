@@ -30,6 +30,7 @@ pcall(function()
 end)
 
 local theme = require "luaxplus.theme"
+local icons = require "luaxplus.icons"
 local C = theme.colors
 local PAPER = C.paper
 local CARD = C.card
@@ -245,11 +246,7 @@ header.setOrientation(LinearLayout.HORIZONTAL)
 header.setGravity(Gravity.CENTER_VERTICAL)
 header.setPadding(dp(10), dp(14), dp(14), dp(8))
 
-local back = TextView(activity)
-back.setText("‹")
-back.setTextSize(28)
-back.setTextColor(INK)
-back.setGravity(Gravity.CENTER)
+local back = icons.view("chevron-left", { size = 20, color = INK })
 back.setPadding(0, 0, 0, 0)
 header.addView(back, LinearLayout.LayoutParams(dp(36), dp(44)))
 back.setOnClickListener(View.OnClickListener{
@@ -415,11 +412,8 @@ local function buildCard(info)
   desc.setPadding(0, dp(4), 0, 0)
   texts.addView(desc)
 
-  local arrow = TextView(activity)
-  arrow.setText("›")
-  arrow.setTextSize(18)
-  arrow.setTextColor(MUTED_LIGHT)
-  card.addView(arrow)
+  local arrow = icons.view("chevron-right", { size = 16, color = MUTED_LIGHT })
+  card.addView(arrow, LinearLayout.LayoutParams(dp(16), dp(16)))
 
   card.setOnClickListener(View.OnClickListener{
     onClick = function()

@@ -365,6 +365,26 @@ package.preload["luaxplus.theme"] = function()
   }
 end
 
+package.preload["luaxplus.icons"] = function()
+  return {
+    has = function() return true end,
+    drawable = function() return 1 end,
+    contrast = function() return 0xFF1C2B3A end,
+    view = function(_, spec)
+      local icon = view()
+      icon.iconSize = spec and spec.size
+      icon.setColorFilter = function() end
+      return icon
+    end,
+    chip = function()
+      return view()
+    end,
+    button = function()
+      return view()
+    end,
+  }
+end
+
 package.preload["luaxplus.ui"] = function()
   local page = view()
   page.root = page

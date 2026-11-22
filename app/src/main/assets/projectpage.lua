@@ -31,6 +31,7 @@ pcall(function()
 end)
 
 local theme = require "luaxplus.theme"
+local icons = require "luaxplus.icons"
 local C = theme.colors
 local PAPER = C.paper
 local CARD = C.card
@@ -221,6 +222,7 @@ end
 
 local currentTab = 1
 local dirSyncNow
+local tabIcons = {}
 
 local function switchTab(index)
   currentTab = index
@@ -233,6 +235,9 @@ local function switchTab(index)
       tabViews[i].setTextColor(MUTED)
       tabViews[i].setTypeface(Typeface.DEFAULT)
       tabViews[i].setBackgroundColor(0x00000000)
+    end
+    if tabIcons[i] then
+      tabIcons[i].setColorFilter(i == index and ACCENT_DEEP or MUTED)
     end
   end
   pageHolder.removeAllViews()
@@ -322,11 +327,8 @@ local function buildInfoPage()
   permHint.setTextColor(MUTED)
   permHint.setPadding(0, dp(3), 0, 0)
   permText.addView(permHint)
-  local permArrow = TextView(activity)
-  permArrow.setText("›")
-  permArrow.setTextSize(16)
-  permArrow.setTextColor(MUTED)
-  permRow.addView(permArrow)
+  local permArrow = icons.view("chevron-right", { size = 15, color = MUTED })
+  permRow.addView(permArrow, LinearLayout.LayoutParams(dp(15), dp(15)))
   permRow.setOnClickListener(View.OnClickListener{
     onClick = function()
       switchTab(3)
@@ -779,13 +781,9 @@ local function renderEntries()
     meta.setPadding(0, dp(3), 0, 0)
     label.addView(meta)
 
-    local more = TextView(activity)
-    more.setText("⋯")
-    more.setTextSize(15)
-    more.setTextColor(MUTED)
-    more.setGravity(Gravity.CENTER)
+    local more = icons.view("more", { size = 17, color = MUTED })
     more.setPadding(dp(6), dp(4), dp(2), dp(4))
-    row.addView(more)
+    row.addView(more, LinearLayout.LayoutParams(dp(28), dp(30)))
 
     row.setOnClickListener(View.OnClickListener{
       onClick = function()
@@ -903,11 +901,8 @@ function buildDirPage(keepPage)
   searchParams.topMargin = dp(10)
   box.addView(searchRow, searchParams)
 
-  local searchIcon = TextView(activity)
-  searchIcon.setText("⌕")
-  searchIcon.setTextSize(15)
-  searchIcon.setTextColor(MUTED)
-  searchRow.addView(searchIcon)
+  local searchIcon = icons.view("search", { size = 16, color = MUTED })
+  searchRow.addView(searchIcon, LinearLayout.LayoutParams(dp(16), dp(16)))
 
   local searchInput = EditText(activity)
   searchInput.setHint("搜索当前目录")
@@ -1208,12 +1203,13 @@ local function buildLogPage()
   card.setBackground(rounded(CARD, LINE, 14))
   box.addView(card, LinearLayout.LayoutParams(-1, -2))
 
-  local symbol = TextView(activity)
-  symbol.setText("志")
-  symbol.setTextSize(20)
-  symbol.setTextColor(WARM_INK)
-  symbol.setGravity(Gravity.CENTER)
-  symbol.setBackground(rounded(PAPER_SOFT, nil, 14))
+  local symbol = icons.chip("log", {
+    size = 52,
+    iconSize = 24,
+    background = PAPER_SOFT,
+    color = WARM_INK,
+    radius = 14,
+  })
   card.addView(symbol, LinearLayout.LayoutParams(dp(52), dp(52)))
 
   local title = TextView(activity)
@@ -1236,14 +1232,23 @@ end
 
 -- 页签装配
 local tabNames = { "属性", "目录", "权限", "日志" }
+local tabIconNames = { "info", "folder", "shield", "log" }
 for i = 1, #tabNames do
   local tab = TextView(activity)
   tab.setText(tabNames[i])
   tab.setTextSize(13.5)
   tab.setGravity(Gravity.CENTER)
-  tab.setPadding(dp(12), dp(8), dp(12), dp(8))
+  tab.setPadding(dp(10), dp(8), dp(12), dp(8))
+  local iconId = icons.drawable(tabIconNames[i])
+  if iconId then
+    tab.setCompoundDrawablesWithIntrinsicBounds(iconId, 0, 0, 0)
+    tab.setCompoundDrawablePadding(dp(4))
+    pcall(function()
+      tabIcons[i] = tab.getCompoundDrawables()[0]
+    end)
+  end
   local params = LinearLayout.LayoutParams(-2, -2)
-  params.rightMargin = dp(8)
+  params.rightMargin = dp(6)
   tabBar.addView(tab, params)
   tabViews[i] = tab
   tab.setOnClickListener(View.OnClickListener{
@@ -1305,18 +1310,23 @@ bar.setPadding(dp(14), dp(8), dp(14), dp(12))
 bar.setBackgroundColor(PAPER)
 root.addView(bar, LinearLayout.LayoutParams(-1, -2))
 
-local function barButton(text, primary, handler)
-  local button = TextView(activity)
-  button.setText(text)
-  button.setTextSize(14)
+local function barButton(text, primary, handler, iconName)
+  local color = primary and ACCENT_DEEP or INK
+  local background = primary and ACCENT_WASH or CARD
+  local stroke = primary and ACCENT_LINE or LINE
+  local button = icons.button(iconName, text, {
+    background = background,
+    stroke = stroke,
+    color = color,
+    radius = 12,
+    iconSize = 17,
+    textSize = 14,
+    gap = 5,
+    paddingLeft = 8,
+    paddingRight = 10,
+  })
   button.setGravity(Gravity.CENTER)
-  if primary then
-    button.setTextColor(ACCENT_DEEP)
-    button.setBackground(rounded(ACCENT_WASH, ACCENT_LINE, 12))
-  else
-    button.setTextColor(INK)
-    button.setBackground(rounded(CARD, LINE, 12))
-  end
+  button.setMinimumHeight(dp(44))
   local params = LinearLayout.LayoutParams(0, dp(44), 1)
   params.rightMargin = dp(8)
   bar.addView(button, params)
@@ -1332,7 +1342,7 @@ barButton("运行", false, function()
     return
   end
   runScript(entry)
-end)
+end, "run")
 
 barButton("打包", true, function()
   local ok, err = pcall(function()
@@ -1346,10 +1356,10 @@ barButton("打包", true, function()
     end)
     toast("打包失败：" .. tostring(err))
   end
-end)
+end, "package")
 
 barButton("编辑器", false, function()
   pcall(function()
     activity.newActivity("editor", {projectDir .. "/main.lua"})
   end)
-end)
+end, "edit")

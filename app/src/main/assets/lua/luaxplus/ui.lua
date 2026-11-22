@@ -25,6 +25,8 @@ pcall(function()
   import "loadbitmap"
 end)
 
+local icons = require "luaxplus.icons"
+
 local M = {}
 
 -- ===== 设计令牌 =====
@@ -995,8 +997,8 @@ function M.page(options)
   nav.addView(navTitle, titleParams)
 
   if options.back then
-    local back = textView("‹", TY.glyph.size, palette.accent, false)
-    back.setGravity(Gravity.CENTER)
+    local back = icons.view("chevron-left", { size = 22, color = palette.accent })
+    back.setPadding(dp(space(4)), 0, dp(space(4)), 0)
     back.setBackground(ripple(0x00000000, R.nav, palette.press))
     local backParams = FrameLayout.LayoutParams(dp(K.navHeight), -1)
     backParams.gravity = Gravity.LEFT
@@ -1133,7 +1135,19 @@ function M.row(spec)
   row.setBackground(ripple(0x00000000, 0, palette.press))
 
   if spec.icon then
-    if type(spec.icon) == "string" then
+    if type(spec.icon) == "string" and icons.has(spec.icon) then
+      local bg = parseColor(spec.iconBg or palette.accent)
+      local badge = icons.chip(spec.icon, {
+        size = K.iconBadge,
+        iconSize = math.max(13, K.iconBadge - 13),
+        background = bg,
+        color = spec.iconColor or icons.contrast(bg),
+        radius = R.iconBadge,
+      })
+      local params = LinearLayout.LayoutParams(dp(K.iconBadge), dp(K.iconBadge))
+      params.rightMargin = dp(space(11))
+      row.addView(badge, params)
+    elseif type(spec.icon) == "string" then
       local badge = textView(spec.icon, TY.callout.size, palette.onAccent, true)
       badge.setGravity(Gravity.CENTER)
       badge.setBackground(roundRect(parseColor(spec.iconBg or palette.accent), R.iconBadge))
@@ -1208,13 +1222,17 @@ function M.row(spec)
       })
     end
   elseif spec.selected then
-    local check = textView("✓", TY.body.size, palette.accent, true)
-    check.setPadding(dp(space(6)), 0, dp(space(2)), 0)
-    row.addView(check)
+    local check = icons.view("check", { size = 16, color = palette.accent })
+    check.setPadding(0, 0, 0, 0)
+    local checkParams = LinearLayout.LayoutParams(dp(16), dp(16))
+    checkParams.leftMargin = dp(space(6))
+    row.addView(check, checkParams)
   elseif spec.chevron ~= false and (spec.onClick or spec.chevron) then
-    local chevron = textView("›", TY.bodyLarge.size, palette.tertiary, false)
-    chevron.setPadding(dp(space(6)), 0, 0, 0)
-    row.addView(chevron)
+    local chevron = icons.view("chevron-right", { size = 16, color = palette.tertiary })
+    chevron.setPadding(0, 0, 0, 0)
+    local chevronParams = LinearLayout.LayoutParams(dp(16), dp(16))
+    chevronParams.leftMargin = dp(space(6))
+    row.addView(chevron, chevronParams)
   end
 
   if spec.disabled then
@@ -1440,8 +1458,9 @@ function M.searchBar(spec)
   bar.setBackground(roundRect(palette.fill, R.search))
   bar.setPadding(dp(space(10)), 0, dp(space(10)), 0)
 
-  local glyph = textView("⌕", TY.callout.size, palette.secondary, false)
-  bar.addView(glyph)
+  local glyph = icons.view("search", { size = 17, color = palette.secondary })
+  glyph.setPadding(0, 0, 0, 0)
+  bar.addView(glyph, LinearLayout.LayoutParams(dp(17), dp(17)))
 
   local input = EditText(activity)
   configureInput(input, {
@@ -1561,11 +1580,21 @@ function M.empty(spec)
   box.setPadding(dp(space(24)), dp(space(44)), dp(space(24)), dp(space(44)))
 
   local glyph
-  if type(spec.icon) == "string" or spec.icon == nil then
-    glyph = textView(spec.icon or "○", TY.emptyGlyph.size, palette.tertiary, false)
+  local emptyIcon = spec.icon or "empty"
+  if type(emptyIcon) == "string" and icons.has(emptyIcon) then
+    local bg = parseColor(spec.iconBackground or palette.accentSoft)
+    glyph = icons.chip(emptyIcon, {
+      size = 58,
+      iconSize = 28,
+      background = bg,
+      color = spec.color or icons.contrast(bg),
+      radius = 18,
+    })
+  elseif type(emptyIcon) == "string" then
+    glyph = textView(emptyIcon, TY.emptyGlyph.size, palette.tertiary, false)
     glyph.setGravity(Gravity.CENTER)
   else
-    glyph = spec.icon
+    glyph = emptyIcon
   end
   box.addView(glyph)
 
@@ -1690,8 +1719,15 @@ function M.tabBar(spec)
     for index = 1, #tabs do
       local tab = tabs[index]
       local active = index == selected
-      tab.icon.setTextColor(active and palette.accent or palette.secondary)
-      tab.label.setTextColor(active and palette.accent or palette.secondary)
+      local color = active and palette.accent or palette.secondary
+      if tab.iconIsImage then
+        pcall(function()
+          tab.icon.setColorFilter(color)
+        end)
+      else
+        tab.icon.setTextColor(color)
+      end
+      tab.label.setTextColor(color)
       tab.label.setTypeface(Typeface.create(active and "sans-serif-medium" or "sans-serif", Typeface.NORMAL))
     end
   end
@@ -1706,8 +1742,15 @@ function M.tabBar(spec)
     tab.setGravity(Gravity.CENTER)
     tab.setPadding(0, dp(space(4)), 0, dp(space(2)))
 
-    local icon = textView(item.icon or "•", TY.icon.size, palette.secondary, false)
-    icon.setGravity(Gravity.CENTER)
+    local iconName = item.icon or item.glyph
+    local icon
+    local iconIsImage = type(iconName) == "string" and icons.has(iconName)
+    if iconIsImage then
+      icon = icons.view(iconName, { size = 20, color = palette.secondary })
+    else
+      icon = textView(iconName or "•", TY.icon.size, palette.secondary, false)
+      icon.setGravity(Gravity.CENTER)
+    end
     tab.addView(icon)
 
     local label = textView(item.title or "", TY.micro.size, palette.secondary, false)
@@ -1724,7 +1767,7 @@ function M.tabBar(spec)
         end
       end
     })
-    tabs[index] = { icon = icon, label = label, root = tab }
+    tabs[index] = { icon = icon, label = label, root = tab, iconIsImage = iconIsImage }
   end
   apply()
 
@@ -2090,8 +2133,19 @@ function M.checkRow(spec)
   row.addView(mark, LinearLayout.LayoutParams(dp(K.checkMark), dp(K.checkMark)))
 
   local function apply()
-    mark.setText(checked and "✓" or "")
-    mark.setTextColor(checked and palette.onAccent or palette.tertiary)
+    mark.setText("")
+    local checkId = checked and icons.drawable("check") or nil
+    if checkId then
+      mark.setCompoundDrawablesWithIntrinsicBounds(checkId, 0, 0, 0)
+      pcall(function()
+        local drawable = mark.getCompoundDrawables()[0]
+        if drawable then
+          drawable.setColorFilter(palette.onAccent)
+        end
+      end)
+    else
+      mark.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
+    end
     mark.setBackground(checked and roundRect(palette.accent, R.check) or shape(palette.transparent, palette.tertiary, R.check))
   end
 
@@ -2363,10 +2417,25 @@ function M.banner(spec)
   header.setGravity(Gravity.CENTER_VERTICAL)
   card.addView(header)
 
-  local glyph = textView(spec.icon or "i", TY.subhead.size, palette.onAccent, true)
-  glyph.setGravity(Gravity.CENTER)
-  glyph.setBackground(roundRect(parseColor(spec.color or palette.accent), R.glyph))
-  header.addView(glyph, LinearLayout.LayoutParams(dp(K.bannerGlyph), dp(K.bannerGlyph)))
+  local bannerIcon = spec.icon or "info"
+  local glyph
+  if type(bannerIcon) == "string" and icons.has(bannerIcon) then
+    local bg = parseColor(spec.color or palette.accent)
+    glyph = icons.chip(bannerIcon, {
+      size = K.bannerGlyph,
+      iconSize = math.max(12, K.bannerGlyph - 8),
+      background = bg,
+      color = icons.contrast(bg),
+      radius = R.glyph,
+    })
+    local iconParams = LinearLayout.LayoutParams(dp(K.bannerGlyph), dp(K.bannerGlyph))
+    header.addView(glyph, iconParams)
+  else
+    glyph = textView(bannerIcon, TY.subhead.size, palette.onAccent, true)
+    glyph.setGravity(Gravity.CENTER)
+    glyph.setBackground(roundRect(parseColor(spec.color or palette.accent), R.glyph))
+    header.addView(glyph, LinearLayout.LayoutParams(dp(K.bannerGlyph), dp(K.bannerGlyph)))
+  end
 
   local title = textView(spec.title or "提示", TY.callout.size, palette.label, true)
   title.setPadding(dp(space(10)), 0, 0, 0)
@@ -2555,6 +2624,38 @@ function M.icon(spec)
       image.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
     end
     return image
+  end
+  local iconName = spec.iconName or spec.icon
+  if type(iconName) == "string" and icons.has(iconName) then
+    local chip = spec.background or spec.bg
+    local iconColor = spec.color or spec.tint
+    if chip then
+      local bg = parseColor(chip)
+      local chipView = icons.chip(iconName, {
+        size = size,
+        iconSize = spec.glyphSize or math.max(12, math.floor(size * 0.62)),
+        background = bg,
+        color = iconColor or icons.contrast(bg),
+        radius = spec.radius or size / 2,
+        alpha = spec.alpha,
+      })
+      if spec.onClick then
+        chipView.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
+      end
+      return chipView
+    end
+    local vector = icons.view(iconName, {
+      size = size,
+      color = iconColor or palette.label,
+      alpha = spec.alpha,
+    })
+    vector.setMinimumWidth(dp(size))
+    vector.setMinimumHeight(dp(size))
+    vector.setLayoutParams(LinearLayout.LayoutParams(dp(size), dp(size)))
+    if spec.onClick then
+      vector.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
+    end
+    return vector
   end
   local chip = spec.background or spec.bg
   -- 带底色的图标本质是圆形容器，字形应比容器小一圈，否则会撑成竖长椭圆。
@@ -2782,19 +2883,37 @@ function M.helper(spec)
 end
 
 -- 选择原子：勾选标记、复选框、单选标记。
-function M.checkMark(spec)
-  spec = spec or {}
-  local palette = colors()
-  local checked = spec.checked == true
-  local size = dimension(spec.size or K.checkMark, K.checkMark)
-  local mark = textView(checked and "✓" or "", TY.callout.size, checked and palette.onAccent or palette.tertiary, true)
-  mark.setGravity(Gravity.CENTER)
-  mark.setIncludeFontPadding(false)
+local function paintCheckMark(mark, checked, palette)
+  mark.setText("")
+  local id = checked and icons.drawable("check") or nil
+  if id then
+    mark.setCompoundDrawablesWithIntrinsicBounds(id, 0, 0, 0)
+    pcall(function()
+      local drawables = mark.getCompoundDrawables()
+      local drawable = drawables and drawables[0]
+      if drawable then
+        drawable.setColorFilter(palette.onAccent)
+      end
+    end)
+  else
+    mark.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
+  end
   if checked then
     mark.setBackground(roundRect(palette.accent, R.check))
   else
     mark.setBackground(shape(palette.transparent, palette.tertiary, R.check))
   end
+end
+
+function M.checkMark(spec)
+  spec = spec or {}
+  local palette = colors()
+  local checked = spec.checked == true
+  local size = dimension(spec.size or K.checkMark, K.checkMark)
+  local mark = textView("", TY.callout.size, checked and palette.onAccent or palette.tertiary, true)
+  mark.setGravity(Gravity.CENTER)
+  mark.setIncludeFontPadding(false)
+  paintCheckMark(mark, checked, palette)
   local extent = dp(size)
   pcall(function()
     mark.setMinimumWidth(extent)
@@ -2830,9 +2949,7 @@ function M.checkbox(spec)
   row.addView(label, LinearLayout.LayoutParams(0, -2, 1))
   local function apply(value)
     checked = value
-    mark.setText(checked and "✓" or "")
-    mark.setTextColor(checked and palette.onAccent or palette.tertiary)
-    mark.setBackground(checked and roundRect(palette.accent, R.check) or shape(palette.transparent, palette.tertiary, R.check))
+    paintCheckMark(mark, checked, palette)
     if spec.onChange then
       spec.onChange(checked)
     end
@@ -2855,9 +2972,11 @@ function M.radioMark(spec)
   local palette = colors()
   local checked = spec.checked == true
   local size = dimension(spec.size or TY.body.size, TY.body.size)
-  local mark = textView(checked and "●" or "○", size, checked and (spec.color and parseColor(spec.color) or palette.accent) or palette.tertiary, false)
-  mark.setGravity(Gravity.CENTER)
-  mark.setLayoutParams(LinearLayout.LayoutParams(-2, -2))
+  local mark = icons.view(checked and "radio-checked" or "radio", {
+    size = size,
+    color = checked and (spec.color and parseColor(spec.color) or palette.accent) or palette.tertiary,
+  })
+  mark.setLayoutParams(LinearLayout.LayoutParams(dp(size), dp(size)))
   if spec.onClick then
     mark.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
   end
@@ -2909,6 +3028,11 @@ function M.tabItem(spec)
       tint = color,
       scale = "contain",
       circle = false,
+    })
+  elseif type(spec.glyph or spec.icon) == "string" and icons.has(spec.glyph or spec.icon) then
+    iconView = icons.view(spec.glyph or spec.icon, {
+      size = iconSize,
+      color = color,
     })
   else
     local glyphText = spec.glyph or spec.icon or "●"
@@ -3090,8 +3214,10 @@ function M.radioGroup(spec)
   local function apply()
     for index = 1, #indicators do
       local active = index == selected
-      indicators[index].setText(active and "●" or "○")
-      indicators[index].setTextColor(active and palette.accent or palette.tertiary)
+      pcall(function()
+        indicators[index].setImageResource(icons.drawable(active and "radio-checked" or "radio"))
+        indicators[index].setColorFilter(active and palette.accent or palette.tertiary)
+      end)
     end
   end
 
@@ -3115,8 +3241,7 @@ function M.radioGroup(spec)
       local line, params = separatorView(16)
       card.addView(line, params)
     end
-    local indicator = textView("○", TY.body.size, palette.tertiary, false)
-    indicator.setGravity(Gravity.CENTER_VERTICAL)
+    local indicator = icons.view("radio", { size = 20, color = palette.tertiary })
     indicator.setPadding(dp(space(6)), 0, 0, 0)
     indicators[index] = indicator
     local row = M.row({
@@ -3589,13 +3714,29 @@ function M.pagination(spec)
     return view
   end
 
-  local function arrowItem(label, target, enabled)
-    local view = item(label, target, false, enabled)
-    view.setTextSize(TY.action.size)
+  local function arrowItem(name, target, enabled)
+    local view = icons.chip(name, {
+      size = 30,
+      iconSize = 16,
+      background = palette.fill,
+      color = enabled and palette.label or palette.tertiary,
+      radius = R.segmentItem,
+    })
+    if enabled ~= false and target then
+      view.setOnClickListener(View.OnClickListener{
+        onClick = function()
+          if target ~= current and spec.onChange then
+            spec.onChange(target)
+          end
+        end,
+      })
+    else
+      view.setAlpha(alphaValue(OP.disabled))
+    end
     return view
   end
 
-  row.addView(arrowItem("‹", current - 1, current > 1), LinearLayout.LayoutParams(dp(36), dp(space(32))))
+  row.addView(arrowItem("chevron-left", current - 1, current > 1), LinearLayout.LayoutParams(dp(36), dp(space(32))))
   local start = math.max(1, current - 2)
   local finish = math.min(total, start + 4)
   start = math.max(1, finish - 4)
@@ -3607,7 +3748,7 @@ function M.pagination(spec)
   end
   local nextParams = LinearLayout.LayoutParams(dp(36), dp(space(32)))
   nextParams.leftMargin = dp(space(4))
-  row.addView(arrowItem("›", current + 1, current < total), nextParams)
+  row.addView(arrowItem("chevron-right", current + 1, current < total), nextParams)
   return row
 end
 
