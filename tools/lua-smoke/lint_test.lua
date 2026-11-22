@@ -152,4 +152,80 @@ local late = lint.audit("ui.show{}\nlocal ui = require \"luaxplus.ui\"\n", { fil
 expect(issueKinds(late).late_local, "声明前使用没有提示")
 expect(#late.fixes == 0, "声明前使用不应重复补全")
 
+-- page:add 未定义时生成页面骨架，并在复检通过后才算修复成功。
+local pageSource = [[local ui = require "luaxplus.ui"
+
+local email = ui.field{
+  label = "邮箱",
+}
+
+page:add(email.view)
+]]
+local pageReport = lint.audit(pageSource, { file = "main.lua" })
+expect(issueKinds(pageReport).page_object, "page 未定义没有识别成页面对象问题")
+expect(pageReport.issues[1].code == "LX1007", "page 问题没有稳定的诊断码")
+expect(#pageReport.actions == 1, "page 未定义没有生成修复动作")
+local pageAction = pageReport.actions[1]
+expect(pageAction.code == "LX1007", "页面骨架动作诊断码不对")
+expect(#pageAction.edits == 2, "页面骨架应同时插入声明和 show")
+local pageResult = lint.applyRepair(pageSource, pageReport)
+expect(pageResult.ok, "页面骨架修复没有通过复检")
+expect(pageResult.text:match("local page = ui%.page%{%}"), "页面骨架没有插入 page 声明")
+expect(pageResult.text:match("page:show%(%)"), "页面骨架没有补 page:show")
+local pageAfter = lint.audit(pageResult.text, { file = "main.lua" })
+expect(#pageAfter.issues == 0, "页面骨架修复后仍有问题")
+
+-- 同时缺 ui 和 page 时，require 必须排在页面骨架前面。
+local missingBoth = lint.audit("page:add(ui.text{ text = 'x' })\n", { file = "main.lua" })
+expect(#missingBoth.actions == 2, "缺 ui 和 page 没有生成两个修复动作")
+local bothResult = lint.applyRepair("page:add(ui.text{ text = 'x' })\n", missingBoth)
+expect(bothResult.ok, "缺 ui 和 page 的组合修复没有通过")
+expect(bothResult.text:match('^local ui = require "luaxplus%.ui"\nlocal page'),
+  "页面骨架插到了 ui require 前面")
+
+-- 只选择 safe 的 require、不选择 page 骨架时，不允许把半成品写回。
+local requireOnly
+for _, action in ipairs(missingBoth.actions) do
+  if action.code == "LX1001" then
+    requireOnly = action
+  end
+end
+expect(requireOnly ~= nil, "缺 ui 场景没有 safe require 动作")
+local partial = lint.applyRepair("page:add(ui.text{ text = 'x' })\n", missingBoth, {
+  actions = { requireOnly },
+})
+expect(not partial.ok, "只修 require 仍留下 page 未定义，复检却通过了")
+expect(partial.reason == "lint", "部分修复没有以 lint 原因阻断")
+
+-- 未知表成员不生成自动修复，避免凭空创建错误对象。
+local ambiguous = lint.audit("foo.bar()\n", { file = "main.lua" })
+expect(#ambiguous.actions == 0, "未知表成员不应生成自动修复")
+
+-- 明确拼写错误可以给出重命名动作。
+local typoFix = lint.audit("prin('x')\n", { file = "main.lua" })
+expect(#typoFix.actions == 1, "拼写错误没有生成重命名动作")
+expect(typoFix.actions[1].confidence == "guided", "拼写重命名应是需确认动作")
+local typoResult = lint.applyRepair("prin('x')\n", typoFix)
+expect(typoResult.ok and typoResult.text == "print('x')\n", "拼写重命名没有正确应用")
+
+-- 未定义函数可以生成空函数占位，但仍标记为需确认。
+local functionFix = lint.audit("foo()\n", { file = "main.lua" })
+expect(#functionFix.actions == 1, "未定义函数没有生成占位动作")
+local functionResult = lint.applyRepair("foo()\n", functionFix)
+expect(functionResult.ok, "函数占位修复没有通过复检")
+expect(functionResult.text:match("local function foo%(%.%.%.%)"), "函数占位内容不对")
+
+-- 越界编辑必须拒绝，并保持原文。
+local badReport = lint.audit("print('x')\n", { file = "main.lua" })
+local badResult = lint.applyRepair("print('x')\n", badReport, {
+  actions = {
+    {
+      code = "LX9999",
+      name = "bad",
+      edits = { { startOffset = 999, endOffset = 999, text = "x" } },
+    },
+  },
+})
+expect(not badResult.ok and badResult.text == "print('x')\n", "越界修复没有回滚")
+
 print("[lint-test] 保存前审计回归通过")

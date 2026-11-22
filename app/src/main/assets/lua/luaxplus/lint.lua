@@ -552,6 +552,8 @@ local function addLocal(facts, scope, token, kind, offset, requireModule)
     line = token.line,
     column = token.column,
     offset = offset or token.offset,
+    tokenOffset = token.offset,
+    tokenEndOffset = token.endOffset,
     kind = kind or "local",
     uses = 0,
     requireModule = requireModule,
@@ -661,11 +663,32 @@ local function analyze(tokens, source)
           and not isTableKey(tokens, index)
           and not isLabel(tokens, index)
           and not isGotoTarget(tokens, index) then
+        local following = tokenValue(tokens, index + 1)
+        local memberName = nil
+        local memberOperator = nil
+        local memberCall = false
+        if following == "." or following == ":" then
+          local memberToken = tokens[index + 2]
+          if memberToken and memberToken.type == "name" then
+            memberName = memberToken.value
+            memberOperator = following
+            local afterMember = tokenValue(tokens, index + 3)
+            memberCall = following == ":" and afterMember == "("
+          end
+        end
+        local call = following == "("
+          or (tokens[index + 1] and tokens[index + 1].type == "string")
+          or following == "{"
+          or memberCall
         facts.uses[#facts.uses + 1] = {
           name = value,
           token = token,
           scope = scope,
           member = isMember(tokens, index),
+          memberName = memberName,
+          memberOperator = memberOperator,
+          memberCall = memberCall,
+          call = call,
         }
 
         if scope.depth == 0 and tokenValue(tokens, index + 1) == "=" then
@@ -1029,8 +1052,62 @@ local function insertOffset(source, facts)
   return newline or 0
 end
 
+local ISSUE_CODES = {
+  missing_require = "LX1001",
+  undefined_global = "LX1002",
+  unused_local = "LX1003",
+  shadow = "LX1004",
+  possible_typo = "LX1005",
+  late_local = "LX1006",
+  page_object = "LX1007",
+  undefined_function = "LX1008",
+}
+
 local function addIssue(report, issue)
+  if not issue.code then
+    issue.code = ISSUE_CODES[issue.kind] or "LX0000"
+  end
   report.issues[#report.issues + 1] = issue
+end
+
+local function lineStartOffset(source, token)
+  local before = source:sub(1, math.max(0, (tonumber(token.offset) or 1) - 1))
+  local newline = before:match(".*()\n")
+  if newline then
+    return newline, before:sub(newline + 1)
+  end
+  return 0, before
+end
+
+local function actionPreview(action)
+  local parts = {}
+  for _, edit in ipairs(action.edits or {}) do
+    local start = tonumber(edit.startOffset) or 0
+    local stop = tonumber(edit.endOffset) or start
+    local text = tostring(edit.text or ""):gsub("\r", ""):gsub("\n", " ")
+    if stop == start then
+      parts[#parts + 1] = "插入 " .. text
+    else
+      parts[#parts + 1] = "替换 " .. (stop - start) .. " 个字符为 " .. text
+    end
+  end
+  return table.concat(parts, "；")
+end
+
+local function addAction(report, seen, action)
+  local key = table.concat({
+    action.code or "",
+    action.name or "",
+    action.title or "",
+    action.confidence or "",
+  }, "\0")
+  if seen[key] then
+    return
+  end
+  seen[key] = true
+  action.edits = action.edits or {}
+  action.preview = action.preview or actionPreview(action)
+  report.actions[#report.actions + 1] = action
 end
 
 local function dedupeAndSort(report)
@@ -1100,11 +1177,14 @@ function M.audit(source, options)
   local report = {
     issues = {},
     fixes = {},
+    actions = {},
     source = source,
     file = options.file,
+    projectRoot = options.projectRoot,
     fixable = 0,
   }
   local fixableNames = {}
+  local seenActions = {}
   local insertAt = insertOffset(source, facts)
 
   local function appendFix(name, library)
@@ -1120,6 +1200,79 @@ function M.audit(source, options)
       text = line,
       line = 1,
     }
+    addAction(report, seenActions, {
+      code = ISSUE_CODES.missing_require,
+      kind = "quickfix",
+      confidence = "safe",
+      priority = 0,
+      name = name,
+      title = "补全 " .. name .. " 引用",
+      edits = {
+        { startOffset = insertAt, endOffset = insertAt, text = line .. "\n", priority = 0 },
+      },
+      preview = "在文件头插入 " .. line,
+    })
+  end
+
+  local pageLikeUses = {}
+  local pageHasShow = false
+  for _, use in ipairs(facts.uses) do
+    if use.name == "page" and use.memberCall
+        and (use.memberName == "add" or use.memberName == "show") then
+      pageLikeUses[#pageLikeUses + 1] = use
+      if use.memberName == "show" then
+        pageHasShow = true
+      end
+    end
+  end
+  local pageCanUseUI = facts.requireBindings.ui == "luaxplus.ui"
+    or facts.globalDefs.ui ~= nil
+  if not pageCanUseUI and not facts.hasLocal.ui then
+    for _, use in ipairs(facts.uses) do
+      if use.name == "ui" then
+        pageCanUseUI = true
+        break
+      end
+    end
+  end
+
+  local function maybePageAction(use)
+    if not pageCanUseUI or #pageLikeUses == 0 then
+      return
+    end
+    local first = pageLikeUses[1]
+    local start, indent = lineStartOffset(source, first.token)
+    if not indent:match("^%s*$") then
+      indent = ""
+    end
+    local edits = {
+      {
+        startOffset = start,
+        endOffset = start,
+        text = indent .. "local page = ui.page{}\n",
+      },
+    }
+    local suffix = ""
+    if not pageHasShow then
+      local prefix = source:sub(-1) == "\n" and "" or "\n"
+      edits[#edits + 1] = {
+        startOffset = #source,
+        endOffset = #source,
+        text = prefix .. "page:show()\n",
+      }
+      suffix = "；文件末尾补 page:show()"
+    end
+    addAction(report, seenActions, {
+      code = ISSUE_CODES.page_object,
+      kind = "quickfix",
+      confidence = "guided",
+      priority = 1,
+      name = "page",
+      title = "插入页面骨架",
+      edits = edits,
+      preview = "在第 " .. tostring(first.token.line or 1)
+        .. " 行前插入 local page = ui.page{}" .. suffix,
+    })
   end
 
   for _, use in ipairs(facts.uses) do
@@ -1142,6 +1295,8 @@ function M.audit(source, options)
           name = name,
           line = use.token.line,
           column = use.token.column,
+          offset = use.token.offset,
+          endOffset = use.token.endOffset,
           message = "使用了 " .. name .. "，但它在本文件后面的作用域才声明",
         })
       else
@@ -1151,6 +1306,8 @@ function M.audit(source, options)
           name = name,
           line = use.token.line,
           column = use.token.column,
+          offset = use.token.offset,
+          endOffset = use.token.endOffset,
           fixable = true,
           message = "使用了 " .. name .. "，但当前文件没有引用模块 " .. library.module,
         })
@@ -1163,15 +1320,29 @@ function M.audit(source, options)
         name = name,
         line = use.token.line,
         column = use.token.column,
+        offset = use.token.offset,
+        endOffset = use.token.endOffset,
         message = "使用了 " .. name .. "，但它在本文件后面的作用域才声明",
       })
     else
       local suggestion, distance = closestName(name, facts, definitions)
       local maxDistance = #name <= 4 and 1 or 2
       local isTypo = suggestion and distance <= maxDistance
+      local isPage = name == "page" and use.memberCall
+        and (use.memberName == "add" or use.memberName == "show")
+        and pageCanUseUI
+      local isFunction = use.call and not use.member and not isPage and not isTypo
+      local kind = "undefined_global"
       local message
       if isTypo then
+        kind = "possible_typo"
         message = "未定义的全局变量 " .. name .. "，是否想写 " .. suggestion .. "？"
+      elseif isPage then
+        kind = "page_object"
+        message = "未定义的页面对象 page，无法执行 :" .. tostring(use.memberName) .. "()"
+      elseif isFunction then
+        kind = "undefined_function"
+        message = "未定义的全局函数 " .. name
       elseif facts.hasDynamicImport or facts.hasDynamicGlobal then
         message = "未定义的全局变量 " .. name .. "，也可能来自 import 或动态赋值"
       else
@@ -1179,13 +1350,59 @@ function M.audit(source, options)
       end
       addIssue(report, {
         severity = "warning",
-        kind = isTypo and "possible_typo" or "undefined_global",
+        kind = kind,
         name = name,
         line = use.token.line,
         column = use.token.column,
+        offset = use.token.offset,
+        endOffset = use.token.endOffset,
         suggestion = suggestion,
         message = message,
       })
+
+      if isPage then
+        maybePageAction(use)
+      elseif isTypo then
+        local edits = {}
+        for _, other in ipairs(facts.uses) do
+          if other.name == name and not other.member
+              and not lookupLocal(other.scope, name, other.token.offset) then
+            edits[#edits + 1] = {
+              startOffset = other.token.offset - 1,
+              endOffset = other.token.endOffset,
+              text = suggestion,
+            }
+          end
+        end
+        addAction(report, seenActions, {
+          code = ISSUE_CODES.possible_typo,
+          kind = "quickfix",
+          confidence = "guided",
+          name = name,
+          title = "重命名为 " .. suggestion,
+          edits = edits,
+          preview = "把 " .. name .. " 的引用改为 " .. suggestion,
+        })
+      elseif isFunction and not facts.hasDynamicGlobal then
+        local start, indent = lineStartOffset(source, use.token)
+        if not indent:match("^%s*$") then
+          indent = ""
+        end
+        local stub = indent .. "local function " .. name .. "(...)\n"
+          .. indent .. "end\n"
+        addAction(report, seenActions, {
+          code = ISSUE_CODES.undefined_function,
+          kind = "quickfix",
+          confidence = "guided",
+          name = name,
+          title = "创建 " .. name .. " 空函数占位",
+          edits = {
+            { startOffset = start, endOffset = start, text = stub },
+          },
+          preview = "在第 " .. tostring(use.token.line or 1)
+            .. " 行前插入 local function " .. name .. "(...)",
+        })
+      end
     end
   end
 
@@ -1199,6 +1416,8 @@ function M.audit(source, options)
         name = declaration.name,
         line = declaration.line,
         column = declaration.column,
+        offset = declaration.tokenOffset,
+        endOffset = declaration.tokenEndOffset,
         message = "局部变量 " .. declaration.name .. " 已声明但未使用",
       })
     end
@@ -1217,6 +1436,16 @@ function M.audit(source, options)
 
   dedupeAndSort(report)
   report.fixable = #report.fixes
+  report.safeCount = 0
+  report.guidedCount = 0
+  for _, action in ipairs(report.actions) do
+    if action.confidence == "safe" then
+      report.safeCount = report.safeCount + 1
+    else
+      report.guidedCount = report.guidedCount + 1
+    end
+  end
+  report.actionCount = #report.actions
   report.hasErrors = false
   report.hasWarnings = false
   report.infoCount = 0
@@ -1268,6 +1497,223 @@ function M.applyFixes(source, report)
     result = result:sub(1, offset) .. block .. result:sub(offset + 1)
   end
   return result, applied
+end
+
+local function compileSource(source)
+  local loader = rawget(_G, "loadstring") or rawget(_G, "load")
+  if not loader then
+    return true
+  end
+  local ok, result, message = pcall(loader, source)
+  if not ok then
+    return false, tostring(result)
+  end
+  if type(result) == "function" then
+    return true
+  end
+  return false, tostring(message or result or "Lua 语法错误")
+end
+
+function M.applyActions(source, actions)
+  source = tostring(source or "")
+  actions = actions or {}
+  local edits = {}
+  for actionIndex, action in ipairs(actions) do
+    if type(action) == "table" then
+      for _, edit in ipairs(action.edits or {}) do
+        local startOffset = tonumber(edit.startOffset)
+        local endOffset = tonumber(edit.endOffset)
+        if not startOffset or not endOffset then
+          return nil, 0, "第 " .. actionIndex .. " 项修复缺少编辑位置"
+        end
+        startOffset = math.floor(startOffset)
+        endOffset = math.floor(endOffset)
+        if startOffset < 0 or endOffset < startOffset or endOffset > #source then
+          return nil, 0, "第 " .. actionIndex .. " 项修复位置越界"
+        end
+        edits[#edits + 1] = {
+          startOffset = startOffset,
+          endOffset = endOffset,
+          text = tostring(edit.text or ""),
+          priority = tonumber(edit.priority) or tonumber(action.priority) or 2,
+          order = #edits + 1,
+        }
+      end
+    end
+  end
+  if #edits == 0 then
+    return source, 0
+  end
+
+  for left = 1, #edits do
+    for right = left + 1, #edits do
+      local first = edits[left]
+      local second = edits[right]
+      local overlaps = first.startOffset < second.endOffset
+        and second.startOffset < first.endOffset
+      if not overlaps then
+        local firstInsert = first.startOffset == first.endOffset
+        local secondInsert = second.startOffset == second.endOffset
+        if firstInsert and not secondInsert
+            and first.startOffset >= second.startOffset
+            and first.startOffset <= second.endOffset then
+          overlaps = true
+        elseif secondInsert and not firstInsert
+            and second.startOffset >= first.startOffset
+            and second.startOffset <= first.endOffset then
+          overlaps = true
+        end
+      end
+      if overlaps then
+        return nil, 0, "修复项存在重叠编辑，请逐项应用"
+      end
+    end
+  end
+
+  local insertGroups = {}
+  local insertOffsets = {}
+  local replacements = {}
+  for _, edit in ipairs(edits) do
+    if edit.startOffset == edit.endOffset then
+      local offset = edit.startOffset
+      if not insertGroups[offset] then
+        insertGroups[offset] = {}
+        insertOffsets[#insertOffsets + 1] = offset
+      end
+      insertGroups[offset][#insertGroups[offset] + 1] = edit
+    else
+      replacements[#replacements + 1] = edit
+    end
+  end
+
+  table.sort(insertOffsets, function(left, right)
+    return left > right
+  end)
+  table.sort(replacements, function(left, right)
+    if left.startOffset ~= right.startOffset then
+      return left.startOffset > right.startOffset
+    end
+    return left.order > right.order
+  end)
+
+  local result = source
+  for _, offset in ipairs(insertOffsets) do
+    local group = insertGroups[offset]
+    table.sort(group, function(left, right)
+      if left.priority ~= right.priority then
+        return left.priority < right.priority
+      end
+      if left.text ~= right.text then
+        return left.text < right.text
+      end
+      return left.order < right.order
+    end)
+    local texts = {}
+    for _, edit in ipairs(group) do
+      texts[#texts + 1] = edit.text
+    end
+    local block = table.concat(texts)
+    result = result:sub(1, offset) .. block .. result:sub(offset + 1)
+  end
+  for _, edit in ipairs(replacements) do
+    result = result:sub(1, edit.startOffset)
+      .. edit.text .. result:sub(edit.endOffset + 1)
+  end
+  return result, #edits
+end
+
+function M.verify(source, options)
+  source = tostring(source or "")
+  options = options or {}
+  local syntaxOk, syntaxMessage = compileSource(source)
+  if not syntaxOk then
+    return false, syntaxMessage, nil
+  end
+  local report = M.audit(source, options)
+  if report.hasErrors then
+    return false, "仍有未解决的错误", report
+  end
+  return true, nil, report
+end
+
+function M.applyRepair(source, report, options)
+  source = tostring(source or "")
+  report = report or {}
+  options = options or {}
+  local actions = options.actions or report.actions or {}
+  if #actions == 0 then
+    return {
+      ok = false,
+      text = source,
+      applied = 0,
+      reason = "empty",
+      message = "没有可自动应用的修复项",
+      report = report,
+    }
+  end
+
+  local fixed, applied, editError = M.applyActions(source, actions)
+  if not fixed then
+    return {
+      ok = false,
+      text = source,
+      applied = 0,
+      reason = "edit",
+      message = tostring(editError or "修复写入失败"),
+      report = report,
+    }
+  end
+
+  local syntaxOk, syntaxMessage = compileSource(fixed)
+  if not syntaxOk then
+    return {
+      ok = false,
+      text = source,
+      applied = 0,
+      reason = "syntax",
+      message = "修复后语法检查失败：" .. tostring(syntaxMessage),
+      report = report,
+    }
+  end
+
+  local auditOptions = {
+    file = report.file,
+    projectRoot = report.projectRoot,
+    projectDefinitions = options.projectDefinitions,
+  }
+  local after = M.audit(fixed, auditOptions)
+  local selectedKeys = {}
+  for _, action in ipairs(actions) do
+    selectedKeys[(action.code or "") .. "\0" .. (action.name or "")] = true
+  end
+  local unresolved = false
+  local runtimeBlocking = {
+    page_object = true,
+    undefined_function = true,
+  }
+  for _, issue in ipairs(after.issues) do
+    if selectedKeys[(issue.code or "") .. "\0" .. (issue.name or "")]
+        or runtimeBlocking[issue.kind] then
+      unresolved = true
+      break
+    end
+  end
+  if after.hasErrors or unresolved then
+    return {
+      ok = false,
+      text = fixed,
+      applied = applied,
+      reason = "lint",
+      message = unresolved and "修复后仍有同类问题，未写入文件" or "修复后仍有错误，未写入文件",
+      report = after,
+    }
+  end
+  return {
+    ok = true,
+    text = fixed,
+    applied = applied,
+    report = after,
+  }
 end
 
 M.tokenize = tokenize

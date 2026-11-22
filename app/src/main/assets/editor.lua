@@ -520,6 +520,7 @@ end
 
 -- ===== 保存前智能审计 =====
 local auditDialogShowing = false
+local lastRepair = nil
 
 local function patternEscape(value)
   return (tostring(value or ""):gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"))
@@ -581,12 +582,120 @@ local function auditMessage(report)
   if total > maxLines then
     lines[#lines + 1] = "还有 " .. (total - maxLines) .. " 条未展开。"
   end
-  if report.fixable > 0 then
-    lines[#lines + 1] = "其中 " .. report.fixable .. " 处是已知模块引用，可一键补全。"
+  local actions = report.actions or {}
+  if #actions > 0 then
+    local safe = report.safeCount or 0
+    local guided = report.guidedCount or 0
+    lines[#lines + 1] = "其中 " .. #actions .. " 项可进入修复方案"
+    if guided > 0 then
+      lines[#lines + 1] = "安全项 " .. safe .. " 个，需确认项 " .. guided .. " 个。"
+    else
+      lines[#lines + 1] = "均为安全修复。"
+    end
   else
     lines[#lines + 1] = "这些问题不会阻止保存，可以继续检查或仍然保存。"
   end
   return table.concat(lines, "\n")
+end
+
+local function showRepairPlan(report, commit)
+  local actions = report.actions or {}
+  if #actions == 0 then
+    toast("没有可自动应用的修复项")
+    return
+  end
+
+  local labels = {}
+  for index, action in ipairs(actions) do
+    local confidence = action.confidence == "safe" and "安全" or "需确认"
+    labels[index] = index .. ". [" .. confidence .. "] " .. tostring(action.title or "修复")
+      .. "\n" .. tostring(action.preview or "")
+  end
+
+  local content = LinearLayout(activity)
+  content.setOrientation(LinearLayout.VERTICAL)
+  content.setPadding(dp(20), dp(8), dp(20), dp(4))
+  local boxes = {}
+  for index, label in ipairs(labels) do
+    local box = CheckBox(activity)
+    box.setText(label)
+    box.setTextSize(13)
+    box.setChecked(true)
+    box.setPadding(dp(4), dp(6), dp(4), dp(6))
+    content.addView(box, LinearLayout.LayoutParams(-1, -2))
+    boxes[index] = box
+  end
+  local scroll = ScrollView(activity)
+  scroll.addView(content)
+
+  local builder = MaterialAlertDialogBuilder(activity)
+    .setTitle("修复方案")
+    .setView(scroll)
+    .setNegativeButton("取消", function()
+      auditDialogShowing = false
+    end)
+    .setOnCancelListener(function()
+      auditDialogShowing = false
+    end)
+
+  builder.setPositiveButton("应用并保存", function()
+    local selected = {}
+    for index, action in ipairs(actions) do
+      if boxes[index] and boxes[index].isChecked() then
+        selected[#selected + 1] = action
+      end
+    end
+    if #selected == 0 then
+      auditDialogShowing = false
+      toast("请至少选择一项修复")
+      return
+    end
+
+    local before = currentText()
+    local ok, result = pcall(lint.applyRepair, before, report, { actions = selected })
+    if not ok or type(result) ~= "table" then
+      auditDialogShowing = false
+      toast("修复执行失败，文件未改动")
+      return
+    end
+    if not result.ok then
+      auditDialogShowing = false
+      local message = tostring(result.message or "修复未应用，文件保持原样")
+      if result.report then
+        message = message .. "\n\n" .. auditMessage(result.report)
+      end
+      MaterialAlertDialogBuilder(activity)
+        .setTitle("修复未应用")
+        .setMessage(message)
+        .setPositiveButton("知道了", nil)
+        .show()
+      return
+    end
+
+    local changed = pcall(function()
+      editor.setText(result.text)
+    end)
+    if not changed then
+      auditDialogShowing = false
+      toast("修复写入编辑器失败，文件未保存")
+      return
+    end
+    lastRepair = {
+      before = before,
+      after = result.text,
+    }
+    local caret = editor.getSelectionEnd()
+    local target = math.max(0, math.min(#result.text, caret + (#result.text - #before)))
+    pcall(function()
+      editor.setSelectionRange(target, target)
+      editor.focusSelectionEnd()
+    end)
+    auditDialogShowing = false
+    toast("已应用 " .. tostring(result.applied or #selected) .. " 处修改，正在保存")
+    commit()
+  end)
+
+  builder.show()
 end
 
 local function saveWithAudit(commit)
@@ -609,32 +718,11 @@ local function saveWithAudit(commit)
       auditDialogShowing = false
     end)
 
-  if report.fixable > 0 then
-    builder.setPositiveButton("一键补全", function()
+  local actions = report.actions or {}
+  if #actions > 0 then
+    builder.setPositiveButton("查看修复方案", function()
       auditDialogShowing = false
-      local before = currentText()
-      local caret = editor.getSelectionEnd()
-      local ok, fixed, count = pcall(lint.applyFixes, before, report)
-      if not ok or not fixed or count == 0 then
-        toast("没有可自动补全的引用")
-        commit()
-        return
-      end
-      local changed = pcall(function()
-        editor.setText(fixed)
-      end)
-      if not changed then
-        toast("补全写入失败，请手动添加 require")
-        commit()
-        return
-      end
-      local target = math.max(0, math.min(#fixed, caret + (#fixed - #before)))
-      pcall(function()
-        editor.setSelectionRange(target, target)
-        editor.focusSelectionEnd()
-      end)
-      toast("已补全 " .. count .. " 处引用，正在保存")
-      commit()
+      showRepairPlan(report, commit)
     end)
     builder.setNeutralButton("仍然保存", function()
       auditDialogShowing = false
@@ -661,11 +749,16 @@ local function showLintReport()
     toast("检查通过，没有发现问题")
     return
   end
-  MaterialAlertDialogBuilder(activity)
+  local builder = MaterialAlertDialogBuilder(activity)
     .setTitle("代码检查")
     .setMessage(auditMessage(report))
     .setPositiveButton("关闭", nil)
-    .show()
+  if #(report.actions or {}) > 0 then
+    builder.setNeutralButton("修复方案", function()
+      showRepairPlan(report, doSave)
+    end)
+  end
+  builder.show()
 end
 
 saveBtn.setOnClickListener(View.OnClickListener{
@@ -1041,6 +1134,7 @@ local MENU_ITEMS = {
   { name = "字号加大", action = "bigger" },
   { name = "字号减小", action = "smaller" },
   { name = "切换明暗主题", action = "theme" },
+  { name = "撤销上次修复", action = "undoRepair" },
   { name = "代码检查", action = "lint" },
   { name = "另存为", action = "saveas" },
   { name = "文件信息", action = "info" }
@@ -1146,6 +1240,26 @@ local function menuActions(action)
         end)
       end)
       .show()
+  elseif action == "undoRepair" then
+    if not lastRepair then
+      toast("没有可撤销的修复")
+      return
+    end
+    if currentText() ~= lastRepair.after then
+      toast("修复后内容已变化，不能自动撤销")
+      return
+    end
+    local before = lastRepair.before
+    lastRepair = nil
+    local ok = pcall(function()
+      editor.setText(before)
+    end)
+    if not ok then
+      toast("撤销修复失败")
+      return
+    end
+    refreshStatus()
+    toast("已撤销上次修复，尚未保存")
   elseif action == "lint" then
     showLintReport()
   elseif action == "info" then
