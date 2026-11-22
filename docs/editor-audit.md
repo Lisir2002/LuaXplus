@@ -103,6 +103,7 @@ ui       -> luaxplus.ui
 theme    -> luaxplus.theme
 icons    -> luaxplus.icons
 pkgname  -> luaxplus.pkgname
+lint     -> luaxplus.lint
 ```
 
 新增官方库时优先改 `DEFAULT_LIBRARIES` 或放项目清单；不要把库名硬编码到编辑器保存流程里。

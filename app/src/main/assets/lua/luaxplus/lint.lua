@@ -73,6 +73,7 @@ local DEFAULT_LIBRARIES = {
   { name = "theme", module = "luaxplus.theme", description = "主题与配色" },
   { name = "icons", module = "luaxplus.icons", description = "图标与着色" },
   { name = "pkgname", module = "luaxplus.pkgname", description = "包名生成" },
+  { name = "lint", module = "luaxplus.lint", description = "保存前审计" },
 }
 
 local libraries = {}
