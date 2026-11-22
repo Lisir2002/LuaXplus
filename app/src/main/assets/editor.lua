@@ -1,0 +1,901 @@
+require "import"
+import "android.app.*"
+import "android.os.*"
+import "android.widget.*"
+import "android.view.*"
+import "android.graphics.Typeface"
+import "android.graphics.drawable.*"
+import "android.text.*"
+import "java.io.File"
+import "com.androlua.LuaEditor"
+import "com.google.android.material.dialog.MaterialAlertDialogBuilder"
+import "autotheme"
+
+-- 独立编辑页：顶部操作栏、代码区、查找替换、符号条、状态栏
+
+activity.setTheme(autotheme())
+
+local PAPER = 0xfffbf6ec
+local PANEL = 0xff1b232c
+local PANEL_SOFT = 0xff232d38
+local PANEL_LINE = 0xff33404d
+local TEXT_MAIN = 0xffe8eef4
+local TEXT_MUTED = 0xff90a0ae
+local ACCENT = 0xff0fa8a0
+local INK = 0xff1c2b3a
+local CARD = 0xfffdf8
+local LINE = 0xffe6dbc8
+
+local args = {...}
+local filePath = args[1]
+if type(filePath) == "table" then
+  filePath = filePath[1]
+end
+filePath = tostring(filePath or "")
+if filePath == "" then
+  Toast.makeText(activity, "没有指定文件", Toast.LENGTH_SHORT).show()
+  activity.finish()
+  return
+end
+
+local function dp(n)
+  return math.floor(n * activity.getResources().getDisplayMetrics().density + 0.5)
+end
+
+local function rounded(fill, stroke, radius)
+  local drawable = GradientDrawable()
+  drawable.setShape(GradientDrawable.RECTANGLE)
+  drawable.setColor(fill)
+  drawable.setCornerRadius(dp(radius))
+  if stroke then
+    drawable.setStroke(dp(1), stroke)
+  end
+  return drawable
+end
+
+local function toast(text)
+  Toast.makeText(activity, text, Toast.LENGTH_SHORT).show()
+end
+
+local function readFile(path)
+  local file = io.open(path, "r")
+  if not file then
+    return ""
+  end
+  local content = file:read("a")
+  file:close()
+  return content or ""
+end
+
+local function writeFile(path, content)
+  local file = io.open(path, "w")
+  if not file then
+    return false
+  end
+  file:write(content)
+  file:close()
+  return true
+end
+
+local fileName = File(filePath).getName()
+local fileExists = File(filePath).exists()
+local savedText = readFile(filePath)
+local darkMode = false
+
+activity.setTitle(fileName)
+
+if not fileExists then
+  Toast.makeText(activity, "文件不存在，保存后会创建", Toast.LENGTH_SHORT).show()
+end
+
+local root = LinearLayout(activity)
+root.setOrientation(LinearLayout.VERTICAL)
+root.setBackgroundColor(PANEL)
+root.setFitsSystemWindows(true)
+activity.setContentView(root)
+
+-- ===== 顶部操作栏 =====
+local bar = LinearLayout(activity)
+bar.setOrientation(LinearLayout.HORIZONTAL)
+bar.setGravity(Gravity.CENTER_VERTICAL)
+bar.setBackgroundColor(PANEL_SOFT)
+bar.setPadding(dp(6), dp(4), dp(8), dp(4))
+
+local function barButton(text, width)
+  local view = TextView(activity)
+  view.setText(text)
+  view.setTextSize(13)
+  view.setTextColor(TEXT_MAIN)
+  view.setGravity(Gravity.CENTER)
+  view.setPadding(dp(10), dp(7), dp(10), dp(7))
+  view.setBackground(rounded(0x00000000, nil, 8))
+  if width then
+    bar.addView(view, LinearLayout.LayoutParams(dp(width), -2))
+  else
+    bar.addView(view, LinearLayout.LayoutParams(-2, -2))
+  end
+  return view
+end
+
+local backBtn = barButton("‹", 32)
+backBtn.setTextSize(22)
+backBtn.setTextColor(TEXT_MUTED)
+
+local titleBox = LinearLayout(activity)
+titleBox.setOrientation(LinearLayout.VERTICAL)
+titleBox.setPadding(dp(2), 0, dp(4), 0)
+bar.addView(titleBox, LinearLayout.LayoutParams(0, -2, 1))
+
+local titleText = TextView(activity)
+titleText.setText(fileName)
+titleText.setTextSize(14)
+titleText.setTypeface(Typeface.DEFAULT_BOLD)
+titleText.setTextColor(TEXT_MAIN)
+titleText.setSingleLine(true)
+titleText.setEllipsize(TextUtils.TruncateAt.MIDDLE)
+titleBox.addView(titleText, LinearLayout.LayoutParams(-1, -2))
+
+local pathText = TextView(activity)
+local shownPath = (filePath:gsub("^/storage/emulated/0/", ""))
+pathText.setText(shownPath)
+pathText.setTextSize(10)
+pathText.setTextColor(TEXT_MUTED)
+pathText.setSingleLine(true)
+pathText.setEllipsize(TextUtils.TruncateAt.MIDDLE)
+titleBox.addView(pathText, LinearLayout.LayoutParams(-1, -2))
+
+local findBtn = barButton("搜索")
+findBtn.setTextSize(12)
+findBtn.setTextColor(TEXT_MUTED)
+
+local saveBtn = barButton("保存")
+saveBtn.setTextSize(12)
+saveBtn.setTextColor(0xff07130f)
+saveBtn.setBackground(rounded(ACCENT, nil, 8))
+local saveParams = LinearLayout.LayoutParams(-2, -2)
+saveParams.leftMargin = dp(4)
+bar.removeView(saveBtn)
+bar.addView(saveBtn, saveParams)
+
+local moreBtn = barButton("⋮", 34)
+moreBtn.setTextSize(18)
+moreBtn.setTextColor(TEXT_MUTED)
+
+root.addView(bar, LinearLayout.LayoutParams(-1, -2))
+
+-- ===== 代码区 =====
+local editor = LuaEditor(activity)
+editor.setDark(darkMode)
+editor.setBackgroundColor(PAPER)
+editor.setTextColor(INK)
+editor.setShowLineNumbers(true)
+editor.setHighlightCurrentRow(true)
+editor.setWordWrap(false)
+editor.setAutoIndent(true)
+editor.setAutoIndentWidth(4)
+editor.setTabSpaces(4)
+editor.setTextSize(15)
+editor.setText(savedText)
+editor.requestFocus()
+
+-- ===== 查找替换 =====
+local findPanel = LinearLayout(activity)
+findPanel.setOrientation(LinearLayout.VERTICAL)
+findPanel.setBackgroundColor(PANEL_SOFT)
+findPanel.setPadding(dp(10), dp(6), dp(10), dp(8))
+findPanel.setVisibility(View.GONE)
+
+local function panelInput(hint, panel)
+  local input = EditText(activity)
+  input.setHint(hint)
+  input.setTextSize(12)
+  input.setTextColor(TEXT_MAIN)
+  input.setHintTextColor(TEXT_MUTED)
+  input.setSingleLine(true)
+  input.setBackground(rounded(0xff141b22, PANEL_LINE, 8))
+  input.setPadding(dp(8), dp(5), dp(8), dp(5))
+  panel.addView(input, LinearLayout.LayoutParams(0, -2, 1))
+  return input
+end
+
+local rowFind = LinearLayout(activity)
+rowFind.setOrientation(LinearLayout.HORIZONTAL)
+rowFind.setGravity(Gravity.CENTER_VERTICAL)
+findPanel.addView(rowFind, LinearLayout.LayoutParams(-1, -2))
+
+local queryInput = panelInput("查找内容", rowFind)
+
+local countText = TextView(activity)
+countText.setTextColor(TEXT_MUTED)
+countText.setTextSize(11)
+countText.setPadding(dp(8), 0, dp(8), 0)
+rowFind.addView(countText, LinearLayout.LayoutParams(-2, -2))
+
+local function smallButton(text, parent)
+  local view = TextView(activity)
+  view.setText(text)
+  view.setTextSize(11)
+  view.setTextColor(TEXT_MAIN)
+  view.setGravity(Gravity.CENTER)
+  view.setPadding(dp(8), dp(5), dp(8), dp(5))
+  view.setBackground(rounded(0xff2b3744, PANEL_LINE, 7))
+  local params = LinearLayout.LayoutParams(-2, -2)
+  params.leftMargin = dp(4)
+  parent.addView(view, params)
+  return view
+end
+
+local prevBtn = smallButton("上一个", rowFind)
+local nextBtn = smallButton("下一个", rowFind)
+local closeBtn = smallButton("关闭", rowFind)
+
+local rowReplace = LinearLayout(activity)
+rowReplace.setOrientation(LinearLayout.HORIZONTAL)
+rowReplace.setGravity(Gravity.CENTER_VERTICAL)
+local replaceParams = LinearLayout.LayoutParams(-1, -2)
+replaceParams.topMargin = dp(6)
+findPanel.addView(rowReplace, replaceParams)
+
+local replaceInput = panelInput("替换为", rowReplace)
+local replaceBtn = smallButton("替换", rowReplace)
+local replaceAllBtn = smallButton("全部替换", rowReplace)
+
+root.addView(findPanel, 1, LinearLayout.LayoutParams(-1, -2))
+root.addView(editor, LinearLayout.LayoutParams(-1, 1, 1))
+
+-- ===== 符号与快捷操作条 =====
+local stripScroll = HorizontalScrollView(activity)
+stripScroll.setHorizontalScrollBarEnabled(false)
+stripScroll.setBackgroundColor(PANEL_SOFT)
+
+local strip = LinearLayout(activity)
+strip.setOrientation(LinearLayout.HORIZONTAL)
+strip.setGravity(Gravity.CENTER_VERTICAL)
+strip.setPadding(dp(6), dp(3), dp(6), dp(3))
+stripScroll.addView(strip, LinearLayout.LayoutParams(-2, -2))
+
+local function stripChip(text, accent)
+  local view = TextView(activity)
+  view.setText(text)
+  view.setTextSize(12)
+  view.setTextColor(accent and ACCENT or TEXT_MUTED)
+  view.setGravity(Gravity.CENTER)
+  view.setPadding(dp(9), dp(4), dp(9), dp(4))
+  view.setBackground(rounded(0x00000000, nil, 6))
+  local params = LinearLayout.LayoutParams(-2, -2)
+  params.rightMargin = dp(2)
+  strip.addView(view, params)
+  return view
+end
+
+local function insertSymbol(text)
+  pcall(function()
+    editor.paste(text)
+  end)
+end
+
+local SYMBOLS = { "Tab", "{", "}", "(", ")", "\"", "'", "[", "]", "=", "==", "~=", "..", ",", ";", ":", "+", "-", "*", "/", "#", "<", ">", "|" }
+for _, symbol in ipairs(SYMBOLS) do
+  local chip = stripChip(symbol)
+  chip.setOnClickListener(View.OnClickListener{
+    onClick = function()
+      if symbol == "Tab" then
+        insertSymbol("    ")
+      else
+        insertSymbol(symbol)
+      end
+    end
+  })
+end
+
+local divider = View(activity)
+divider.setBackgroundColor(PANEL_LINE)
+local dividerParams = LinearLayout.LayoutParams(dp(1), dp(18))
+dividerParams.leftMargin = dp(6)
+dividerParams.rightMargin = dp(6)
+strip.addView(divider, dividerParams)
+
+root.addView(stripScroll, LinearLayout.LayoutParams(-1, -2))
+
+-- ===== 底部状态栏 =====
+local statusBar = LinearLayout(activity)
+statusBar.setOrientation(LinearLayout.HORIZONTAL)
+statusBar.setGravity(Gravity.CENTER_VERTICAL)
+statusBar.setBackgroundColor(0xff141b22)
+statusBar.setPadding(dp(10), dp(2), dp(8), dp(3))
+
+local statusText = TextView(activity)
+statusText.setTextSize(10)
+statusText.setTextColor(TEXT_MUTED)
+statusBar.addView(statusText, LinearLayout.LayoutParams(0, -2, 1))
+
+local dirtyText = TextView(activity)
+dirtyText.setTextSize(10)
+dirtyText.setTextColor(ACCENT)
+statusBar.addView(dirtyText, LinearLayout.LayoutParams(-2, -2))
+
+root.addView(statusBar, LinearLayout.LayoutParams(-1, -2))
+
+-- ===== 保存与状态 =====
+local function currentText()
+  local ok, value = pcall(function()
+    return tostring(editor.getText().toString())
+  end)
+  if ok and value then
+    return value
+  end
+  return ""
+end
+
+-- Java 字符串用于 indexOf / lastIndexOf / substring，避免中文按字节计数错位
+local function javaText()
+  local ok, value = pcall(function()
+    return editor.getText().toString()
+  end)
+  if ok and value ~= nil then
+    return value
+  end
+  return currentText()
+end
+
+local function inputText(input)
+  return tostring(input.getText().toString())
+end
+
+local function lineCount(text)
+  local _, count = text:gsub("\n", "")
+  return count + 1
+end
+
+local function isDirty()
+  return currentText() ~= savedText
+end
+
+local cacheCaret = -1
+local cacheLength = -1
+local cacheLine = 1
+local cacheColumn = 1
+
+local function refreshStatus()
+  local text = currentText()
+  local caret = editor.getSelectionEnd()
+  local total = lineCount(text)
+  if caret ~= cacheCaret or #text ~= cacheLength then
+    local start = 0
+    pcall(function()
+      local index = javaText().lastIndexOf("\n", caret - 1)
+      start = index + 1
+    end)
+    cacheColumn = caret - start + 1
+    local prefix = tostring(javaText().substring(0, start))
+    local _, count = prefix:gsub("\n", "")
+    cacheLine = count + 1
+    cacheCaret = caret
+    cacheLength = #text
+  end
+  local line = cacheLine
+  local column = cacheColumn
+  statusText.setText("行 " .. line .. "/" .. total .. " · 列 " .. column .. " · " .. #text .. " 字符")
+  if text == savedText then
+    dirtyText.setText("已保存")
+    dirtyText.setTextColor(0xff6fbf9a)
+    titleText.setText(fileName)
+  else
+    dirtyText.setText("未保存")
+    dirtyText.setTextColor(ACCENT)
+    titleText.setText(fileName .. " ●")
+  end
+end
+
+local function markSaved()
+  savedText = currentText()
+  refreshStatus()
+end
+
+local function doSave()
+  local content = currentText()
+  if not writeFile(filePath, content) then
+    toast("保存失败，请检查存储权限")
+    return false
+  end
+  savedText = content
+  refreshStatus()
+  toast("已保存 " .. fileName)
+  return true
+end
+
+saveBtn.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    doSave()
+  end
+})
+
+-- ===== 查找替换逻辑 =====
+local function selectRange(fromIndex, toIndex)
+  pcall(function()
+    editor.setSelectionRange(fromIndex, toIndex)
+    editor.focusSelectionEnd()
+  end)
+end
+
+local function countMatches(query)
+  if query == "" then
+    return 0
+  end
+  local text = javaText()
+  local total = 0
+  local from = 0
+  while true do
+    local index = text.indexOf(query, from)
+    if index < 0 then
+      break
+    end
+    total = total + 1
+    from = index + #query
+    if total > 9999 then
+      break
+    end
+  end
+  return total
+end
+
+local function updateCount()
+  local query = inputText(queryInput)
+  local total = countMatches(query)
+  if query == "" then
+    countText.setText("")
+  else
+    countText.setText(total .. " 处")
+  end
+end
+
+queryInput.addTextChangedListener(TextWatcher{
+  beforeTextChanged = function()
+  end,
+  onTextChanged = function()
+  end,
+  afterTextChanged = function()
+    updateCount()
+  end
+})
+
+local function findNextMatch()
+  local query = inputText(queryInput)
+  if query == "" then
+    return
+  end
+  local text = javaText()
+  local from = editor.getSelectionEnd()
+  local index = text.indexOf(query, from)
+  if index < 0 and from > 0 then
+    index = text.indexOf(query, 0)
+    if index >= 0 then
+      toast("已回到开头")
+    end
+  end
+  if index < 0 then
+    toast("没有匹配内容")
+    return
+  end
+  selectRange(index, index + #query)
+end
+
+local function findPrevMatch()
+  local query = inputText(queryInput)
+  if query == "" then
+    return
+  end
+  local text = javaText()
+  local from = editor.getSelectionStart() - 1
+  local index = -1
+  if from > 0 then
+    index = text.lastIndexOf(query, from)
+  end
+  if index < 0 and #text > 0 then
+    index = text.lastIndexOf(query, #text - 1)
+    if index >= 0 then
+      toast("已到末尾")
+    end
+  end
+  if index < 0 then
+    toast("没有匹配内容")
+    return
+  end
+  selectRange(index, index + #query)
+end
+
+nextBtn.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    findNextMatch()
+  end
+})
+
+prevBtn.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    findPrevMatch()
+  end
+})
+
+closeBtn.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    findPanel.setVisibility(View.GONE)
+  end
+})
+
+local function replaceCurrent()
+  local query = inputText(queryInput)
+  if query == "" then
+    return
+  end
+  local start = editor.getSelectionStart()
+  local stop = editor.getSelectionEnd()
+  local selected = tostring(javaText().substring(start, stop))
+  if selected ~= query then
+    findNextMatch()
+    return
+  end
+  pcall(function()
+    editor.replaceText(start, stop, inputText(replaceInput))
+  end)
+  updateCount()
+  findNextMatch()
+end
+
+local function replaceAll()
+  local query = inputText(queryInput)
+  if query == "" then
+    return
+  end
+  local replacement = inputText(replaceInput)
+  local total = 0
+  local from = 0
+  while total < 9999 do
+    local text = javaText()
+    local index = text.indexOf(query, from)
+    if index < 0 then
+      break
+    end
+    pcall(function()
+      editor.replaceText(index, index + #query, replacement)
+    end)
+    total = total + 1
+    from = index + #replacement
+    if #replacement == 0 and from <= index then
+      break
+    end
+  end
+  updateCount()
+  if total == 0 then
+    toast("没有匹配内容")
+  else
+    toast("已替换 " .. total .. " 处")
+  end
+end
+
+replaceBtn.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    replaceCurrent()
+  end
+})
+
+replaceAllBtn.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    replaceAll()
+  end
+})
+
+local function toggleFind()
+  if findPanel.getVisibility() == View.GONE then
+    findPanel.setVisibility(View.VISIBLE)
+    queryInput.requestFocus()
+    updateCount()
+  else
+    findPanel.setVisibility(View.GONE)
+  end
+end
+
+findBtn.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    toggleFind()
+  end
+})
+
+-- ===== 行操作 =====
+local function caretLineBounds()
+  local text = javaText()
+  local caret = editor.getSelectionEnd()
+  local startIndex = text.lastIndexOf("\n", caret - 1) + 1
+  local endIndex = text.indexOf("\n", caret)
+  if endIndex < 0 then
+    endIndex = #text
+  end
+  return startIndex, endIndex
+end
+
+local function currentLineText()
+  local startIndex, endIndex = caretLineBounds()
+  return tostring(javaText().substring(startIndex, endIndex))
+end
+
+local function duplicateLine()
+  local text = javaText()
+  local startIndex, endIndex = caretLineBounds()
+  local line = tostring(text.substring(startIndex, endIndex))
+  local caret = editor.getSelectionEnd()
+  pcall(function()
+    editor.insert(endIndex, "\n" .. line)
+  end)
+  pcall(function()
+    editor.setSelection(caret + #line + 1)
+  end)
+  refreshStatus()
+end
+
+local function moveLine(offset)
+  local text = javaText()
+  local startIndex, endIndex = caretLineBounds()
+  local line = tostring(text.substring(startIndex, endIndex))
+  local caret = editor.getSelectionEnd()
+  if offset < 0 then
+    if startIndex == 0 then
+      return
+    end
+    local prevStart = text.lastIndexOf("\n", startIndex - 2) + 1
+    local prevLine = tostring(text.substring(prevStart, startIndex - 1))
+    local block = prevLine .. "\n" .. line
+    pcall(function()
+      editor.replaceText(prevStart, endIndex, line .. "\n" .. prevLine)
+    end)
+    pcall(function()
+      editor.setSelection(prevStart + #line + (caret - startIndex))
+    end)
+  else
+    if endIndex >= #text then
+      return
+    end
+    local nextEnd = text.indexOf("\n", endIndex + 1)
+    if nextEnd < 0 then
+      nextEnd = #text
+    end
+    local nextLine = tostring(text.substring(endIndex + 1, nextEnd))
+    pcall(function()
+      editor.replaceText(startIndex, nextEnd, nextLine .. "\n" .. line)
+    end)
+    pcall(function()
+      editor.setSelection(startIndex + #nextLine + 1 + (caret - startIndex))
+    end)
+  end
+  refreshStatus()
+end
+
+local function toggleComment()
+  local text = javaText()
+  local startIndex, endIndex = caretLineBounds()
+  local line = tostring(text.substring(startIndex, endIndex))
+  local trimmed = line:match("^%s*")
+  local body = line:sub(#trimmed + 1)
+  local replacement
+  if body:sub(1, 2) == "--" then
+    replacement = trimmed .. body:sub(3)
+  else
+    replacement = trimmed .. "--" .. body
+  end
+  pcall(function()
+    editor.replaceText(startIndex, endIndex, replacement)
+  end)
+  refreshStatus()
+end
+
+-- ===== 菜单 =====
+local MENU_ITEMS = {
+  { name = "跳转行", action = "goto" },
+  { name = "查找替换", action = "find" },
+  { name = "格式化代码", action = "format" },
+  { name = "复制当前行", action = "duplicate" },
+  { name = "注释当前行", action = "comment" },
+  { name = "当前行上移", action = "up" },
+  { name = "当前行下移", action = "down" },
+  { name = "自动换行", action = "wrap" },
+  { name = "字号加大", action = "bigger" },
+  { name = "字号减小", action = "smaller" },
+  { name = "切换明暗主题", action = "theme" },
+  { name = "另存为", action = "saveas" },
+  { name = "文件信息", action = "info" },
+  { name = "运行脚本", action = "run" }
+}
+
+local function menuActions(action)
+  if action == "goto" then
+    local box = LinearLayout(activity)
+    box.setPadding(dp(18), dp(6), dp(18), 0)
+    local input = EditText(activity)
+    input.setHint("输入行号")
+    input.setInputType(InputType.TYPE_CLASS_NUMBER)
+    input.setTextSize(14)
+    box.addView(input, LinearLayout.LayoutParams(-1, -2))
+    MaterialAlertDialogBuilder(activity)
+      .setTitle("跳转行")
+      .setView(box)
+      .setNegativeButton("取消", nil)
+      .setPositiveButton("跳转", function()
+        local number = tonumber(inputText(input))
+        if number and number > 0 then
+          editor.gotoLine(number)
+          refreshStatus()
+        end
+      end)
+      .show()
+  elseif action == "find" then
+    toggleFind()
+  elseif action == "format" then
+    pcall(function()
+      editor.format()
+    end)
+    refreshStatus()
+  elseif action == "duplicate" then
+    duplicateLine()
+  elseif action == "comment" then
+    toggleComment()
+  elseif action == "up" then
+    moveLine(-1)
+  elseif action == "down" then
+    moveLine(1)
+  elseif action == "wrap" then
+    local wrap = not editor.isWordWrap()
+    editor.setWordWrap(wrap)
+    toast(wrap and "已开启自动换行" or "已关闭自动换行")
+  elseif action == "bigger" or action == "smaller" then
+    local size = 15
+    if action == "bigger" then
+      size = math.min(24, math.floor(editor.getTextSize()) + 1)
+    else
+      size = math.max(11, math.floor(editor.getTextSize()) - 1)
+    end
+    editor.setTextSize(size)
+    toast("字号 " .. size)
+  elseif action == "theme" then
+    darkMode = not darkMode
+    editor.setDark(darkMode)
+    if darkMode then
+      editor.setBackgroundColor(0xff141a20)
+      editor.setTextColor(0xffd6dde5)
+    else
+      editor.setBackgroundColor(PAPER)
+      editor.setTextColor(INK)
+    end
+  elseif action == "saveas" then
+    local box = LinearLayout(activity)
+    box.setOrientation(LinearLayout.VERTICAL)
+    box.setPadding(dp(18), dp(6), dp(18), 0)
+    local input = EditText(activity)
+    input.setText(fileName)
+    input.setTextSize(14)
+    box.addView(input, LinearLayout.LayoutParams(-1, -2))
+    MaterialAlertDialogBuilder(activity)
+      .setTitle("另存为")
+      .setView(box)
+      .setNegativeButton("取消", nil)
+      .setPositiveButton("保存", function()
+        local name = inputText(input)
+        if name == "" then
+          return
+        end
+        local directory = File(filePath).getParentFile()
+        local target = directory.getAbsolutePath() .. "/" .. name
+        if writeFile(target, currentText()) then
+          toast("已保存到 " .. name)
+        else
+          toast("保存失败")
+        end
+      end)
+      .show()
+  elseif action == "info" then
+    local file = File(filePath)
+    local message = "路径：" .. filePath
+      .. "\n大小：" .. file.length() .. " 字节"
+      .. "\n修改时间：" .. os.date("%Y-%m-%d %H:%M:%S", math.floor(file.lastModified() / 1000))
+      .. "\n行数：" .. lineCount(currentText())
+      .. "\n字符数：" .. #currentText()
+    MaterialAlertDialogBuilder(activity)
+      .setTitle("文件信息")
+      .setMessage(message)
+      .setPositiveButton("知道了", nil)
+      .show()
+  elseif action == "run" then
+    if isDirty() and not doSave() then
+      return
+    end
+    pcall(function()
+      activity.newActivity(filePath)
+    end)
+  end
+end
+
+moreBtn.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    local names = {}
+    for _, item in ipairs(MENU_ITEMS) do
+      table.insert(names, item.name)
+    end
+    MaterialAlertDialogBuilder(activity)
+      .setTitle(fileName)
+      .setItems(names, function(_, which)
+        local item = MENU_ITEMS[which + 1]
+        if item then
+          menuActions(item.action)
+        end
+      end)
+      .setNegativeButton("取消", nil)
+      .show()
+  end
+})
+
+-- ===== 退出确认 =====
+local function tryExit()
+  if not isDirty() then
+    activity.finish()
+    return
+  end
+  MaterialAlertDialogBuilder(activity)
+    .setTitle("还有修改未保存")
+    .setMessage("要保存后再退出吗？")
+    .setPositiveButton("保存并退出", function()
+      if doSave() then
+        activity.finish()
+      end
+    end)
+    .setNeutralButton("直接退出", function()
+      activity.finish()
+    end)
+    .setNegativeButton("取消", nil)
+    .show()
+end
+
+backBtn.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    tryExit()
+  end
+})
+
+pcall(function()
+  activity.getWindow().getDecorView().setOnKeyListener(View.OnKeyListener{
+    onKey = function(view, keyCode, event)
+      if keyCode == event.KEYCODE_BACK and event.getAction() == event.ACTION_UP then
+        if isDirty() then
+          tryExit()
+          return true
+        end
+      end
+      return false
+    end
+  })
+end)
+
+-- ===== 状态刷新 =====
+refreshStatus()
+
+local alive = true
+local handler = Handler(Looper.getMainLooper())
+local tick = nil
+tick = function()
+  if not alive then
+    return
+  end
+  pcall(function()
+    if activity.isFinishing() then
+      alive = false
+      return
+    end
+    refreshStatus()
+  end)
+  handler.postDelayed(tick, 700)
+end
+handler.postDelayed(tick, 400)
+
+function onDestroy()
+  alive = false
+  pcall(function()
+    handler.removeCallbacksAndMessages(nil)
+  end)
+end
+

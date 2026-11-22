@@ -258,95 +258,9 @@ local function humanSize(bytes)
 end
 
 local function openEditor(filePath)
-  local content = ""
-  local file = io.open(filePath, "r")
-  if file then
-    content = file:read("a")
-    file:close()
-  end
-
-  local box = LinearLayout(activity)
-  box.setOrientation(LinearLayout.VERTICAL)
-  box.setPadding(dp(14), dp(8), dp(14), 0)
-
-  local label = TextView(activity)
-  label.setText(File(filePath).getName())
-  label.setTextSize(12)
-  label.setTextColor(MUTED)
-  box.addView(label)
-
-  local editor = EditText(activity)
-  editor.setText(content)
-  editor.setTextSize(13)
-  editor.setSingleLine(false)
-  editor.setGravity(Gravity.TOP)
-  editor.setMinLines(12)
-  editor.setBackground(rounded(CARD, LINE, 10))
-  editor.setPadding(dp(10), dp(8), dp(10), dp(8))
-  box.addView(editor, LinearLayout.LayoutParams(-1, dp(320)))
-
-  MaterialAlertDialogBuilder(activity)
-    .setTitle("编辑文件")
-    .setView(box)
-    .setNegativeButton("取消", nil)
-    .setPositiveButton("保存", function()
-      local out = io.open(filePath, "w")
-      out:write(editor.getText().toString())
-      out:close()
-      toast("已保存")
-      buildDirPage(true)
-    end)
-    .show()
-end
-
-local function deleteFile(filePath)
-  MaterialAlertDialogBuilder(activity)
-    .setTitle("删除")
-    .setMessage("确定删除 " .. File(filePath).getName() .. "？")
-    .setNegativeButton("取消", nil)
-    .setPositiveButton("删除", function()
-      local function drop(path)
-        local file = File(path)
-        if file.isDirectory() then
-          local children = file.listFiles()
-          if children then
-            for i = 0, #children - 1 do
-              drop(children[i].getAbsolutePath())
-            end
-          end
-        end
-        file.delete()
-      end
-      drop(filePath)
-      toast("已删除")
-      buildDirPage(true)
-    end)
-    .show()
-end
-
-local function showFileMenu(filePath, isDir)
-  local options
-  if isDir then
-    options = { "进入", "删除" }
-  else
-    options = { "编辑", "运行", "删除" }
-  end
-  MaterialAlertDialogBuilder(activity)
-    .setTitle(File(filePath).getName())
-    .setItems(options, function(dialog, which)
-      local choice = options[which + 1]
-      if choice == "进入" then
-        currentDir = filePath
-        buildDirPage()
-      elseif choice == "编辑" then
-        openEditor(filePath)
-      elseif choice == "运行" then
-        runScript(filePath)
-      elseif choice == "删除" then
-        deleteFile(filePath)
-      end
-    end)
-    .show()
+  pcall(function()
+    activity.newActivity("editor", {filePath})
+  end)
 end
 
 local dirScroll
@@ -830,6 +744,6 @@ end)
 
 barButton("编辑器", false, function()
   pcall(function()
-    activity.newActivity("mainbody")
+    activity.newActivity("editor", {projectDir .. "/main.lua"})
   end)
 end)

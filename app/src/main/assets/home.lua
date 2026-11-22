@@ -461,11 +461,65 @@ newBtn.setOnClickListener(View.OnClickListener{
   end
 })
 
+local function collectScripts(directory, result, depth)
+  if depth > 4 then
+    return
+  end
+  local children = directory.listFiles()
+  if not children then
+    return
+  end
+  for index = 0, #children - 1 do
+    local item = children[index]
+    if item.isDirectory() then
+      collectScripts(item, result, depth + 1)
+    else
+      local name = item.getName()
+      if name:sub(-4) == ".lua" then
+        local path = item.getAbsolutePath()
+        local relative = path:sub(#projectRoot + 2)
+        table.insert(result, {
+          path = path,
+          label = relative,
+          time = item.lastModified()
+        })
+      end
+    end
+  end
+end
+
+local function showEditorPicker()
+  local list = {}
+  collectScripts(File(projectRoot), list, 0)
+  if #list == 0 then
+    toast("还没有脚本文件，先新建一个应用")
+    return
+  end
+  table.sort(list, function(a, b)
+    return a.time > b.time
+  end)
+  local labels = {}
+  local limit = math.min(#list, 30)
+  for index = 1, limit do
+    table.insert(labels, list[index].label)
+  end
+  MaterialAlertDialogBuilder(activity)
+    .setTitle("选择要编辑的文件")
+    .setItems(labels, function(_, which)
+      local item = list[which + 1]
+      if item then
+        pcall(function()
+          activity.newActivity("editor", {item.path})
+        end)
+      end
+    end)
+    .setNegativeButton("取消", nil)
+    .show()
+end
+
 editorBtn.setOnClickListener(View.OnClickListener{
   onClick = function()
-    pcall(function()
-      activity.newActivity("mainbody")
-    end)
+    showEditorPicker()
   end
 })
 
