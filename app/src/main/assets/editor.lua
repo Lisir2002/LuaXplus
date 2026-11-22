@@ -849,23 +849,35 @@ moreBtn.setOnClickListener(View.OnClickListener{
 })
 
 -- ===== 退出确认 =====
+local exitDialogShowing = false
 local function tryExit()
   if not isDirty() then
     activity.finish()
     return
   end
+  if exitDialogShowing then
+    return
+  end
+  exitDialogShowing = true
   MaterialAlertDialogBuilder(activity)
     .setTitle("还有修改未保存")
-    .setMessage("要保存后再退出吗？")
+    .setMessage("退出后这次修改会丢失，确定要退出吗？")
     .setPositiveButton("保存并退出", function()
+      exitDialogShowing = false
       if doSave() then
         activity.finish()
       end
     end)
     .setNeutralButton("直接退出", function()
+      exitDialogShowing = false
       activity.finish()
     end)
-    .setNegativeButton("取消", nil)
+    .setNegativeButton("取消", function()
+      exitDialogShowing = false
+    end)
+    .setOnCancelListener(function()
+      exitDialogShowing = false
+    end)
     .show()
 end
 
@@ -875,18 +887,15 @@ backBtn.setOnClickListener(View.OnClickListener{
   end
 })
 
+-- 系统返回与手势返回统一交给守卫，未保存时先弹确认
 pcall(function()
-  activity.getWindow().getDecorView().setOnKeyListener(View.OnKeyListener{
-    onKey = function(view, keyCode, event)
-      if keyCode == event.KEYCODE_BACK and event.getAction() == event.ACTION_UP then
-        if isDirty() then
-          tryExit()
-          return true
-        end
-      end
-      return false
+  local BackGuard = luajava.bindClass("com.mini.luaxplus.BackGuard")
+  BackGuard.install(activity)
+  BackGuard.setHandler(luajava.new(luajava.bindClass("java.lang.Runnable"), {
+    run = function()
+      tryExit()
     end
-  })
+  }))
 end)
 
 -- ===== 状态刷新 =====

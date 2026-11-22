@@ -372,14 +372,23 @@ function buildDirPage(keepPage)
       .setView(input)
       .setNegativeButton("取消", nil)
       .setPositiveButton("创建", function()
-        local name = input.getText().toString()
+        local name = tostring(input.getText().toString())
         if name == "" then
           return
         end
-        local out = io.open(currentDir .. "/" .. name, "w")
+        local target = currentDir .. "/" .. name
+        if File(target).exists() then
+          toast("同名文件已存在")
+          return
+        end
+        local out = io.open(target, "w")
+        if not out then
+          toast("创建失败，请检查存储权限")
+          return
+        end
         out:write("")
         out:close()
-        buildDirPage()
+        buildDirPage(true)
         toast("已创建 " .. name)
       end)
       .show()
@@ -393,12 +402,21 @@ function buildDirPage(keepPage)
       .setView(input)
       .setNegativeButton("取消", nil)
       .setPositiveButton("创建", function()
-        local name = input.getText().toString()
+        local name = tostring(input.getText().toString())
         if name == "" then
           return
         end
-        File(currentDir .. "/" .. name).mkdirs()
-        buildDirPage()
+        local target = File(currentDir .. "/" .. name)
+        if target.exists() then
+          toast("同名文件夹已存在")
+          return
+        end
+        if target.mkdirs() then
+          buildDirPage(true)
+          toast("已创建 " .. name)
+        else
+          toast("创建失败，请检查存储权限")
+        end
       end)
       .show()
   end)
@@ -664,56 +682,36 @@ local function buildLogPage()
   local scroll, box = makeScroll()
   pages[4] = scroll
 
-  local intro = TextView(activity)
-  intro.setText("这里汇总主程序日志与当前包名的成品日志，点开可看开头几行。完整内容请到 LuaXPlus/logs 目录查看。")
-  intro.setTextSize(12.5)
-  intro.setTextColor(MUTED)
-  box.addView(intro)
+  local card = LinearLayout(activity)
+  card.setOrientation(LinearLayout.VERTICAL)
+  card.setGravity(Gravity.CENTER)
+  card.setPadding(dp(20), dp(46), dp(20), dp(46))
+  card.setBackground(rounded(CARD, LINE, 14))
+  box.addView(card, LinearLayout.LayoutParams(-1, -2))
 
-  local logs = collectLogs()
-  if #logs == 0 then
-    local empty = TextView(activity)
-    empty.setText("暂无日志")
-    empty.setTextSize(13)
-    empty.setTextColor(MUTED)
-    empty.setPadding(dp(2), dp(18), 0, 0)
-    box.addView(empty)
-    return scroll
-  end
+  local symbol = TextView(activity)
+  symbol.setText("志")
+  symbol.setTextSize(20)
+  symbol.setTextColor(0xff7a6a56)
+  symbol.setGravity(Gravity.CENTER)
+  symbol.setBackground(rounded(0xfff2ece0, nil, 14))
+  card.addView(symbol, LinearLayout.LayoutParams(dp(52), dp(52)))
 
-  for i = 1, math.min(#logs, 20) do
-    local item = logs[i]
-    local row = LinearLayout(activity)
-    row.setOrientation(LinearLayout.VERTICAL)
-    row.setPadding(dp(12), dp(10), dp(12), dp(10))
-    row.setBackground(rounded(CARD, LINE, 10))
-    local params = LinearLayout.LayoutParams(-1, -2)
-    params.topMargin = dp(8)
-    box.addView(row, params)
+  local title = TextView(activity)
+  title.setText("日志页占位")
+  title.setTextSize(15)
+  title.setTextColor(INK)
+  title.setGravity(Gravity.CENTER)
+  title.setPadding(0, dp(14), 0, dp(6))
+  card.addView(title)
 
-    local fileName = TextView(activity)
-    fileName.setText(item.getName())
-    fileName.setTextSize(13)
-    fileName.setTextColor(INK)
-    row.addView(fileName)
+  local hint = TextView(activity)
+  hint.setText("这里先留空，日志的展示方式与内容待确认后接入。")
+  hint.setTextSize(12.5)
+  hint.setTextColor(MUTED)
+  hint.setGravity(Gravity.CENTER)
+  card.addView(hint, LinearLayout.LayoutParams(-1, -2))
 
-    local preview = TextView(activity)
-    preview.setText((readHead(item.getAbsolutePath(), 2):gsub("\n", "  ") or ""):sub(1, 90))
-    preview.setTextSize(11.5)
-    preview.setTextColor(MUTED)
-    row.addView(preview)
-
-    row.setOnClickListener(View.OnClickListener{
-      onClick = function()
-        local content = readHead(item.getAbsolutePath(), 40)
-        MaterialAlertDialogBuilder(activity)
-          .setTitle(item.getName())
-          .setMessage(content)
-          .setPositiveButton("关闭", nil)
-          .show()
-      end
-    })
-  end
   return scroll
 end
 

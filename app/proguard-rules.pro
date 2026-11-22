@@ -48,3 +48,6 @@
 
 # 脚本通过反射调用文本定位工具，需保留类与方法名
 -keep class com.mini.luaxplus.TextUtil { public static *; }
+
+# 返回键守卫由脚本反射注入
+-keep class com.mini.luaxplus.BackGuard { *; }
