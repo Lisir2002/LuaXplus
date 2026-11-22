@@ -190,6 +190,7 @@ local BASE = {
     stepper = 38,
     bannerGlyph = 28,
     avatar = 40,
+    avatarGroup = 32,
     avatarFontRatio = 2.4,
     alertWidth = 270,
     hitTarget = 44,
@@ -2408,6 +2409,587 @@ function M.toast(spec)
   toast.setGravity(Gravity.BOTTOM, 0, dp(space(spec.offset or 72)))
   toast.show()
   return toast
+end
+
+-- ===== 选择与数据展示 =====
+-- 独立开关；带标题的开关行可以直接用 M.row({ toggle = ... })。
+function M.switch(spec)
+  if type(spec) == "boolean" then
+    spec = { value = spec }
+  end
+  spec = spec or {}
+  local palette = colors()
+  local switchView
+  local ok = pcall(function()
+    local IosSwitch = luajava.bindClass("com.mini.luaxplus.ui.IosSwitch")
+    switchView = luajava.new(IosSwitch, activity)
+  end)
+  if not ok or not switchView then
+    switchView = Switch(activity)
+    pcall(function()
+      switchView.setShowText(false)
+    end)
+  else
+    pcall(function()
+      switchView.setTrackColors(palette.fill, palette.success)
+    end)
+  end
+  switchView.setChecked(spec.value == true or spec.checked == true)
+  local listener = spec.onChange or spec.onToggle
+  switchView.setOnCheckedChangeListener(CompoundButton.OnCheckedChangeListener{
+    onCheckedChanged = function(button, state)
+      spec.value = state
+      if listener then
+        listener(state)
+      end
+    end
+  })
+  if spec.disabled then
+    switchView.setEnabled(false)
+    switchView.setAlpha(alphaValue(OP.disabled))
+  end
+  return switchView
+end
+
+function M.switchRow(spec)
+  spec = spec or {}
+  if spec.toggle == nil then
+    spec.toggle = spec.value == true or spec.checked == true
+  end
+  return M.row(spec)
+end
+
+-- 单选组：items 支持字符串或 { title, subtitle, value }。
+function M.radioGroup(spec)
+  spec = spec or {}
+  local palette = colors()
+  local items = spec.items or {}
+  local card = LinearLayout(activity)
+  card.setOrientation(LinearLayout.VERTICAL)
+  card.setBackground(roundRect(palette.surface, R.card))
+  card.setClipToOutline(true)
+
+  local selected = spec.selected
+  if selected == nil then
+    selected = spec.value
+  end
+  if type(selected) == "string" then
+    for index = 1, #items do
+      local item = items[index]
+      if type(item) == "table" and tostring(item.value or "") == selected then
+        selected = index
+        break
+      end
+    end
+  end
+  selected = math.floor(numberValue(selected, 1))
+  if selected < 1 or selected > #items then
+    selected = 1
+  end
+
+  local indicators = {}
+  local function apply()
+    for index = 1, #indicators do
+      local active = index == selected
+      indicators[index].setText(active and "●" or "○")
+      indicators[index].setTextColor(active and palette.accent or palette.tertiary)
+    end
+  end
+
+  local function choose(index)
+    if spec.disabled then
+      return
+    end
+    selected = index
+    apply()
+    if spec.onChange then
+      spec.onChange(items[index], index)
+    end
+  end
+
+  for index = 1, #items do
+    local item = items[index]
+    if type(item) ~= "table" then
+      item = { title = tostring(item) }
+    end
+    if index > 1 then
+      local line, params = separatorView(16)
+      card.addView(line, params)
+    end
+    local indicator = textView("○", TY.body.size, palette.tertiary, false)
+    indicator.setGravity(Gravity.CENTER_VERTICAL)
+    indicator.setPadding(dp(space(6)), 0, 0, 0)
+    indicators[index] = indicator
+    local row = M.row({
+      title = item.title or item.text or "",
+      subtitle = item.subtitle,
+      accessory = indicator,
+      chevron = false,
+      height = spec.height,
+      onClick = function()
+        choose(index)
+      end,
+    })
+    card.addView(row, LinearLayout.LayoutParams(-1, -2))
+  end
+  apply()
+  return card
+end
+
+-- 星级评分；value 为 1..max，readonly 时只展示。
+function M.rating(spec)
+  spec = spec or {}
+  local palette = colors()
+  local max = math.floor(numberValue(spec.max, 5))
+  if max < 1 then
+    max = 5
+  end
+  local value = math.floor(numberValue(spec.value, 0))
+  value = math.max(0, math.min(max, value))
+  local size = dimension(spec.size or TY.action.size, TY.action.size)
+  local activeColor = parseColor(spec.color or palette.warning)
+  local row = LinearLayout(activity)
+  row.setOrientation(LinearLayout.HORIZONTAL)
+  row.setGravity(Gravity.CENTER_VERTICAL)
+  local stars = {}
+
+  local function apply()
+    for index = 1, #stars do
+      local active = index <= value
+      stars[index].setText(active and "★" or "☆")
+      stars[index].setTextColor(active and activeColor or palette.tertiary)
+    end
+  end
+
+  for index = 1, max do
+    local star = textView("☆", size, palette.tertiary, false)
+    star.setGravity(Gravity.CENTER)
+    star.setPadding(dp(space(2)), dp(space(2)), dp(space(2)), dp(space(2)))
+    stars[index] = star
+    if not spec.readonly and not spec.disabled then
+      star.setOnClickListener(View.OnClickListener{
+        onClick = function()
+          value = index
+          apply()
+          if spec.onChange then
+            spec.onChange(value)
+          end
+        end
+      })
+    end
+    row.addView(star)
+  end
+  apply()
+  if spec.disabled then
+    row.setAlpha(alphaValue(OP.disabled))
+  end
+  return row
+end
+
+-- 下拉选择：用底部动作菜单展示 options，避免引入第二套弹窗样式。
+function M.select(spec)
+  spec = spec or {}
+  local palette = colors()
+  local options = spec.options or {}
+  local function labelOf(option)
+    if type(option) == "table" then
+      return tostring(option.title or option.text or option.label or option.value or "")
+    end
+    return tostring(option or "")
+  end
+  local selected = spec.selected
+  if selected == nil then
+    selected = spec.value or 1
+  end
+  if type(selected) == "string" then
+    for index = 1, #options do
+      local option = options[index]
+      local value = type(option) == "table" and option.value or option
+      if tostring(value) == selected then
+        selected = index
+        break
+      end
+    end
+  end
+  selected = math.floor(numberValue(selected, 1))
+  if selected < 1 or selected > #options then
+    selected = 1
+  end
+  local current = options[selected]
+  local valueView = textView(
+    current and labelOf(current) or (spec.placeholder or "请选择"),
+    TY.callout.size,
+    current and palette.label or palette.tertiary,
+    false
+  )
+  valueView.setPadding(dp(space(8)), 0, dp(space(2)), 0)
+  local row
+  row = M.row({
+    title = spec.title or "选项",
+    subtitle = spec.subtitle,
+    accessory = valueView,
+    chevron = false,
+    height = spec.height,
+    onClick = function()
+      if #options == 0 then
+        return
+      end
+      local actions = {}
+      for index = 1, #options do
+        local option = options[index]
+        actions[index] = {
+          title = (index == selected and "✓ " or "") .. labelOf(option),
+          onClick = function()
+            selected = index
+            valueView.setText(labelOf(option))
+            valueView.setTextColor(palette.label)
+            if spec.onChange then
+              spec.onChange(option, index)
+            end
+          end,
+        }
+      end
+      M.actionSheet({ title = spec.title, actions = actions })
+    end,
+  })
+  return row
+end
+
+-- 键值说明列表；value 可以是字符串，也可以直接放一个 View。
+function M.keyValue(spec)
+  spec = spec or {}
+  local palette = colors()
+  local card = LinearLayout(activity)
+  card.setOrientation(LinearLayout.VERTICAL)
+  card.setBackground(roundRect(palette.surface, R.card))
+  card.setClipToOutline(true)
+
+  if spec.title then
+    local title = textView(spec.title, TY.footnote.size, palette.secondary, true)
+    title.setPadding(dp(space(16)), dp(space(12)), dp(space(16)), dp(space(6)))
+    card.addView(title)
+  end
+
+  local items = spec.items or {}
+  for index = 1, #items do
+    local item = items[index]
+    if type(item) ~= "table" then
+      item = { label = tostring(item), value = "" }
+    end
+    if index > 1 then
+      local line, params = separatorView(16)
+      card.addView(line, params)
+    end
+    local row = LinearLayout(activity)
+    row.setOrientation(LinearLayout.HORIZONTAL)
+    row.setGravity(Gravity.CENTER_VERTICAL)
+    row.setPadding(dp(space(16)), dp(space(10)), dp(space(16)), dp(space(10)))
+    local label = textView(item.label or item.key or "", TY.subhead.size, palette.secondary, false)
+    row.addView(label, LinearLayout.LayoutParams(0, -2, 1))
+    if type(item.value) == "userdata" then
+      row.addView(item.value, LinearLayout.LayoutParams(0, -2, 1.5))
+    else
+      local value = textView(tostring(item.value or ""), TY.subhead.size, parseColor(item.color or palette.label), false)
+      value.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL)
+      row.addView(value, LinearLayout.LayoutParams(0, -2, 1.5))
+    end
+    card.addView(row, LinearLayout.LayoutParams(-1, -2))
+  end
+
+  if spec.footer then
+    local footer = textView(spec.footer, TY.footnote.size, palette.secondary, false)
+    footer.setPadding(dp(space(16)), dp(space(8)), dp(space(16)), dp(space(12)))
+    card.addView(footer)
+  end
+  return card
+end
+
+M.descriptionList = M.keyValue
+
+-- 表格：columns 支持 { title, key, width, weight, align }，rows 支持数组或字段映射。
+function M.table(spec)
+  spec = spec or {}
+  local palette = colors()
+  local columns = spec.columns or {}
+  local rows = spec.rows or {}
+  local card = LinearLayout(activity)
+  card.setOrientation(LinearLayout.VERTICAL)
+  card.setBackground(roundRect(palette.surface, R.card))
+  card.setClipToOutline(true)
+  if type(columns) == "string" then
+    columns = { columns }
+  end
+  for index = 1, #columns do
+    if type(columns[index]) ~= "table" then
+      columns[index] = { title = tostring(columns[index]) }
+    end
+  end
+
+  local function makeCell(text, column, header)
+    local cell = textView(tostring(text or ""), header and TY.footnote.size or TY.subhead.size,
+      header and palette.secondary or palette.label, header)
+    cell.setPadding(dp(space(8)), dp(space(8)), dp(space(8)), dp(space(8)))
+    cell.setMaxLines(2)
+    cell.setEllipsize(TextUtils.TruncateAt.END)
+    local gravity = Gravity.CENTER_VERTICAL
+    if column.align == "right" then
+      gravity = Gravity.RIGHT | Gravity.CENTER_VERTICAL
+    elseif column.align == "center" then
+      gravity = Gravity.CENTER
+    end
+    cell.setGravity(gravity)
+    local width = column.width and dp(space(column.width)) or 0
+    local params = LinearLayout.LayoutParams(width, -2, width == 0 and (column.weight or 1) or 0)
+    return cell, params
+  end
+
+  local header = LinearLayout(activity)
+  header.setOrientation(LinearLayout.HORIZONTAL)
+  header.setBackgroundColor(palette.fill)
+  for index = 1, #columns do
+    local column = columns[index]
+    local cell, params = makeCell(column.title or column.key or "", column, true)
+    header.addView(cell, params)
+  end
+  card.addView(header, LinearLayout.LayoutParams(-1, -2))
+
+  for rowIndex = 1, #rows do
+    local data = rows[rowIndex]
+    if type(data) ~= "table" then
+      data = { data }
+    end
+    local row = LinearLayout(activity)
+    row.setOrientation(LinearLayout.HORIZONTAL)
+    if spec.striped and rowIndex % 2 == 0 then
+      row.setBackgroundColor(palette.bg)
+    end
+    for index = 1, #columns do
+      local column = columns[index]
+      local value = data[column.key or index]
+      local cell, params = makeCell(value, column, false)
+      row.addView(cell, params)
+    end
+    if spec.onRowClick then
+      row.setOnClickListener(View.OnClickListener{
+        onClick = function()
+          spec.onRowClick(data, rowIndex)
+        end
+      })
+    end
+    card.addView(row, LinearLayout.LayoutParams(-1, -2))
+    if rowIndex < #rows then
+      local line, params = separatorView(0)
+      card.addView(line, params)
+    end
+  end
+
+  if #rows == 0 then
+    local empty = textView(spec.empty or "暂无数据", TY.subhead.size, palette.tertiary, false)
+    empty.setGravity(Gravity.CENTER)
+    empty.setPadding(dp(space(16)), dp(space(20)), dp(space(16)), dp(space(20)))
+    card.addView(empty, LinearLayout.LayoutParams(-1, -2))
+  end
+  return card
+end
+
+-- 竖向时间线；items 支持 { title, time, description, active, color }。
+function M.timeline(spec)
+  spec = spec or {}
+  local palette = colors()
+  local root = LinearLayout(activity)
+  root.setOrientation(LinearLayout.VERTICAL)
+  local items = spec.items or {}
+  for index = 1, #items do
+    local item = items[index]
+    if type(item) ~= "table" then
+      item = { title = tostring(item) }
+    end
+    local row = LinearLayout(activity)
+    row.setOrientation(LinearLayout.HORIZONTAL)
+    row.setMinimumHeight(dp(space(52)))
+    row.setPadding(0, 0, 0, dp(space(2)))
+
+    local rail = FrameLayout(activity)
+    row.addView(rail, LinearLayout.LayoutParams(dp(space(24)), -1))
+    if index < #items then
+      local line = View(activity)
+      line.setBackgroundColor(palette.separator)
+      local lineParams = FrameLayout.LayoutParams(hairline(), -1)
+      lineParams.gravity = Gravity.CENTER_HORIZONTAL
+      lineParams.topMargin = dp(space(16))
+      rail.addView(line, lineParams)
+    end
+    local dot = View(activity)
+    dot.setBackground(roundRect(parseColor(item.color or (item.active and palette.accent) or palette.tertiary), 5))
+    local dotParams = FrameLayout.LayoutParams(dp(space(10)), dp(space(10)))
+    dotParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL
+    dotParams.topMargin = dp(space(5))
+    rail.addView(dot, dotParams)
+
+    local content = LinearLayout(activity)
+    content.setOrientation(LinearLayout.VERTICAL)
+    row.addView(content, LinearLayout.LayoutParams(0, -2, 1))
+    local head = LinearLayout(activity)
+    head.setOrientation(LinearLayout.HORIZONTAL)
+    head.setGravity(Gravity.CENTER_VERTICAL)
+    local title = textView(item.title or "", TY.body.size, palette.label, item.active == true)
+    head.addView(title, LinearLayout.LayoutParams(0, -2, 1))
+    if item.time then
+      local time = textView(item.time, TY.caption.size, palette.secondary, false)
+      time.setGravity(Gravity.RIGHT)
+      head.addView(time)
+    end
+    content.addView(head)
+    if item.description then
+      local description = textView(item.description, TY.footnote.size, palette.secondary, false)
+      description.setPadding(0, dp(space(4)), 0, 0)
+      content.addView(description)
+    end
+    root.addView(row, LinearLayout.LayoutParams(-1, -2))
+  end
+  return root
+end
+
+-- 折叠容器；header 点击展开/收起，content 支持函数或 View。
+function M.accordion(spec)
+  spec = spec or {}
+  local palette = colors()
+  local card = LinearLayout(activity)
+  card.setOrientation(LinearLayout.VERTICAL)
+  card.setBackground(roundRect(palette.surface, R.card))
+  card.setClipToOutline(true)
+  local expanded = spec.expanded ~= false
+
+  local header = LinearLayout(activity)
+  header.setOrientation(LinearLayout.HORIZONTAL)
+  header.setGravity(Gravity.CENTER_VERTICAL)
+  header.setPadding(dp(space(16)), dp(space(13)), dp(space(16)), dp(space(13)))
+  header.setBackground(ripple(0x00000000, 0, palette.press))
+  local textBox = LinearLayout(activity)
+  textBox.setOrientation(LinearLayout.VERTICAL)
+  header.addView(textBox, LinearLayout.LayoutParams(0, -2, 1))
+  local title = textView(spec.title or "详情", TY.body.size, palette.label, true)
+  textBox.addView(title)
+  if spec.subtitle then
+    local subtitle = textView(spec.subtitle, TY.footnote.size, palette.secondary, false)
+    subtitle.setPadding(0, dp(space(3)), 0, 0)
+    textBox.addView(subtitle)
+  end
+  local chevron = textView("⌃", TY.bodyLarge.size, palette.tertiary, false)
+  chevron.setPadding(dp(space(8)), 0, 0, 0)
+  header.addView(chevron)
+
+  local body = LinearLayout(activity)
+  body.setOrientation(LinearLayout.VERTICAL)
+  body.setPadding(dp(space(16)), 0, dp(space(16)), dp(space(16)))
+  if spec.content then
+    if type(spec.content) == "function" then
+      spec.content(body, card)
+    else
+      body.addView(spec.content, LinearLayout.LayoutParams(-1, -2))
+    end
+  end
+
+  local function apply()
+    body.setVisibility(expanded and View.VISIBLE or View.GONE)
+    chevron.setText(expanded and "⌄" or "⌃")
+  end
+  header.setOnClickListener(View.OnClickListener{
+    onClick = function()
+      if spec.disabled then
+        return
+      end
+      expanded = not expanded
+      apply()
+      if spec.onToggle then
+        spec.onToggle(expanded)
+      end
+    end
+  })
+  card.addView(header, LinearLayout.LayoutParams(-1, -2))
+  card.addView(body, LinearLayout.LayoutParams(-1, -2))
+  apply()
+  if spec.disabled then
+    card.setAlpha(alphaValue(OP.disabled))
+  end
+  return card
+end
+
+-- 头像组：重叠展示，超出 max 时显示 +N。
+function M.avatarGroup(spec)
+  spec = spec or {}
+  local palette = colors()
+  local names = spec.names or spec.items or {}
+  local size = dimension(spec.size or K.avatarGroup, K.avatarGroup)
+  local max = math.floor(numberValue(spec.max, #names))
+  local row = LinearLayout(activity)
+  row.setOrientation(LinearLayout.HORIZONTAL)
+  row.setGravity(Gravity.CENTER_VERTICAL)
+  local count = math.min(#names, max)
+  for index = 1, count do
+    local avatar = M.avatar(names[index], spec.color, size)
+    local params = LinearLayout.LayoutParams(dp(size), dp(size))
+    if index > 1 then
+      params.leftMargin = -dp(size / 3)
+    end
+    avatar.setLayoutParams(params)
+    row.addView(avatar)
+  end
+  if #names > count then
+    local more = M.badge("+" .. tostring(#names - count), palette.fill)
+    more.setTextColor(palette.secondary)
+    more.setGravity(Gravity.CENTER)
+    local params = LinearLayout.LayoutParams(dp(size), dp(size))
+    params.leftMargin = -dp(size / 3)
+    row.addView(more, params)
+  end
+  return row
+end
+
+-- 分页器：page 从 1 开始，total 为总页数。
+function M.pagination(spec)
+  spec = spec or {}
+  local palette = colors()
+  local current = math.floor(numberValue(spec.page, 1))
+  local total = math.max(1, math.floor(numberValue(spec.total, 1)))
+  current = math.max(1, math.min(total, current))
+  local row = LinearLayout(activity)
+  row.setOrientation(LinearLayout.HORIZONTAL)
+  row.setGravity(Gravity.CENTER_VERTICAL)
+
+  local function item(label, target, active, enabled)
+    local view = textView(label, TY.footnote.size, active and palette.onAccent or palette.label, active)
+    view.setGravity(Gravity.CENTER)
+    view.setMinWidth(dp(space(32)))
+    view.setMinHeight(dp(space(32)))
+    view.setPadding(dp(space(6)), 0, dp(space(6)), 0)
+    view.setBackground(roundRect(active and palette.accent or palette.fill, R.segmentItem))
+    if enabled ~= false and target then
+      view.setOnClickListener(View.OnClickListener{
+        onClick = function()
+          if target ~= current and spec.onChange then
+            spec.onChange(target)
+          end
+        end
+      })
+    else
+      view.setAlpha(alphaValue(OP.disabled))
+    end
+    return view
+  end
+
+  row.addView(item("‹", current - 1, false, current > 1))
+  local start = math.max(1, current - 2)
+  local finish = math.min(total, start + 4)
+  start = math.max(1, finish - 4)
+  for index = start, finish do
+    local view = item(tostring(index), index, index == current, true)
+    local params = LinearLayout.LayoutParams(-2, dp(space(32)))
+    params.leftMargin = dp(space(4))
+    row.addView(view, params)
+  end
+  row.addView(item("›", current + 1, false, current < total), LinearLayout.LayoutParams(-2, dp(space(32))))
+  return row
 end
 
 -- ===== 动画 =====

@@ -152,6 +152,104 @@ ui.show{
     end,
   })
   page:add(next, 8)
+  page:add(ui.card({
+    title = "选择与评分",
+    subtitle = "radioGroup / rating / select / switchRow",
+  }, function(box)
+    box.addView(ui.radioGroup({
+      selected = 1,
+      items = {
+        { title = "标准模式", subtitle = "默认动画和圆角" },
+        { title = "紧凑模式", subtitle = "更小的行高与间距" },
+      },
+      onChange = function(item)
+        showInfo("单选", item.title or "")
+      end,
+    }), LinearLayout.LayoutParams(-1, -2))
+
+    box.addView(ui.rating({
+      value = 4,
+      max = 5,
+      onChange = function(value)
+        showInfo("评分", tostring(value) .. " / 5")
+      end,
+    }), LinearLayout.LayoutParams(-2, -2))
+
+    box.addView(ui.select({
+      title = "运行平台",
+      options = { "Android", "iOS", "Web" },
+      selected = 1,
+      onChange = function(option, index)
+        showInfo("选择", tostring(option) .. "（第 " .. tostring(index) .. " 项）")
+      end,
+    }), LinearLayout.LayoutParams(-1, -2))
+  end), 14)
+
+  page:add(ui.keyValue({
+    title = "项目信息",
+    items = {
+      { label = "包名", value = "com.mini.luaxplus" },
+      { label = "当前版本", value = "1.0.0-rc18" },
+      { label = "构建渠道", value = "Release" },
+    },
+    footer = "键值列表适合详情页、设置摘要和订单信息。",
+  }), 14)
+
+  page:add(ui.accordion({
+    title = "高级设置",
+    subtitle = "点击标题展开",
+    expanded = false,
+    content = function(body)
+      local note = TextView(activity)
+      note.setText("折叠容器可以放任意 View；内部仍然使用普通布局。")
+      note.setTextSize("13px")
+      note.setTextColor(palette().secondary)
+      body.addView(note)
+    end,
+    onToggle = function(expanded)
+      toast(expanded and "已展开" or "已收起")
+    end,
+  }), 14)
+
+  local avatars = ui.avatarGroup({
+    names = { "林", "周", "陈", "王", "赵" },
+    max = 4,
+    size = "34px",
+  })
+  page:add(avatars, 14)
+
+  page:add(ui.table({
+    columns = {
+      { title = "组件", key = "name" },
+      { title = "类型", key = "type", align = "right" },
+    },
+    rows = {
+      { name = "radioGroup", type = "选择" },
+      { name = "timeline", type = "数据" },
+      { name = "accordion", type = "容器" },
+    },
+    striped = true,
+    onRowClick = function(data)
+      showInfo("表格", data.name or "")
+    end,
+  }), 14)
+
+  page:add(ui.timeline({
+    items = {
+      { title = "创建工程", time = "09:00", description = "选择模板并命名。" },
+      { title = "编辑页面", time = "09:20", description = "用组件库快速搭建。", active = true },
+      { title = "打包发布", time = "10:10", description = "生成签名 APK。" },
+    },
+  }), 14)
+
+  page:add(ui.pagination({
+    page = 2,
+    total = 6,
+    onChange = function(value)
+      showInfo("分页", "第 " .. tostring(value) .. " 页")
+    end,
+  }), 14)
+
   page:add(ui.spacer(8))
 end
 

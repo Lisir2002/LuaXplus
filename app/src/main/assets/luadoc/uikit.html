@@ -587,6 +587,9 @@ t.motion.slow</pre>
       <tr><td><code>chip / checkRow / stepper</code></td><td><code>control.chipHeight/checkMark/stepper</code>、<code>radius.chip/check/stepper</code></td></tr>
       <tr><td><code>avatar / banner / fab / toast</code></td><td><code>control.avatar/bannerGlyph/fab</code>、<code>radius.avatar/glyph/fab/toast</code>、<code>elevation.fab</code></td></tr>
       <tr><td><code>skeleton / shimmer</code></td><td><code>radius.skeleton</code>、<code>opacity.shimmerLow/shimmerHigh</code>、<code>motion.shimmer</code></td></tr>
+      <tr><td><code>switch / radioGroup / rating / select</code></td><td><code>color</code>、<code>type</code>、<code>radius.check/chip</code>、<code>opacity.disabled</code></td></tr>
+      <tr><td><code>keyValue / table / timeline</code></td><td><code>color</code>、<code>type</code>、<code>spacing</code>、<code>radius.card</code>、<code>control.hairline</code></td></tr>
+      <tr><td><code>accordion / avatarGroup / pagination</code></td><td><code>radius.card/segmentItem</code>、<code>control.avatarGroup</code>、<code>spacing</code>、<code>opacity.disabled</code></td></tr>
       <tr><td><code>animate / stagger / press</code></td><td><code>motion.slow/normal/fast/stagger</code>、<code>motion.enterScale/pressScale</code></td></tr>
     </tbody>
   </table>
@@ -787,7 +790,130 @@ page:add(hero, 14)</pre>
     图片加载是同步的：本地文件很快；HTTP 图片会阻塞 UI 线程。网络图建议先在后台线程下载并缓存到本地，再传给 <code class="inline">ui.image</code>。大图先按目标尺寸缩放，避免把原图直接塞进小卡片。
   </div>
 
-  <h2>二十二、限制与常见问题</h2>
+  <h2>二十二、选择、数据与折叠组件</h2>
+  <p>新增一组高频但之前缺失的组件：开关、单选组、评分、下拉选择、键值列表、表格、时间线、折叠容器、头像组和分页器。它们全部复用现有颜色、间距、圆角、字体、控件和透明度令牌，没有引入新的视觉体系。</p>
+  <table>
+    <thead><tr><th>组件</th><th>用途</th><th>核心字段</th></tr></thead>
+    <tbody>
+      <tr><td><code>switch</code></td><td>独立开关</td><td><code>value / checked / onChange / disabled</code></td></tr>
+      <tr><td><code>switchRow</code></td><td>带标题的开关行</td><td><code>title / subtitle / toggle / onToggle</code></td></tr>
+      <tr><td><code>radioGroup</code></td><td>单选列表</td><td><code>items / selected / value / onChange</code></td></tr>
+      <tr><td><code>rating</code></td><td>星级评分</td><td><code>value / max / size / color / readonly</code></td></tr>
+      <tr><td><code>select</code></td><td>下拉选择</td><td><code>title / options / selected / value / onChange</code></td></tr>
+      <tr><td><code>keyValue</code></td><td>键值详情</td><td><code>title / items / footer</code></td></tr>
+      <tr><td><code>table</code></td><td>简单数据表</td><td><code>columns / rows / striped / onRowClick</code></td></tr>
+      <tr><td><code>timeline</code></td><td>竖向时间线</td><td><code>items / active / color</code></td></tr>
+      <tr><td><code>accordion</code></td><td>折叠容器</td><td><code>title / expanded / content / onToggle</code></td></tr>
+      <tr><td><code>avatarGroup</code></td><td>重叠头像组</td><td><code>names / items / max / size</code></td></tr>
+      <tr><td><code>pagination</code></td><td>分页器</td><td><code>page / total / onChange</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>开关、单选、评分与选择</h3>
+<pre>-- 独立开关
+local darkMode = ui.switch({
+  value = true,
+  onChange = function(on)
+    print("深色模式", on)
+  end,
+})
+
+-- 带标题的开关行
+page:add(ui.switchRow({
+  title = "自动保存",
+  subtitle = "每次退出编辑器时写入磁盘",
+  toggle = false,
+  onToggle = function(on) print(on) end,
+}))
+
+-- 单选组
+page:add(ui.radioGroup({
+  selected = 1,
+  items = {
+    { title = "标准模式", subtitle = "默认圆角和间距" },
+    { title = "紧凑模式", subtitle = "适合信息密度高的页面" },
+  },
+  onChange = function(item, index)
+    print(index, item.title)
+  end,
+}))
+
+-- 星级评分
+page:add(ui.rating({
+  value = 4,
+  max = 5,
+  size = "26px",
+  onChange = function(value) print(value) end,
+}))
+
+-- 下拉选择
+page:add(ui.select({
+  title = "运行平台",
+  options = { "Android", "iOS", "Web" },
+  selected = 1,
+  onChange = function(option, index) print(index, option) end,
+}))</pre>
+  <p><code>select</code> 复用底部动作菜单，不额外打开新窗口；选项可以是字符串，也可以是 <code>{ title, value }</code>。</p>
+
+  <h3>键值、表格与时间线</h3>
+<pre>page:add(ui.keyValue({
+  title = "项目信息",
+  items = {
+    { label = "包名", value = "com.mini.luaxplus" },
+    { label = "版本", value = "1.0.0-rc18" },
+  },
+  footer = "键值列表适合详情页和设置摘要。",
+}))
+
+page:add(ui.table({
+  columns = {
+    { title = "组件", key = "name" },
+    { title = "类型", key = "type", align = "right" },
+  },
+  rows = {
+    { name = "radioGroup", type = "选择" },
+    { name = "timeline", type = "数据" },
+  },
+  striped = true,
+  onRowClick = function(data) print(data.name) end,
+}))
+
+page:add(ui.timeline({
+  items = {
+    { title = "创建工程", time = "09:00", description = "选择模板。" },
+    { title = "编辑页面", time = "09:20", active = true, description = "搭建界面。" },
+    { title = "打包发布", time = "10:10", description = "生成 APK。" },
+  },
+}))</pre>
+  <p>表格列支持 <code>width</code>、<code>weight</code>、<code>align</code> 和 <code>key</code>；不写宽度时按权重平分。时间线的 <code>active</code> 项会使用强调色圆点。</p>
+
+  <h3>折叠、头像组与分页</h3>
+<pre>page:add(ui.accordion({
+  title = "高级设置",
+  subtitle = "点击展开",
+  expanded = false,
+  content = function(body)
+    body.addView(ui.switchRow({ title = "实验特性", toggle = false }))
+  end,
+  onToggle = function(expanded) print(expanded) end,
+}))
+
+page:add(ui.avatarGroup({
+  names = { "林", "周", "陈", "王", "赵" },
+  max = 4,
+  size = "34px",
+}))
+
+page:add(ui.pagination({
+  page = 2,
+  total = 6,
+  onChange = function(page) print(page) end,
+}))</pre>
+  <div class="tip">
+    这些组件都是普通 View 的封装，可以继续 <code>addView</code>、设置 LayoutParams 或放进原生布局；需要更复杂的数据列表时，仍然优先使用 RecyclerView。
+  </div>
+
+  <h2>二十三、限制与常见问题</h2>
   <ul>
     <li><strong>这是 iOS 风格的 Android 组件，不是 UIKit。</strong> 系统字体、阴影和动画与真机 iOS 仍有差异。</li>
     <li><strong>主题切换不会实时重绘已有控件。</strong> 切换后重建页面即可。</li>
@@ -797,7 +923,7 @@ page:add(hero, 14)</pre>
   </ul>
 
   <footer>
-    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc17
+    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc18
   </footer>
 </div>
 
