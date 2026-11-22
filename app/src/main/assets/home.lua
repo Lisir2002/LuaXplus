@@ -9,12 +9,27 @@ import "java.io.File"
 import "com.google.android.material.dialog.MaterialAlertDialogBuilder"
 import "loadbitmap"
 import "autotheme"
+import "androidx.drawerlayout.widget.DrawerLayout"
 
 -- 首页：应用（项目）列表
 -- 数据来源：外部目录 project 下的工程文件夹，每个文件夹带 init.lua 描述信息
 
 activity.setTheme(autotheme())
 activity.setTitle("应用")
+
+-- 页面自带标题区，隐藏系统标题栏
+pcall(function()
+  local actionBar = activity.getActionBar()
+  if actionBar then
+    actionBar.hide()
+  end
+end)
+pcall(function()
+  local supportBar = activity.getSupportActionBar()
+  if supportBar then
+    supportBar.hide()
+  end
+end)
 
 local PAPER = 0xfff7f1e6
 local CARD = 0xfffdf8
@@ -107,6 +122,10 @@ local function humanSize(bytes)
   return string.format("%.1f MB", bytes / 1024 / 1024)
 end
 
+local drawerLayout = DrawerLayout(activity)
+drawerLayout.setScrimColor(0x99000000)
+local sidePanel
+
 local root = LinearLayout(activity)
 root.setOrientation(LinearLayout.VERTICAL)
 root.setBackgroundColor(PAPER)
@@ -116,7 +135,15 @@ root.setFitsSystemWindows(true)
 local header = LinearLayout(activity)
 header.setOrientation(LinearLayout.HORIZONTAL)
 header.setGravity(Gravity.CENTER_VERTICAL)
-header.setPadding(dp(18), dp(16), dp(14), dp(6))
+header.setPadding(dp(10), dp(16), dp(14), dp(6))
+
+local menuBtn = TextView(activity)
+menuBtn.setText("≡")
+menuBtn.setTextSize(22)
+menuBtn.setTextColor(INK)
+menuBtn.setGravity(Gravity.CENTER)
+menuBtn.setPadding(0, 0, 0, 0)
+header.addView(menuBtn, LinearLayout.LayoutParams(dp(34), -2))
 
 local title = TextView(activity)
 title.setText("应用")
@@ -176,7 +203,8 @@ list.setPadding(dp(16), dp(4), dp(16), dp(20))
 scroll.addView(list, LinearLayout.LayoutParams(-1, -2))
 root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1))
 
-activity.setContentView(root)
+drawerLayout.addView(root, DrawerLayout.LayoutParams(-1, -1))
+activity.setContentView(drawerLayout)
 
 local projects = {}
 
@@ -522,5 +550,142 @@ editorBtn.setOnClickListener(View.OnClickListener{
     showEditorPicker()
   end
 })
+
+-- ===== 侧边栏 =====
+local appVersion = ""
+pcall(function()
+  local info = activity.getPackageManager().getPackageInfo(activity.getPackageName(), 0)
+  appVersion = tostring(info.versionName)
+end)
+
+local function showAbout()
+  local versionName = appVersion
+  MaterialAlertDialogBuilder(activity)
+    .setTitle("关于 Mini-LuaXPLUS")
+    .setMessage("版本：" .. versionName
+      .. "\n包名：" .. tostring(activity.getPackageName())
+      .. "\n\n基于 AndroLuaX 改造的 Lua 移动开发环境：应用列表、工程管理、独立编辑器、权限注入与打包签名。")
+    .setPositiveButton("知道了", nil)
+    .show()
+end
+
+local function showSettings()
+  MaterialAlertDialogBuilder(activity)
+    .setTitle("设置")
+    .setMessage("设置项还没接入，这里先留入口。需要哪些开关或偏好，告诉我我按清单补上。")
+    .setPositiveButton("知道了", nil)
+    .show()
+end
+
+sidePanel = LinearLayout(activity)
+sidePanel.setOrientation(LinearLayout.VERTICAL)
+sidePanel.setBackgroundColor(CARD)
+sidePanel.setPadding(dp(16), dp(16), dp(16), dp(18))
+
+local sideHeader = LinearLayout(activity)
+sideHeader.setOrientation(LinearLayout.HORIZONTAL)
+sideHeader.setGravity(Gravity.CENTER_VERTICAL)
+sidePanel.addView(sideHeader, LinearLayout.LayoutParams(-1, -2))
+
+local brandBox = LinearLayout(activity)
+brandBox.setOrientation(LinearLayout.VERTICAL)
+sideHeader.addView(brandBox, LinearLayout.LayoutParams(0, -2, 1))
+
+local brand = TextView(activity)
+brand.setText("Mini-LuaXPLUS")
+brand.setTextSize(16)
+brand.setTypeface(Typeface.DEFAULT_BOLD)
+brand.setTextColor(INK)
+brandBox.addView(brand)
+
+local brandHint = TextView(activity)
+brandHint.setText("Lua 移动开发工作台")
+brandHint.setTextSize(11)
+brandHint.setTextColor(MUTED)
+brandBox.addView(brandHint)
+
+local closeBtn = TextView(activity)
+closeBtn.setText("✕")
+closeBtn.setTextSize(16)
+closeBtn.setTextColor(MUTED)
+closeBtn.setGravity(Gravity.CENTER)
+closeBtn.setPadding(dp(8), dp(4), dp(8), dp(4))
+sideHeader.addView(closeBtn, LinearLayout.LayoutParams(dp(32), -2))
+
+local divider = View(activity)
+divider.setBackgroundColor(LINE)
+local dividerParams = LinearLayout.LayoutParams(-1, dp(1))
+dividerParams.topMargin = dp(14)
+dividerParams.bottomMargin = dp(8)
+sidePanel.addView(divider, dividerParams)
+
+local function sideEntry(titleText, hintText, handler)
+  local row = LinearLayout(activity)
+  row.setOrientation(LinearLayout.VERTICAL)
+  row.setPadding(dp(12), dp(11), dp(12), dp(11))
+  row.setBackground(rounded(0x00ffffff, nil, 10))
+  sidePanel.addView(row, LinearLayout.LayoutParams(-1, -2))
+
+  local entryTitle = TextView(activity)
+  entryTitle.setText(titleText)
+  entryTitle.setTextSize(14)
+  entryTitle.setTextColor(INK)
+  row.addView(entryTitle)
+
+  local entryHint = TextView(activity)
+  entryHint.setText(hintText)
+  entryHint.setTextSize(11)
+  entryHint.setTextColor(MUTED)
+  entryHint.setPadding(0, dp(3), 0, 0)
+  row.addView(entryHint)
+
+  row.setOnClickListener(View.OnClickListener{
+    onClick = function()
+      drawerLayout.closeDrawer(sidePanel)
+      handler()
+    end
+  })
+  return row
+end
+
+sideEntry("关于", "版本信息与开发说明", showAbout)
+sideEntry("设置", "偏好与行为配置", showSettings)
+
+local sideFooter = TextView(activity)
+sideFooter.setText(appVersion ~= "" and appVersion or "1.0.0-rc1")
+sideFooter.setTextSize(10.5)
+sideFooter.setTextColor(MUTED)
+sideFooter.setPadding(dp(12), dp(20), 0, 0)
+sidePanel.addView(sideFooter)
+
+local sideParams = DrawerLayout.LayoutParams(dp(272), -1)
+sideParams.gravity = Gravity.LEFT
+drawerLayout.addView(sidePanel, sideParams)
+
+menuBtn.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    drawerLayout.openDrawer(sidePanel)
+  end
+})
+
+closeBtn.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    drawerLayout.closeDrawer(sidePanel)
+  end
+})
+
+pcall(function()
+  local BackGuard = luajava.bindClass("com.mini.luaxplus.BackGuard")
+  BackGuard.install(activity)
+  BackGuard.setHandler(activity, luajava.new(luajava.bindClass("java.lang.Runnable"), {
+    run = function()
+      if drawerLayout.isDrawerOpen(sidePanel) then
+        drawerLayout.closeDrawer(sidePanel)
+      else
+        activity.finish()
+      end
+    end
+  }))
+end)
 
 refresh()

@@ -15,6 +15,20 @@ import "autotheme"
 
 activity.setTheme(autotheme())
 
+-- 页面自带标题区，隐藏系统标题栏
+pcall(function()
+  local actionBar = activity.getActionBar()
+  if actionBar then
+    actionBar.hide()
+  end
+end)
+pcall(function()
+  local supportBar = activity.getSupportActionBar()
+  if supportBar then
+    supportBar.hide()
+  end
+end)
+
 local PAPER = 0xfff7f1e6
 local CARD = 0xfffdf8
 local INK = 0xff1c2b3a

@@ -891,7 +891,7 @@ backBtn.setOnClickListener(View.OnClickListener{
 pcall(function()
   local BackGuard = luajava.bindClass("com.mini.luaxplus.BackGuard")
   BackGuard.install(activity)
-  BackGuard.setHandler(luajava.new(luajava.bindClass("java.lang.Runnable"), {
+  BackGuard.setHandler(activity, luajava.new(luajava.bindClass("java.lang.Runnable"), {
     run = function()
       tryExit()
     end

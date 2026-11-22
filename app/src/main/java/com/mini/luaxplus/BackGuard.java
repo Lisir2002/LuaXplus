@@ -5,14 +5,16 @@ import android.app.Activity;
 import androidx.activity.ComponentActivity;
 import androidx.activity.OnBackPressedCallback;
 
+import java.util.Map;
+import java.util.WeakHashMap;
+
 /**
  * 返回键守卫：统一接管系统返回与手势返回，交给脚本决定是否退出。
- * 脚本通过 setHandler 注入处理函数，未注入时按默认行为退出。
+ * 处理函数按页面实例保存，避免多个页面共用同一份导致串页。
  */
 public final class BackGuard {
 
-    private static Runnable handler;
-    private static OnBackPressedCallback callback;
+    private static final Map<Activity, Runnable> HANDLERS = new WeakHashMap<>();
 
     private BackGuard() {
     }
@@ -21,13 +23,18 @@ public final class BackGuard {
         if (!(activity instanceof ComponentActivity)) {
             return;
         }
-        handler = null;
-        callback = new OnBackPressedCallback(true) {
+        synchronized (HANDLERS) {
+            HANDLERS.remove(activity);
+        }
+        OnBackPressedCallback callback = new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                Runnable current = handler;
-                if (current != null) {
-                    current.run();
+                Runnable handler;
+                synchronized (HANDLERS) {
+                    handler = HANDLERS.get(activity);
+                }
+                if (handler != null) {
+                    handler.run();
                 } else {
                     setEnabled(false);
                     activity.onBackPressed();
@@ -37,12 +44,15 @@ public final class BackGuard {
         ((ComponentActivity) activity).getOnBackPressedDispatcher().addCallback(callback);
     }
 
-    public static void setHandler(Runnable runnable) {
-        handler = runnable;
+    public static void setHandler(Activity activity, Runnable runnable) {
+        synchronized (HANDLERS) {
+            HANDLERS.put(activity, runnable);
+        }
     }
 
-    public static void clear() {
-        handler = null;
-        callback = null;
+    public static void clear(Activity activity) {
+        synchronized (HANDLERS) {
+            HANDLERS.remove(activity);
+        }
     }
 }
