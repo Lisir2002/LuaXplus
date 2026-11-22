@@ -38,6 +38,8 @@ if filePath == "" then
   return
 end
 
+local TextUtil = luajava.bindClass("com.mini.luaxplus.TextUtil")
+
 local function dp(n)
   return math.floor(n * activity.getResources().getDisplayMetrics().density + 0.5)
 end
@@ -327,17 +329,6 @@ local function currentText()
   return ""
 end
 
--- Java 字符串用于 indexOf / lastIndexOf / substring，避免中文按字节计数错位
-local function javaText()
-  local ok, value = pcall(function()
-    return editor.getText().toString()
-  end)
-  if ok and value ~= nil then
-    return value
-  end
-  return currentText()
-end
-
 local function inputText(input)
   return tostring(input.getText().toString())
 end
@@ -363,11 +354,10 @@ local function refreshStatus()
   if caret ~= cacheCaret or #text ~= cacheLength then
     local start = 0
     pcall(function()
-      local index = javaText().lastIndexOf("\n", caret - 1)
-      start = index + 1
+      start = TextUtil.lastIndexOf(text, "\n", caret - 1) + 1
     end)
     cacheColumn = caret - start + 1
-    local prefix = tostring(javaText().substring(0, start))
+    local prefix = tostring(TextUtil.substring(text, 0, start))
     local _, count = prefix:gsub("\n", "")
     cacheLine = count + 1
     cacheCaret = caret
@@ -375,7 +365,7 @@ local function refreshStatus()
   end
   local line = cacheLine
   local column = cacheColumn
-  statusText.setText("行 " .. line .. "/" .. total .. " · 列 " .. column .. " · " .. #text .. " 字符")
+  statusText.setText("行 " .. line .. "/" .. total .. " · 列 " .. column .. " · " .. TextUtil.length(text) .. " 字符")
   if text == savedText then
     dirtyText.setText("已保存")
     dirtyText.setTextColor(0xff6fbf9a)
@@ -422,16 +412,16 @@ local function countMatches(query)
   if query == "" then
     return 0
   end
-  local text = javaText()
+  local text = currentText()
   local total = 0
   local from = 0
   while true do
-    local index = text.indexOf(query, from)
+    local index = TextUtil.indexOf(text, query, from)
     if index < 0 then
       break
     end
     total = total + 1
-    from = index + #query
+    from = index + TextUtil.length(query)
     if total > 9999 then
       break
     end
@@ -464,11 +454,11 @@ local function findNextMatch()
   if query == "" then
     return
   end
-  local text = javaText()
+  local text = currentText()
   local from = editor.getSelectionEnd()
-  local index = text.indexOf(query, from)
+  local index = TextUtil.indexOf(text, query, from)
   if index < 0 and from > 0 then
-    index = text.indexOf(query, 0)
+    index = TextUtil.indexOf(text, query, 0)
     if index >= 0 then
       toast("已回到开头")
     end
@@ -477,7 +467,7 @@ local function findNextMatch()
     toast("没有匹配内容")
     return
   end
-  selectRange(index, index + #query)
+  selectRange(index, index + TextUtil.length(query))
 end
 
 local function findPrevMatch()
@@ -485,14 +475,14 @@ local function findPrevMatch()
   if query == "" then
     return
   end
-  local text = javaText()
+  local text = currentText()
   local from = editor.getSelectionStart() - 1
   local index = -1
   if from > 0 then
-    index = text.lastIndexOf(query, from)
+    index = TextUtil.lastIndexOf(text, query, from)
   end
   if index < 0 and #text > 0 then
-    index = text.lastIndexOf(query, #text - 1)
+    index = TextUtil.lastIndexOf(text, query, TextUtil.length(text) - 1)
     if index >= 0 then
       toast("已到末尾")
     end
@@ -501,7 +491,7 @@ local function findPrevMatch()
     toast("没有匹配内容")
     return
   end
-  selectRange(index, index + #query)
+  selectRange(index, index + TextUtil.length(query))
 end
 
 nextBtn.setOnClickListener(View.OnClickListener{
@@ -529,7 +519,7 @@ local function replaceCurrent()
   end
   local start = editor.getSelectionStart()
   local stop = editor.getSelectionEnd()
-  local selected = tostring(javaText().substring(start, stop))
+  local selected = tostring(TextUtil.substring(currentText(), start, stop))
   if selected ~= query then
     findNextMatch()
     return
@@ -550,17 +540,17 @@ local function replaceAll()
   local total = 0
   local from = 0
   while total < 9999 do
-    local text = javaText()
-    local index = text.indexOf(query, from)
+    local text = currentText()
+    local index = TextUtil.indexOf(text, query, from)
     if index < 0 then
       break
     end
     pcall(function()
-      editor.replaceText(index, index + #query, replacement)
+      editor.replaceText(index, index + TextUtil.length(query), replacement)
     end)
     total = total + 1
-    from = index + #replacement
-    if #replacement == 0 and from <= index then
+    from = index + TextUtil.length(replacement)
+    if TextUtil.length(replacement) == 0 and from <= index then
       break
     end
   end
@@ -602,76 +592,76 @@ findBtn.setOnClickListener(View.OnClickListener{
 
 -- ===== 行操作 =====
 local function caretLineBounds()
-  local text = javaText()
+  local text = currentText()
   local caret = editor.getSelectionEnd()
-  local startIndex = text.lastIndexOf("\n", caret - 1) + 1
-  local endIndex = text.indexOf("\n", caret)
+  local startIndex = TextUtil.lastIndexOf(text, "\n", caret - 1) + 1
+  local endIndex = TextUtil.indexOf(text, "\n", caret)
   if endIndex < 0 then
-    endIndex = #text
+    endIndex = TextUtil.length(text)
   end
   return startIndex, endIndex
 end
 
 local function currentLineText()
   local startIndex, endIndex = caretLineBounds()
-  return tostring(javaText().substring(startIndex, endIndex))
+  return tostring(TextUtil.substring(currentText(), startIndex, endIndex))
 end
 
 local function duplicateLine()
-  local text = javaText()
+  local text = currentText()
   local startIndex, endIndex = caretLineBounds()
-  local line = tostring(text.substring(startIndex, endIndex))
+  local line = tostring(TextUtil.substring(text, startIndex, endIndex))
   local caret = editor.getSelectionEnd()
   pcall(function()
     editor.insert(endIndex, "\n" .. line)
   end)
   pcall(function()
-    editor.setSelection(caret + #line + 1)
+    editor.setSelection(caret + TextUtil.length(line) + 1)
   end)
   refreshStatus()
 end
 
 local function moveLine(offset)
-  local text = javaText()
+  local text = currentText()
   local startIndex, endIndex = caretLineBounds()
-  local line = tostring(text.substring(startIndex, endIndex))
+  local line = tostring(TextUtil.substring(text, startIndex, endIndex))
   local caret = editor.getSelectionEnd()
   if offset < 0 then
     if startIndex == 0 then
       return
     end
-    local prevStart = text.lastIndexOf("\n", startIndex - 2) + 1
-    local prevLine = tostring(text.substring(prevStart, startIndex - 1))
+    local prevStart = TextUtil.lastIndexOf(text, "\n", startIndex - 2) + 1
+    local prevLine = tostring(TextUtil.substring(text, prevStart, startIndex - 1))
     local block = prevLine .. "\n" .. line
     pcall(function()
       editor.replaceText(prevStart, endIndex, line .. "\n" .. prevLine)
     end)
     pcall(function()
-      editor.setSelection(prevStart + #line + (caret - startIndex))
+      editor.setSelection(prevStart + TextUtil.length(line) + (caret - startIndex))
     end)
   else
-    if endIndex >= #text then
+    if endIndex >= TextUtil.length(text) then
       return
     end
-    local nextEnd = text.indexOf("\n", endIndex + 1)
+    local nextEnd = TextUtil.indexOf(text, "\n", endIndex + 1)
     if nextEnd < 0 then
-      nextEnd = #text
+      nextEnd = TextUtil.length(text)
     end
-    local nextLine = tostring(text.substring(endIndex + 1, nextEnd))
+    local nextLine = tostring(TextUtil.substring(text, endIndex + 1, nextEnd))
     pcall(function()
       editor.replaceText(startIndex, nextEnd, nextLine .. "\n" .. line)
     end)
     pcall(function()
-      editor.setSelection(startIndex + #nextLine + 1 + (caret - startIndex))
+      editor.setSelection(startIndex + TextUtil.length(nextLine) + 1 + (caret - startIndex))
     end)
   end
   refreshStatus()
 end
 
 local function toggleComment()
-  local text = javaText()
+  local text = currentText()
   local startIndex, endIndex = caretLineBounds()
-  local line = tostring(text.substring(startIndex, endIndex))
+  local line = tostring(TextUtil.substring(text, startIndex, endIndex))
   local trimmed = line:match("^%s*")
   local body = line:sub(#trimmed + 1)
   local replacement

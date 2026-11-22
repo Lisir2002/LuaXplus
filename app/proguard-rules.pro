@@ -45,3 +45,6 @@
 
 -keep class com.android.apksig.** { *; }
 -keep class com.mini.luaxplus.PackSigner { *; }
+
+# 脚本通过反射调用文本定位工具，需保留类与方法名
+-keep class com.mini.luaxplus.TextUtil { public static *; }

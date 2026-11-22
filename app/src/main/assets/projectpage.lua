@@ -263,6 +263,56 @@ local function openEditor(filePath)
   end)
 end
 
+local function deleteFile(filePath)
+  MaterialAlertDialogBuilder(activity)
+    .setTitle("删除")
+    .setMessage("确定删除 " .. File(filePath).getName() .. "？")
+    .setNegativeButton("取消", nil)
+    .setPositiveButton("删除", function()
+      local function drop(path)
+        local file = File(path)
+        if file.isDirectory() then
+          local children = file.listFiles()
+          if children then
+            for i = 0, #children - 1 do
+              drop(children[i].getAbsolutePath())
+            end
+          end
+        end
+        file.delete()
+      end
+      drop(filePath)
+      toast("已删除")
+      buildDirPage(true)
+    end)
+    .show()
+end
+
+local function showFileMenu(filePath, isDir)
+  local options
+  if isDir then
+    options = { "进入", "删除" }
+  else
+    options = { "编辑", "运行", "删除" }
+  end
+  MaterialAlertDialogBuilder(activity)
+    .setTitle(File(filePath).getName())
+    .setItems(options, function(dialog, which)
+      local choice = options[which + 1]
+      if choice == "进入" then
+        currentDir = filePath
+        buildDirPage()
+      elseif choice == "编辑" then
+        openEditor(filePath)
+      elseif choice == "运行" then
+        runScript(filePath)
+      elseif choice == "删除" then
+        deleteFile(filePath)
+      end
+    end)
+    .show()
+end
+
 local dirScroll
 function buildDirPage(keepPage)
   local scroll, box = makeScroll()
