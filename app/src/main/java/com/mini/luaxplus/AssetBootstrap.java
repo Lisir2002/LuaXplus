@@ -43,6 +43,9 @@ public final class AssetBootstrap {
         boolean ok;
         try {
             copyDir(context.getAssets(), "", target, files, bytes);
+            // 打包组件按无扩展名加载，需把 mao.dex、sign.dex 另存为 mao、sign
+            copyDex(context.getAssets(), "mao.dex", new File(target, "mao"), bytes);
+            copyDex(context.getAssets(), "sign.dex", new File(target, "sign"), bytes);
             // 用户脚本运行时按 app_lua 目录查找 import、loadlayout 等基础模块
             File luaHome = context.getDir("lua", Context.MODE_PRIVATE);
             int[] luaFiles = new int[1];
@@ -86,6 +89,14 @@ public final class AssetBootstrap {
                 files[0]++;
             }
         }
+    }
+
+    /** 把 assets 内的 dex 复制成运行时要求的无扩展名文件 */
+    private static void copyDex(AssetManager assets, String assetPath, File destination,
+                                long[] bytes) throws IOException {
+        copyFile(assets, assetPath, destination, bytes);
+        LogCore.i(TAG, "打包组件铺设 " + assetPath + " -> " + destination.getName()
+                + " 大小=" + destination.length());
     }
 
     private static void copyFile(AssetManager assets, String assetPath, File destination,

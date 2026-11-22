@@ -241,3 +241,15 @@
 - `import.lua` 末尾注册全局 `onError`：写入 `luaerror` 快照后返回 false，保留原有错误页展示。绝大多数脚本都会 `require "import"`，可覆盖模板与用户工程。
 - `RuntimeWatcher` 增加错误页兜底扫描：页面恢复前台时检查视图树，若出现 `Runtime error` 文本则整段截取存快照，覆盖未加载 import 的脚本。
 - 快照文件名精确到毫秒（`luaerror_yyyyMMdd_HHmmss_SSS.log`），3 秒内完全相同的错误只记入运行日志，避免同一错误刷出大量文件。
+
+## 十九、打包流程缺少 mao、sign 组件
+
+现象：点打包后报 `Invalid method call ... /data/user/0/com.mini.luaxplus/files/mao not found`，堆栈落在 `import.lua:216 compile` 与 `bin.lua:56`。
+
+原因：打包功能由 `bin.lua` 驱动，它依次 `compile "mao"`、`compile "sign"`。`compile` 转调 `loadDex(name)`，只在应用私有目录按无扩展名查找 `files/mao`、`files/sign`；而工程里这两个组件以 `assets/mao.dex`、`assets/sign.dex` 形式存在，启动铺设时被 `.dex` 后缀规则整体跳过，导致文件始终缺失。
+
+处置：
+
+- 启动铺设阶段单独把 `assets/mao.dex` 复制为 `files/mao`、`assets/sign.dex` 复制为 `files/sign`，安装后强制覆盖，保证组件与安装包一致。
+- 打包最后一步 `Signer.sign` 固定从 `assets/keys/` 取密钥，候选为 `platform`、`testkey`。平台密钥维持移除状态；恢复 AOSP 公开测试密钥 `testkey`（`.pk8`/`.x509.pem`/`.sbt`），仅用于本机打包调试，不涉及品牌私钥，也不具备系统平台权限。
+- “平台签名打包”选项仍不可用，属预期行为。
