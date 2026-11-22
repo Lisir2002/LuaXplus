@@ -370,7 +370,12 @@ local function binapk(luapath, apkpath)
     if #errbuffer == 0 then
         this.update("正在签名...");
         os.remove(apkpath)
-        Signer.sign(tmp, apkpath)
+        local signed = pcall(function()
+            luajava.bindClass("com.mini.luaxplus.PackSigner").sign(activity, tmp, apkpath)
+        end)
+        if not signed then
+            Signer.sign(tmp, apkpath)
+        end
         os.remove(tmp)
         activity.installApk(apkpath)
         --[[import "android.net.*"

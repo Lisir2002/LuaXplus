@@ -42,3 +42,6 @@
 
 -dontwarn **
 -ignorewarnings
+
+-keep class com.android.apksig.** { *; }
+-keep class com.mini.luaxplus.PackSigner { *; }

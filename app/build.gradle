@@ -105,6 +105,8 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+        // 签名库依赖 java.time、java.util.Base64 等新版本接口，低版本系统需脱糖兼容
+        coreLibraryDesugaringEnabled true
     }
 
     lint {
@@ -124,6 +126,11 @@ android {
 dependencies {
     api fileTree(dir: "libs", include: ["*.jar"])
     api project(':androlua')
+
+    // 打包成品的签名能力，提供 v1 + v2 + v3 完整签名
+    implementation 'com.android.tools.build:apksig:8.1.1'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+
 
     // activity
     implementation libs.androidx.activity
