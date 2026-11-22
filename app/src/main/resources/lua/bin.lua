@@ -168,7 +168,8 @@ local function binapk(luapath, apkpath)
         local f = io.open(path)
         local s = f:read("*a")
         f:close()
-        for m, n in s:gmatch("require *%(? *\"([%w_]+)%.?([%w_]*)") do
+        for mod, sub in s:gmatch("require *%(? *\"([%w_]+)%.?([%w_]*)") do
+            local m, n = mod, sub
             cp = string.format("lib%s.so", m)
             if n ~= "" then
                 lp = string.format("lua/%s/%s.lua", m, n)
@@ -185,7 +186,8 @@ local function binapk(luapath, apkpath)
                 lualib[lp] = mdp .. "/" .. m .. ".lua"
             end
         end
-        for m, n in s:gmatch("import *%(? *\"([%w_]+)%.?([%w_]*)") do
+        for mod, sub in s:gmatch("import *%(? *\"([%w_]+)%.?([%w_]*)") do
+            local m, n = mod, sub
             cp = string.format("lib%s.so", m)
             if n ~= "" then
                 lp = string.format("lua/%s/%s.lua", m, n)

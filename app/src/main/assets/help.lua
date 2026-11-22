@@ -1287,10 +1287,10 @@ import "themeutil"
 import "res"
 
 list={}
-for t,c in help:gmatch("(%b@@)\n*(%b@@)") do
-  --print(t)
-  t=t:sub(2,-2)
-  c=c:sub(2,-2)
+for title,body in help:gmatch("(%b@@)\n*(%b@@)") do
+  --print(title)
+  local t=title:sub(2,-2)
+  local c=body:sub(2,-2)
   list[t]=c
   list[#list+1]=t
 end

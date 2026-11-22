@@ -4,15 +4,16 @@
 
 - 应用名称：Mini-LuaXPLUS
 - 应用包名：`com.mini.luaxplus`
-- 运行平台：Android 5.0（API 21）及以上，目标版本 Android 12（API 31）
-- 当前版本：`1.0.0-rc40`
+- 运行平台：Android 5.0（API 21）及以上，目标版本 Android 12（API 31）；当前只发布 arm64-v8a 真机包
+- 当前版本：`1.0.0-rc41`
 
 ## 技术架构
 
 | 模块 | 职责 | 形态 |
 | --- | --- | --- |
 | `:app` | 编辑器外壳、主题、图标、打包入口 | Java + Lua 脚本 |
-| `:androlua` | Lua 运行时（LuaActivity / LuaJava / 布局装载 / 打包） | 预编译 `libs/AndroLua+5.0.18_AndroidX.jar` + `libluajava.so` |
+| `:androlua` | Lua 运行时（LuaActivity / LuaJava / 布局装载 / 打包） | 预编译 `libs/AndroLua+5.0.18_AndroidX.jar` + Lua 5.5.1 `libluajava.so` |
+| `native/` | Lua 5.5.1、JNI 与 18 个原生模块源码 | C / CMake |
 | `app/src/main/assets` | 编辑器全部界面与业务逻辑 | Lua 脚本（13k+ 行，`main.lua` 为主入口） |
 
 运行时的 Java 实现位于二进制 jar 中，本仓库只包含少量扩展类：
@@ -30,7 +31,7 @@ app/                     编辑器应用模块
   src/main/assets/       Lua 脚本、类库索引、帮助文档、插件与工程模板
   src/main/java/         扩展 Java 类
   src/main/res/          主题、颜色、图标
-  src/main/jniLibs/      LuaJava 原生库（armeabi-v7a / arm64-v8a）
+  src/main/jniLibs/      LuaJava 原生库（arm64-v8a 发布；armeabi-v7a 仅保留源码兼容）
 androlua/                 运行时封装模块（jar + 原生库 + 少量桥接类）
 version.properties        版本号唯一来源
 keystore.properties       本地签名配置（不入库）

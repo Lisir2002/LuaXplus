@@ -1521,9 +1521,9 @@ func.navi = function()
   local str = editor.getText().toString()
   local fs = {}
   indexs = {}
-  for s, i in str:gmatch("([%w%._]* *=? *function *[%w%._]*%b())()") do
-    i = utf8.len(str, 1, i) - 1
-    s = s:gsub("^ +", "")
+  for name, pos in str:gmatch("([%w%._]* *=? *function *[%w%._]*%b())()") do
+    local i = utf8.len(str, 1, pos) - 1
+    local s = name:gsub("^ +", "")
     table.insert(fs, s)
     table.insert(indexs, i)
     fs[s] = i
@@ -2141,44 +2141,35 @@ function fix(c)
 end
 
 function onKeyShortcut(keyCode, event)
-  local filteredMetaState = event.getMetaState() & ~KeyEvent.META_CTRL_MASK;
-  if (KeyEvent.metaStateHasNoModifiers(filteredMetaState)) then
-    switch(keyCode)
-     case
-      KeyEvent.KEYCODE_O
-      func.open();
-      return true;
-     case
-      KeyEvent.KEYCODE_P
-      func.openproject();
-      return true;
-     case
-      KeyEvent.KEYCODE_S
-      func.save();
-      return true;
-     case
-      KeyEvent.KEYCODE_E
-      func.check();
-      return true;
-     case
-      KeyEvent.KEYCODE_R
-      func.play();
-      return true;
-     case
-      KeyEvent.KEYCODE_N
-      func.navi();
-      return true;
-     case
-      KeyEvent.KEYCODE_U
-      func.undo();
-      return true;
-     case
-      KeyEvent.KEYCODE_I
-      fix(editor.getSelectedText());
-      return true;
+  local filteredMetaState = event.getMetaState() & ~KeyEvent.META_CTRL_MASK
+  if KeyEvent.metaStateHasNoModifiers(filteredMetaState) then
+    if keyCode == KeyEvent.KEYCODE_O then
+      func.open()
+      return true
+    elseif keyCode == KeyEvent.KEYCODE_P then
+      func.openproject()
+      return true
+    elseif keyCode == KeyEvent.KEYCODE_S then
+      func.save()
+      return true
+    elseif keyCode == KeyEvent.KEYCODE_E then
+      func.check()
+      return true
+    elseif keyCode == KeyEvent.KEYCODE_R then
+      func.play()
+      return true
+    elseif keyCode == KeyEvent.KEYCODE_N then
+      func.navi()
+      return true
+    elseif keyCode == KeyEvent.KEYCODE_U then
+      func.undo()
+      return true
+    elseif keyCode == KeyEvent.KEYCODE_I then
+      fix(editor.getSelectedText())
+      return true
     end
   end
-  return false;
+  return false
 end
 
 pcall(function() require("luaxplus.log").i("load", "导入 ActionMode 前") end)
@@ -2219,20 +2210,20 @@ if not(_clipboardActionMode) and status then
       return true
     end,
     onActionItemClicked=function(mode,item)
-      switch (item.getItemId()) do
-         case 0 then
-          view.selectAll();
-         case 1 then
-          view.cut();
-          mode.finish();
-         case 2 then
-          view.copy();
-          mode.finish();
-         case 3 then
-          view.paste();
-          mode.finish();
-        end
-        return false;
+      local itemId = item.getItemId()
+      if itemId == 0 then
+        view.selectAll()
+      elseif itemId == 1 then
+        view.cut()
+        mode.finish()
+      elseif itemId == 2 then
+        view.copy()
+        mode.finish()
+      elseif itemId == 3 then
+        view.paste()
+        mode.finish()
+      end
+      return false
       end,
       onDestroyActionMode=function(mode)
         view.selectText(false)

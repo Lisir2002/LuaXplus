@@ -14,8 +14,8 @@ end
 local legacy = {}
 local file = io.open(LEGACY_FILE, "r")
 if file then
-  for line in file:lines() do
-    line = line:gsub("\r", "")
+  for raw in file:lines() do
+    local line = raw:gsub("\r", "")
     if line ~= "" and not line:match("^#") then
       legacy[line] = true
     end

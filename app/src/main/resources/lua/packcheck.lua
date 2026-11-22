@@ -48,7 +48,8 @@ local function scan(File, path, root, errors)
     return
   end
 
-  for index = 0, #children - 1 do
+  local firstIndex = children[0] ~= nil and 0 or 1
+  for index = firstIndex, #children - (firstIndex == 0 and 1 or 0) do
     local child = children[index]
     if child then
       local name = child.getName()

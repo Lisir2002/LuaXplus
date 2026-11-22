@@ -12,7 +12,7 @@ else
 fi
 BUILD_ROOT="${ROOT_DIR}/build/native"
 if [ "$#" -eq 0 ]; then
-  ABIS=(arm64-v8a armeabi-v7a)
+  ABIS=(arm64-v8a)
 else
   ABIS=("$@")
   if [ "${#ABIS[@]}" -eq 1 ] && [[ "${ABIS[0]}" == *" "* ]]; then

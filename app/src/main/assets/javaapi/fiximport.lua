@@ -71,8 +71,8 @@ function fiximport(path)
     end
     table.sort(buf)
 
-    for k,v in pairs(buf) do
-      k="[%.$]"..k.."$"
+    for key,v in pairs(buf) do
+      local k="[%.$]"..key.."$"
       for a,b in ipairs(classes) do
         if string.find(b,k) then
           if cache[b]==nil then

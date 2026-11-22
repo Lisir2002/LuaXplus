@@ -1,3 +1,4 @@
+pcall(require, "lua55_compat")
 local require = require
 local luajava = luajava
 local type=type
@@ -255,7 +256,8 @@ function _M.dump(o)
         deep = deep + 2
         table.insert(t, '{')
 
-        for k, v in pairs(o) do
+        for key, v in pairs(o) do
+          local k = key
           if v == _G then
             table.insert(t, string.format('\r\n%s%s\t=%s ;', string.rep(space, deep - 1), k, "_G"))
            elseif v ~= package.loaded then

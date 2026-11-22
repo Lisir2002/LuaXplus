@@ -2,7 +2,7 @@
 
 日期：2026-11-23  
 范围：Lua 运行时、原生模块、LuaX-UI、打包器、插件/注入链路  
-当前版本：1.0.0-rc40（versionCode 1000040）  
+当前版本：1.0.0-rc41（versionCode 1000041）  
 结论：**可以升级，建议采用“官方 Lua 5.5 语义 + 兼容层”方案，分五步落地，不做一次性大改。**
 
 ---
@@ -263,8 +263,54 @@ LuaX-UI：
 - 新旧 `luaopen_*` 入口对比：旧模块入口全部覆盖，新增的是 Lua 5.5 标准库入口，不是缺失。
 - Gradle 任务 `:androlua:buildLua55Native` 已实际执行通过，构建耗时约 35 秒。
 
-仍未做：
+当时仍未做：
 
 - 没有替换 `androlua/src/main/jniLibs` 下的生产 `.so`。
 - 没有接入 APK 默认打包流程。
 - 没有在真机验证 `libtcc` 的 arm64 代码生成能力，这一项仍按风险项单独验证。
+
+---
+
+## 9. 第二步实施结果（2026-11-23）
+
+生产运行时已经替换为 Lua 5.5.1，脚本兼容层已接入，arm64 打包配置已收口。
+
+### 9.1 运行时替换
+
+- `androlua/src/main/jniLibs/arm64-v8a/libluajava.so` 与 `armeabi-v7a/libluajava.so` 均已换成 **Lua 5.5.1**，JNI 导出均为 **118 个**。
+- `app/src/main/jniLibs/arm64-v8a/` 与 `armeabi-v7a/` 的 17 个模块库同步替换；`libluajava` 只保留在 `androlua`，避免重复打包。
+- arm64 `libluajava.so` 的 SHA-256 为 `be648009c58de920e7729526c4d89bd42e25ad8e106d64ce41b1c797d0a4cfbb`，strip 后约 360KB。
+- `abiFilters` 已改为只保留 `arm64-v8a`；`androlua` 的 `minSdkVersion` 对齐到 21。
+- `tools/native/build.sh` 默认只构建 arm64，仍可通过参数手动构建 armv7。
+
+### 9.2 脚本兼容
+
+- 新增 `app/src/main/resources/lua/lua55_compat.lua` 与 `androlua/src/main/resources/lua/lua55_compat.lua`，内容一致。
+- 两份 `import.lua` 顶部统一执行 `pcall(require, "lua55_compat")`，保证宿主、工程与插件脚本先装配兼容层。
+- 兼容层覆盖 `loadstring`、`unpack`、`math.mod`、`math.pow`、`math.log10`、`table.getn`、`table.maxn`、`string.gfind`、`package.seeall`、`module`、`bit32`。
+- 修复 7 个文件的 for 循环变量只读写法；`bin.lua` 的 `require` 与 `import` 两处循环、`mainbody.lua` 的 `navi` 均已处理。
+- `mainbody.lua` 的 `onKeyShortcut` 与剪贴板 ActionMode 两段 Java 风格 `switch/case` 已改为等价 `if/elseif`，不再依赖历史例外。
+
+### 9.3 验证结果
+
+- `LUA_BIN=.research-lua55/lua-5.5.1/src/lua LUA_INIT=@app/src/main/resources/lua/lua55_compat.lua bash tools/lua-check/run.sh`
+  - 语法通过：**74 个文件，跳过 0 个历史文件**。
+  - LuaX-UI 页面、类搜索、类加载保护、详情、成员长按、详情搜索、详情关闭全部通过。
+  - 打包预检、包名生成、图标着色、保存前审计全部通过。
+- 额外的 5.5.1 全量 `loadfile` 扫描：**92 个 .lua 文件全部通过**（包含 `native/` 下的 Lua 源码）。
+- `./gradlew :app:testDebugUnitTest --no-daemon` 执行成功；当前仓库没有单元测试源码，任务为 `NO-SOURCE`，但 Java 编译与 `luaCheck` 均已完成。
+- 按当前约束，本地没有执行 `assembleRelease`，也没有构建 APK。
+
+### 9.4 仍未验证
+
+- 完整 APK 的打包、签名、安装与启动。
+- 成品包的 `.luac` 是否为 5.5 字节码，以及插件/注入链路在 5.5 宿主中的实际行为。
+- `libtcc` 的 arm64 代码生成、`libyaml` 与 `libthreads` 的真机行为。
+- GitHub Actions 云端构建、签名 Secrets 与 Release 流程仍未配置。
+
+### 9.5 当前构建入口
+
+- 本地语法与冒烟：`LUA_BIN=/path/to/lua-5.5.1/src/lua LUA_INIT=@app/src/main/resources/lua/lua55_compat.lua bash tools/lua-check/run.sh`
+- 本地单元测试：`./gradlew :app:testDebugUnitTest --no-daemon`
+- 云端全量打包：待 GitHub Actions 工作流与签名 Secrets 就绪后执行。
+
