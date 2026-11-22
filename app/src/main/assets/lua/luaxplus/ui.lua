@@ -1631,8 +1631,19 @@ function M.avatar(name, color, size)
   local avatarFont = math.floor(avatarSize / numberValue(K.avatarFontRatio, 2.4))
   local avatar = textView(string.upper(initial), avatarFont, palette.onAccent, true)
   avatar.setGravity(Gravity.CENTER)
+  avatar.setIncludeFontPadding(false)
   avatar.setBackground(roundRect(parseColor(color or palette.accent), avatarSize / 2))
-  avatar.setLayoutParams(LinearLayout.LayoutParams(dp(avatarSize), dp(avatarSize)))
+  local extent = dp(avatarSize)
+  pcall(function()
+    avatar.setMinimumWidth(extent)
+    avatar.setMinimumHeight(extent)
+  end)
+  -- 父容器重新添加 View 时会覆盖 LayoutParams，这里同时锁住测量尺寸。
+  pcall(function()
+    avatar.setMaxWidth(extent)
+    avatar.setMaxHeight(extent)
+  end)
+  avatar.setLayoutParams(LinearLayout.LayoutParams(extent, extent))
   return avatar
 end
 
@@ -2537,16 +2548,22 @@ function M.icon(spec)
       alpha = spec.alpha,
       placeholder = spec.placeholder,
     })
+    image.setMinimumWidth(dp(size))
+    image.setMinimumHeight(dp(size))
     image.setLayoutParams(LinearLayout.LayoutParams(dp(size), dp(size)))
     if spec.onClick then
       image.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
     end
     return image
   end
-  local view = textView(spec.glyph or spec.text or "●", size, parseColor(spec.color or palette.label), spec.bold == true)
+  local chip = spec.background or spec.bg
+  -- 带底色的图标本质是圆形容器，字形应比容器小一圈，否则会撑成竖长椭圆。
+  local font = spec.glyphSize or (chip and math.max(10, math.floor(size * 0.68)) or size)
+  local view = textView(spec.glyph or spec.text or "●", font, parseColor(spec.color or palette.label), spec.bold == true)
   view.setGravity(Gravity.CENTER)
-  if spec.background or spec.bg then
-    view.setBackground(roundRect(parseColor(spec.background or spec.bg), spec.radius or size / 2))
+  view.setIncludeFontPadding(false)
+  if chip then
+    view.setBackground(roundRect(parseColor(chip), spec.radius or size / 2))
   end
   if spec.padding then
     local padding = dp(space(spec.padding))
@@ -2555,7 +2572,17 @@ function M.icon(spec)
   if spec.alpha then
     view.setAlpha(alphaValue(spec.alpha))
   end
-  view.setLayoutParams(LinearLayout.LayoutParams(dp(size), dp(size)))
+  local extent = dp(size)
+  pcall(function()
+    view.setMinimumWidth(extent)
+    view.setMinimumHeight(extent)
+  end)
+  -- hstack 等容器会用 WRAP_CONTENT 重新添加子 View，必须把测量尺寸也锁成正方形。
+  pcall(function()
+    view.setMaxWidth(extent)
+    view.setMaxHeight(extent)
+  end)
+  view.setLayoutParams(LinearLayout.LayoutParams(extent, extent))
   if spec.onClick then
     view.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
   end
@@ -2760,14 +2787,24 @@ function M.checkMark(spec)
   local palette = colors()
   local checked = spec.checked == true
   local size = dimension(spec.size or K.checkMark, K.checkMark)
-  local mark = textView(checked and "✓" or "", TY.body.size, checked and palette.onAccent or palette.tertiary, true)
+  local mark = textView(checked and "✓" or "", TY.callout.size, checked and palette.onAccent or palette.tertiary, true)
   mark.setGravity(Gravity.CENTER)
+  mark.setIncludeFontPadding(false)
   if checked then
     mark.setBackground(roundRect(palette.accent, R.check))
   else
     mark.setBackground(shape(palette.transparent, palette.tertiary, R.check))
   end
-  mark.setLayoutParams(LinearLayout.LayoutParams(dp(size), dp(size)))
+  local extent = dp(size)
+  pcall(function()
+    mark.setMinimumWidth(extent)
+    mark.setMinimumHeight(extent)
+  end)
+  pcall(function()
+    mark.setMaxWidth(extent)
+    mark.setMaxHeight(extent)
+  end)
+  mark.setLayoutParams(LinearLayout.LayoutParams(extent, extent))
   if spec.onClick then
     mark.setOnClickListener(View.OnClickListener{ onClick = spec.onClick })
   end
@@ -2836,7 +2873,10 @@ function M.statusDot(spec)
   local size = dimension(spec.size or K.statusDot, K.statusDot)
   local dot = View(activity)
   dot.setBackground(roundRect(parseColor(spec.color or palette.success), size / 2))
-  dot.setLayoutParams(LinearLayout.LayoutParams(dp(size), dp(size)))
+  local extent = dp(size)
+  dot.setMinimumWidth(extent)
+  dot.setMinimumHeight(extent)
+  dot.setLayoutParams(LinearLayout.LayoutParams(extent, extent))
   if spec.alpha then
     dot.setAlpha(alphaValue(spec.alpha))
   end
@@ -2848,19 +2888,51 @@ function M.tabItem(spec)
   spec = spec or {}
   local palette = colors()
   local selected = spec.selected == true
+  local color = selected and palette.accent or palette.secondary
   local item = LinearLayout(activity)
   item.setOrientation(LinearLayout.VERTICAL)
   item.setGravity(Gravity.CENTER)
+  item.setMinimumWidth(dp(space(56)))
   item.setMinimumHeight(dp(K.tabHeight))
   item.setPadding(dp(space(0)), dp(space("tabTop")), dp(space(0)), dp(space("tabBottom")))
   item.setBackground(ripple(palette.transparent, 0, palette.press))
-  local glyph = textView(spec.glyph or spec.icon or "●", TY.icon.size,
-    selected and palette.accent or palette.secondary, false)
-  glyph.setGravity(Gravity.CENTER)
-  item.addView(glyph)
-  local title = textView(spec.title or spec.text or "", TY.caption.size,
-    selected and palette.accent or palette.secondary, false)
+
+  local iconSize = dimension(spec.iconSize or TY.icon.size, TY.icon.size)
+  local holder = FrameLayout(activity)
+  local holderParams = LinearLayout.LayoutParams(dp(iconSize), dp(iconSize))
+  holder.setLayoutParams(holderParams)
+  local iconView
+  if spec.src or spec.image then
+    iconView = M.icon({
+      src = spec.src or spec.image,
+      size = iconSize,
+      tint = color,
+      scale = "contain",
+      circle = false,
+    })
+  else
+    local glyphText = spec.glyph or spec.icon or "●"
+    if type(glyphText) == "userdata" then
+      iconView = glyphText
+    else
+      -- 字形图标统一放进固定方框；信封等字形视觉偏小，单独补一点字号。
+      local glyphSize = spec.glyphSize or iconSize
+      if glyphText == "✉" or glyphText == "✉️" then
+        glyphSize = glyphSize * 1.22
+      elseif glyphText == "⌂" then
+        glyphSize = glyphSize * 0.94
+      end
+      iconView = textView(glyphText, glyphSize, color, false)
+      iconView.setGravity(Gravity.CENTER)
+      iconView.setIncludeFontPadding(false)
+    end
+  end
+  holder.addView(iconView, FrameLayout.LayoutParams(-1, -1))
+  item.addView(holder, holderParams)
+
+  local title = textView(spec.title or spec.text or "", TY.caption.size, color, false)
   title.setGravity(Gravity.CENTER)
+  title.setIncludeFontPadding(false)
   title.setPadding(0, dp(space("tabGap")), 0, 0)
   title.setLetterSpacing(numberValue(TY.caption.tracking, 0))
   item.addView(title)
@@ -3453,21 +3525,33 @@ function M.avatarGroup(spec)
   row.setOrientation(LinearLayout.HORIZONTAL)
   row.setGravity(Gravity.CENTER_VERTICAL)
   local count = math.min(#names, max)
+  local overlap = dimension(spec.overlap or (size / 6), size / 6)
   for index = 1, count do
     local avatar = M.avatar(names[index], spec.color, size)
     local params = LinearLayout.LayoutParams(dp(size), dp(size))
     if index > 1 then
-      params.leftMargin = -dp(size / 4)
+      params.leftMargin = -dp(overlap)
     end
     avatar.setLayoutParams(params)
     row.addView(avatar)
   end
   if #names > count then
-    local more = M.badge("+" .. tostring(#names - count), palette.fill)
-    more.setTextColor(palette.secondary)
+    local more = textView("+" .. tostring(#names - count), TY.caption.size, palette.secondary, true)
     more.setGravity(Gravity.CENTER)
-    local params = LinearLayout.LayoutParams(dp(size), dp(size))
-    params.leftMargin = -dp(size / 4)
+    more.setIncludeFontPadding(false)
+    more.setBackground(roundRect(palette.fill, size / 2))
+    local extent = dp(size)
+    pcall(function()
+      more.setMinimumWidth(extent)
+      more.setMinimumHeight(extent)
+    end)
+    pcall(function()
+      more.setMaxWidth(extent)
+      more.setMaxHeight(extent)
+    end)
+    local params = LinearLayout.LayoutParams(extent, extent)
+    -- 计数徽标不再叠进上一个头像，留出 4dp 呼吸位，避免“+1”被压住。
+    params.leftMargin = dp(space(4))
     row.addView(more, params)
   end
   return row
@@ -3482,7 +3566,7 @@ function M.pagination(spec)
   current = math.max(1, math.min(total, current))
   local row = LinearLayout(activity)
   row.setOrientation(LinearLayout.HORIZONTAL)
-  row.setGravity(Gravity.CENTER_VERTICAL)
+  row.setGravity(Gravity.CENTER_HORIZONTAL + Gravity.CENTER_VERTICAL)
 
   local function item(label, target, active, enabled)
     local view = textView(label, TY.footnote.size, active and palette.onAccent or palette.label, active)
@@ -3507,7 +3591,7 @@ function M.pagination(spec)
 
   local function arrowItem(label, target, enabled)
     local view = item(label, target, false, enabled)
-    view.setTextSize(TY.body.size)
+    view.setTextSize(TY.action.size)
     return view
   end
 
@@ -3521,7 +3605,9 @@ function M.pagination(spec)
     params.leftMargin = dp(space(4))
     row.addView(view, params)
   end
-  row.addView(arrowItem("›", current + 1, current < total), LinearLayout.LayoutParams(dp(36), dp(space(32))))
+  local nextParams = LinearLayout.LayoutParams(dp(36), dp(space(32)))
+  nextParams.leftMargin = dp(space(4))
+  row.addView(arrowItem("›", current + 1, current < total), nextParams)
   return row
 end
 

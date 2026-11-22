@@ -237,9 +237,29 @@ ui.show{
       background = palette().fill,
     }), LinearLayout.LayoutParams(-1, -2))
 
-    local tabs = ui.hstack({ gap = "4px" }, function(add)
-      add(ui.tabItem({ title = "首页", glyph = "⌂", selected = true }))
-      add(ui.tabItem({ title = "消息", glyph = "✉", onClick = function() toast("消息") end }))
+    local function drawableId(name)
+      local ok, id = pcall(function()
+        return activity.getResources().getIdentifier(name, "drawable", activity.getPackageName())
+      end)
+      if ok and id and id ~= 0 then
+        return id
+      end
+      return nil
+    end
+
+    local tabs = ui.hstack({ gap = "4px", fill = true }, function(add)
+      add(ui.tabItem({
+        title = "首页",
+        glyph = "⌂",
+        src = drawableId("ic_tab_home"),
+        selected = true,
+      }))
+      add(ui.tabItem({
+        title = "消息",
+        glyph = "✉",
+        src = drawableId("ic_tab_mail"),
+        onClick = function() toast("消息") end,
+      }))
     end)
     box.addView(tabs, LinearLayout.LayoutParams(-1, -2))
 
@@ -299,6 +319,7 @@ ui.show{
     names = { "林", "周", "陈", "王", "赵" },
     max = 4,
     size = "36px",
+    overlap = "4px",
   })
   page:add(avatars, 14)
 

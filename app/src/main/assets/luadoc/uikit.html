@@ -807,7 +807,7 @@ page:add(hero, 14)</pre>
       <tr><td><code>table</code></td><td>简单数据表</td><td><code>columns / rows / striped / onRowClick</code></td></tr>
       <tr><td><code>timeline</code></td><td>竖向时间线</td><td><code>items / active / color</code></td></tr>
       <tr><td><code>accordion</code></td><td>折叠容器</td><td><code>title / expanded / content / onToggle</code></td></tr>
-      <tr><td><code>avatarGroup</code></td><td>重叠头像组</td><td><code>names / items / max / size</code></td></tr>
+      <tr><td><code>avatarGroup</code></td><td>重叠头像组</td><td><code>names / items / max / size / overlap</code></td></tr>
       <tr><td><code>pagination</code></td><td>分页器</td><td><code>page / total / onChange</code></td></tr>
     </tbody>
   </table>
@@ -863,7 +863,7 @@ page:add(ui.select({
   title = "项目信息",
   items = {
     { label = "包名", value = "com.mini.luaxplus" },
-    { label = "版本", value = "1.0.0-rc24" },
+    { label = "版本", value = "1.0.0-rc25" },
   },
   footer = "键值列表适合详情页和设置摘要。",
 }))
@@ -924,10 +924,10 @@ page:add(ui.pagination({
     <tbody>
       <tr><td>布局</td><td><code>surface</code>、<code>stack/vstack/hstack</code>、<code>grid</code>、<code>center</code></td><td>底色容器、行列栈、网格和居中容器。</td></tr>
       <tr><td>排版</td><td><code>text</code>、<code>label</code>、<code>helper</code></td><td>统一字号、字重、颜色、对齐、行数和帮助文本。</td></tr>
-      <tr><td>图标</td><td><code>icon</code>、<code>statusDot</code></td><td>字形或图片图标，以及成功/警告/危险状态点。</td></tr>
+      <tr><td>图标</td><td><code>icon</code>（<code>glyph / src / glyphSize</code>）、<code>statusDot</code></td><td>字形或图片图标，以及成功/警告/危险状态点。</td></tr>
       <tr><td>表单</td><td><code>input</code>、<code>label</code>、<code>helper</code></td><td>裸输入框、字段标签和错误/帮助文本。</td></tr>
       <tr><td>选择</td><td><code>checkMark</code>、<code>checkbox</code>、<code>radioMark</code>、<code>switch</code></td><td>勾选、单选、开关的最小可交互单元。</td></tr>
-      <tr><td>导航</td><td><code>tabItem</code></td><td>底部标签栏的单个标签项。</td></tr>
+      <tr><td>导航</td><td><code>tabItem</code></td><td>底部标签栏的单个标签项；支持字形或 <code>src</code> 资源图标。</td></tr>
       <tr><td>数据</td><td><code>cell</code>、<code>kvRow</code></td><td>表格单元格和键值行。</td></tr>
       <tr><td>动效</td><td><code>fadeIn</code>、<code>slideIn</code>、<code>scaleIn</code></td><td>淡入、上移、缩放的短入口。</td></tr>
     </tbody>
@@ -984,14 +984,15 @@ end))</pre>
   <h3>导航、数据与动效</h3>
 <pre>local tab = ui.tabItem({
   title = "首页",
-  glyph = "⌂",
+  glyph = "⌂",              -- 也可以改传 src = R.drawable.ic_tab_home
+  iconSize = "20px",
   selected = true,
   onClick = function() print("home") end,
 })
 
 page:add(ui.cell({ text = "名称", header = true }))
 page:add(ui.cell({ text = "Mini-LuaXPLUS" }))
-page:add(ui.kvRow({ label = "版本", value = "1.0.0-rc24" }))
+page:add(ui.kvRow({ label = "版本", value = "1.0.0-rc25" }))
 
 ui.fadeIn(view)
 ui.slideIn(view, { duration = "200ms" })
@@ -1010,7 +1011,7 @@ ui.scaleIn(view, { duration = "220ms" })</pre>
   </ul>
 
   <footer>
-    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc24
+    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc25
   </footer>
 </div>
 
