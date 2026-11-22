@@ -14,15 +14,64 @@ local function stableHash(value)
   return tostring(hash)
 end
 
+local transliterator
+local transliteratorChecked = false
+
+local function getTransliterator()
+  if transliteratorChecked then
+    return transliterator
+  end
+  transliteratorChecked = true
+
+  local luajava = rawget(_G, "luajava")
+  if not luajava then
+    return nil
+  end
+  local loaded, class = pcall(luajava.bindClass, "android.icu.text.Transliterator")
+  if not loaded or not class then
+    return nil
+  end
+  local created, instance = pcall(function()
+    -- Latin-ASCII 去掉声调符号，直接得到可进包名的拉丁字母
+    return class.getInstance("Han-Latin; Latin-ASCII")
+  end)
+  if created and instance then
+    transliterator = instance
+  end
+  return transliterator
+end
+
+-- 中文转拼音；Android 10+ 使用系统 ICU。低版本或类不可用时返回 nil，
+-- 由 slug 的哈希兜底，仍然保证包名合法。
+function M.pinyin(value)
+  local instance = getTransliterator()
+  if not instance then
+    return nil
+  end
+  local ok, result = pcall(function()
+    return instance.transliterate(tostring(value or ""))
+  end)
+  if not ok or not result then
+    return nil
+  end
+  result = tostring(result)
+  if result == "" then
+    return nil
+  end
+  return result
+end
+
 function M.slug(name)
   name = trim(name)
-  local slug = name:lower()
+  local pinyin = M.pinyin(name)
+  local source = pinyin or name
+  local slug = source:lower()
     :gsub("[^a-z0-9_]+", "_")
     :gsub("_+", "_")
     :gsub("^_", "")
     :gsub("_$", "")
 
-  -- 纯中文、符号或空名称没有可用的 ASCII 字符，用稳定哈希保证可重复。
+  -- 拼音不可用、纯符号或空名称没有可用的 ASCII 字符，用稳定哈希保证可重复。
   if slug == "" then
     slug = "app" .. stableHash(name)
   elseif not slug:match("^[a-z]") then
