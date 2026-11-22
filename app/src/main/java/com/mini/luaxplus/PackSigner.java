@@ -40,6 +40,13 @@ public final class PackSigner {
             throw new IOException("无法清理待签名文件 " + staging.getAbsolutePath());
         }
 
+        // 先重排归档：资源表不压缩且四字节对齐，否则系统会判为不兼容
+        File prepared = new File(output.getParentFile(), output.getName() + ".prepared");
+        if (prepared.exists() && !prepared.delete()) {
+            throw new IOException("无法清理整理产物 " + prepared.getAbsolutePath());
+        }
+        ApkPreparer.prepare(input, prepared);
+
         PrivateKey key = loadPrivateKey(context);
         X509Certificate cert = loadCertificate(context);
 
@@ -47,7 +54,7 @@ public final class PackSigner {
                 CERT_ALIAS, key, Collections.singletonList(cert)).build();
 
         new ApkSigner.Builder(Collections.singletonList(config))
-                .setInputApk(input)
+                .setInputApk(prepared)
                 .setOutputApk(staging)
                 .setV1SigningEnabled(true)
                 .setV2SigningEnabled(true)
@@ -55,6 +62,7 @@ public final class PackSigner {
                 .build()
                 .sign();
 
+        prepared.delete();
         if (output.exists() && !output.delete()) {
             throw new IOException("无法覆盖旧安装包 " + output.getAbsolutePath());
         }
