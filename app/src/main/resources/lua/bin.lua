@@ -53,15 +53,14 @@ local function create_error_dlg2()
     error_dlg.setPositiveButton("确定", nil)
 end
 
--- 项目显式选择了权限注入时，只保留勾选项与基础必需项
-local MANDATORY_PERMISSIONS = {
-    "INTERNET",
-    "WRITE_EXTERNAL_STORAGE",
-    "READ_EXTERNAL_STORAGE",
-    "MANAGE_EXTERNAL_STORAGE",
-}
-
 local function binapk(luapath, apkpath)
+    -- 放进函数内部，异步任务执行时不会依赖模块闭包
+    local MANDATORY_PERMISSIONS = {
+        "INTERNET",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE",
+        "MANAGE_EXTERNAL_STORAGE",
+    }
     require "import"
     import "console"
     local pinfo = {}
@@ -444,23 +443,6 @@ end
 
 --luabindir=activity.getLuaExtDir("bin")
 --print(activity.getLuaExtPath("bin","a"))
-local function safe_binapk(luapath, apkpath)
-    local ok, result = xpcall(function()
-        return binapk(luapath, apkpath)
-    end, function(err)
-        return debug.traceback(tostring(err), 2)
-    end)
-    if ok then
-        return result
-    end
-    local message = "打包异常：" .. tostring(result)
-    pcall(function()
-        luajava.bindClass("com.mini.luaxplus.LogCore")
-            .luaError("打包任务异常 " .. tostring(apkpath), message)
-    end)
-    return message
-end
-
 local function bin(path)
     local p = {}
     local e, s = pcall(loadfile(path .. "init.lua", "bt", p))
@@ -474,7 +456,7 @@ local function bin(path)
         bin_dlg.show()
         local appName = tostring(p.appname or "app")
         local appVer = tostring(p.appver or "1.0")
-        activity.newTask(safe_binapk, update, callback).execute { path, activity.getLuaExtPath("bin", appName .. "_" .. appVer .. ".apk") }
+        activity.newTask(binapk, update, callback).execute { path, activity.getLuaExtPath("bin", appName .. "_" .. appVer .. ".apk") }
     else
         Toast.makeText(activity, "工程配置文件错误." .. s, Toast.LENGTH_SHORT).show()
     end
