@@ -407,7 +407,128 @@ page.root.addView(tabs.view, LinearLayout.LayoutParams(-1, -2))
 
 page:show()</pre>
 
-  <h2>十五、和原生代码混用的建议</h2>
+  <h2>十五、快捷页面 show 与表单 form</h2>
+  <p>最常用的两个能力已经收成一行式入口：<code class="inline">ui.show</code> 建页面，<code class="inline">ui.form</code> 建表单。它们不是新运行时，仍然返回普通 View。</p>
+<pre>local ui = require "luaxplus.ui"
+
+local form = ui.form{
+  title = "账号",
+  fields = {
+    { name = "nickname", label = "昵称", placeholder = "输入昵称" },
+    { name = "email", label = "邮箱", placeholder = "name@example.com", email = true },
+  },
+  footer = "ui.form 返回 getValues()、setValues() 和 reset()。",
+}
+
+ui.show{
+  title = "快速上手",
+  subtitle = "一个页面、一个表单",
+  content = function(_, page)
+    page:add(form.view)
+    page:add(ui.button{
+      text = "保存",
+      onClick = function()
+        ui.toast("昵称：" .. form.getValues().nickname)
+      end,
+    }, 12)
+  end,
+}</pre>
+  <table>
+    <thead><tr><th>接口</th><th>作用</th></tr></thead>
+    <tbody>
+      <tr><td><code class="inline">ui.show(spec)</code></td><td>创建页面、执行 content 回调、显示并播放入场动画；<code>spec.animate=false</code> 可关闭。</td></tr>
+      <tr><td><code class="inline">ui.form(spec)</code></td><td>用 fieldRow 快速生成一组字段，返回 <code>view</code>、<code>inputs</code>、<code>getValues()</code>、<code>setValues()</code>、<code>reset()</code>。</td></tr>
+      <tr><td><code class="inline">page:reveal()</code></td><td>对页面内容做错峰入场；可传 <code>{ step, duration, preset }</code>。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>十六、更多高效组件</h2>
+  <p>这些组件都返回普通 View 或 <code>{ view, ... }</code> 表，可以单独用，也可以组合进 group 和 card。</p>
+<pre>local ui = require "luaxplus.ui"
+
+local chips = ui.chipGroup{
+  items = { "全部", "常用", "新组件" },
+  selected = 1,
+  onChange = function(index, item) print(item.text) end,
+}
+page:add(chips.view)
+
+local check = ui.checkRow{
+  title = "接收更新提醒",
+  checked = true,
+  onChange = function(state) print(state) end,
+}
+page:add(check.view)
+
+local slider = ui.slider{
+  label = "音量", value = 35, max = 100,
+  onChange = function(value) print(value) end,
+}
+page:add(slider.view)
+
+local stepper = ui.stepper{ label = "数量", value = 2, min = 0, max = 20 }
+page:add(stepper.view)
+
+local progress = ui.progress{ label = "下载进度", value = 42 }
+page:add(progress.view)
+progress.setProgress(72)
+
+local skeleton = ui.skeleton{ lines = 3 }
+page:add(skeleton.view)
+
+page:add(ui.banner{
+  title = "新组件已就绪",
+  message = "banner 适合公告、提示和更新说明。",
+  action = { title = "知道了", onClick = function() end },
+})
+
+page:add(ui.statRow{
+  { value = "20+", label = "组件" },
+  { value = "260ms", label = "动画" },
+  { value = "0", label = "额外依赖" },
+})
+
+page:add(ui.fab{ text = "+", onClick = function() end })
+ui.toast("这是一条自定义 toast")</pre>
+  <table>
+    <thead><tr><th>组件</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code class="inline">chip / chipGroup</code></td><td>胶囊标签和单选 chip 组；chipGroup 返回 <code>view</code>、<code>getSelected</code>、<code>setSelected</code>。</td></tr>
+      <tr><td><code class="inline">checkRow</code></td><td>整行可点的 iOS 勾选样式，返回 <code>view</code>、<code>isChecked</code>、<code>setChecked</code>。</td></tr>
+      <tr><td><code class="inline">slider</code></td><td>带标签和数值的 SeekBar，返回 <code>view</code>、<code>getValue</code>、<code>setValue</code>。</td></tr>
+      <tr><td><code class="inline">stepper</code></td><td>减/加步进器，支持 min、max、step，返回 <code>view</code>、<code>getValue</code>、<code>setValue</code>。</td></tr>
+      <tr><td><code class="inline">progress</code></td><td>横向进度条，支持 <code>value</code>、<code>max</code>、<code>indeterminate</code>，返回 <code>setProgress</code>。</td></tr>
+      <tr><td><code class="inline">skeleton</code></td><td>带 shimmer 循环的骨架屏，返回 <code>view</code> 和 <code>stop()</code>。</td></tr>
+      <tr><td><code class="inline">banner</code></td><td>轻量提示条，支持图标、标题、说明和 action。</td></tr>
+      <tr><td><code class="inline">stat / statRow</code></td><td>数据卡和等宽数据卡横排，适合概览指标。</td></tr>
+      <tr><td><code class="inline">fab</code></td><td>圆形悬浮按钮，支持 onClick。</td></tr>
+      <tr><td><code class="inline">toast</code></td><td>自定义圆角 Toast，支持 <code>text</code>、<code>long</code>、<code>offset</code>。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>十七、动画：animate、stagger、press</h2>
+  <p>动画是纯增量封装，不改变 View 本身。默认使用 260ms 的减速曲线，支持上移、下移、缩放和纯淡入。</p>
+<pre>local ui = require "luaxplus.ui"
+
+ui.animate(view, { preset = "up", duration = 260 })
+ui.animate(view, { preset = "scale", delay = 80 })
+ui.stagger({ first, second, third }, { step = 50, preset = "up" })
+ui.press(button, { scale = 0.97 })
+page:reveal({ step = 45, duration = 280 })</pre>
+  <table>
+    <thead><tr><th>接口</th><th>预设</th></tr></thead>
+    <tbody>
+      <tr><td><code class="inline">ui.animate(view, spec)</code></td><td><code>up</code>、<code>down</code>、<code>fade</code>、<code>scale</code>；可设 duration、delay。</td></tr>
+      <tr><td><code class="inline">ui.stagger(views, spec)</code></td><td>给一组 View 按顺序错峰播放，step 默认 55ms。</td></tr>
+      <tr><td><code class="inline">ui.press(view, spec)</code></td><td>按下缩放、抬起回弹；不拦截原有点击事件。</td></tr>
+      <tr><td><code class="inline">page:reveal(spec)</code></td><td>对页面直接子 View 做错峰入场，适合页面首次显示。</td></tr>
+    </tbody>
+  </table>
+  <div class="tip">
+    动画只改变 alpha、translation 和 scale，不改变布局尺寸；如果页面需要实时重绘，先完成数据更新，再播放动画。
+  </div>
+
+  <h2>十八、和原生代码混用的建议</h2>
   <table>
     <thead><tr><th>场景</th><th>推荐做法</th></tr></thead>
     <tbody>
@@ -418,7 +539,7 @@ page:show()</pre>
     </tbody>
   </table>
 
-  <h2>十六、打包与发布</h2>
+  <h2>十九、打包与发布</h2>
   <p>组件库放在 <code class="inline">assets/lua/luaxplus/ui.lua</code>，会随基础模块铺设到运行时的 <code class="inline">app_lua</code>，所有成品包会自动带上，不需要在工程里复制文件，也不需要改打包脚本。</p>
   <p>iOS 风格开关是一个很小的原生 View（<code class="inline">com.mini.luaxplus.ui.IosSwitch</code>），已经随模板 APK 一起打包；Lua 侧通过 <code class="inline">luajava</code> 反射创建，不依赖额外权限。</p>
 
@@ -426,7 +547,7 @@ page:show()</pre>
     成品包使用时同样写 <code class="inline">local ui = require "luaxplus.ui"</code>。如果某个工程不想用组件库，不 require 即可，原有代码和包体积都不受影响。
   </div>
 
-  <h2>十七、限制与常见问题</h2>
+  <h2>二十、限制与常见问题</h2>
   <ul>
     <li><strong>这是 iOS 风格的 Android 组件，不是 UIKit。</strong> 系统字体、阴影和动画与真机 iOS 仍有差异。</li>
     <li><strong>主题切换不会实时重绘已有控件。</strong> 切换后重建页面即可。</li>
@@ -436,7 +557,7 @@ page:show()</pre>
   </ul>
 
   <footer>
-    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc1
+    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc5
   </footer>
 </div>
 

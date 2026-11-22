@@ -1,0 +1,11 @@
+appname = "LuaX-UI 快速上手"
+appver = "1.0"
+appcode = "1"
+appsdk = "21"
+packagename = "com.mini.luaxui.quick"
+theme = "Theme_Material_Light"
+developer = "Mini-LuaXPLUS"
+description = "用 ui.show 和 ui.form 在几十行内做一个可用的设置页。"
+debugmode = true
+official = true
+user_permission = {"INTERNET"}

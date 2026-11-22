@@ -5,7 +5,7 @@
 - 应用名称：Mini-LuaXPLUS
 - 应用包名：`com.mini.luaxplus`
 - 运行平台：Android 5.0（API 21）及以上，目标版本 Android 12（API 31）
-- 当前版本：`1.0.0-rc4`
+- 当前版本：`1.0.0-rc5`
 
 ## 技术架构
 
@@ -44,7 +44,10 @@ docs/                     审计与规范文档
 内置一套 iOS 风格的原生界面组件，放在 `app/src/main/assets/lua/luaxplus/ui.lua`，通过 `require "luaxplus.ui"` 使用。
 
 - 纯增量：不修改 `import`、`luajava`、`LuaActivity`，不接管 `setContentView`，原生 View 可继续混用。
+- 快捷 API：`ui.show` 一行建页面，`ui.form` 一行建表单并直接读写字段。
 - 组件范围：页面骨架、分组列表、按钮、表单、搜索栏、分段控件、卡片、弹窗、操作菜单、底部标签栏、空态与加载态。
+- 进阶组件：chip、checkRow、slider、stepper、progress、skeleton、banner、stat、fab、toast。
+- 动画：`ui.animate`、`ui.stagger`、`ui.press` 与 `page:reveal`，默认 260ms 上移淡入。
 - 自绘开关：`app/src/main/java/com/mini/luaxplus/ui/IosSwitch.java`，失败时自动回退系统 `Switch`。
 - 打包携带：`assets/luaxplus/` 在打包白名单内，新打包的成品会自动带上组件库；已安装的旧成品需重新打包。
 - 教程：应用内“手册 → LuaX-UI 组件库”，含字段表、明暗主题与可直接运行的完整页面示例。
@@ -56,7 +59,7 @@ docs/                     审计与规范文档
 - 示例源码位于 `app/src/main/assets/examples/`，首次打开会铺设到 `LuaXPlus/examples`。
 - 自建工程只存放在 `LuaXPlus/project`，两边目录与列表完全隔离，删除或改名互不影响。
 - 示例工程和普通工程一样，可以进入属性页、目录页编辑文件、运行和打包。
-- 当前示例「LuaX-UI 组件库示例」覆盖全部组件：列表行、按钮、表单、搜索、分段、卡片、弹窗、操作菜单、标签栏、空态、加载、头像、徽标和明暗主题。
+- 「LuaX-UI 组件库示例」覆盖全部组件与动画；「LuaX-UI 快速上手」用几十行演示 `ui.show` 和 `ui.form`。
 
 ## 版本号规范
 

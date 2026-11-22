@@ -12,7 +12,7 @@ import "android.graphics.drawable.*"
 local ui = require "luaxplus.ui"
 local dp = ui.dp
 
-local TAB_TITLES = {"控件", "表单", "弹窗", "关于"}
+local TAB_TITLES = {"控件", "表单", "弹窗", "进阶", "关于"}
 
 local page
 local tabBar
@@ -432,6 +432,29 @@ local function buildForms()
   resetParams.topMargin = dp(8)
   actions.addView(reset, resetParams)
   page:add(actions, 14)
+
+  local quickForm = ui.form({
+    title = "快捷表单 form",
+    fields = {
+      { name = "project", label = "项目名", placeholder = "例如 记账本" },
+      { name = "owner", label = "负责人", value = "LuaX" },
+      { name = "channel", label = "渠道", placeholder = "例如 official" },
+    },
+    footer = "ui.form 返回 view、inputs、getValues、setValues、reset，字段默认一行一个。",
+  })
+  page:add(quickForm.view, 14)
+
+  local quickRead = ui.button({
+    text = "读取快捷表单",
+    style = "tinted",
+    onClick = function()
+      local values = quickForm.getValues()
+      showInfo("form.getValues()", "项目名：" .. values.project
+        .. "\n负责人：" .. values.owner
+        .. "\n渠道：" .. values.channel)
+    end,
+  })
+  page:add(quickRead, 8)
   page:add(ui.spacer(8))
 end
 
@@ -602,7 +625,201 @@ local function buildDialogs()
   page:add(ui.spacer(8))
 end
 
--- ===== 四、关于 =====
+-- ===== 四、进阶 =====
+local function buildAdvanced()
+  page:add(heading("进阶", "chips、勾选、滑杆、步进、进度、骨架屏、横幅、数据卡、悬浮按钮和动画"))
+
+  local chipLabel = TextView(activity)
+  chipLabel.setTextSize(13)
+  chipLabel.setTextColor(palette().secondary)
+  chipLabel.setPadding(dp(4), dp(8), dp(4), 0)
+  chipLabel.setText("当前筛选：全部")
+
+  local chips = ui.chipGroup({
+    items = { "全部", "常用", "新组件" },
+    selected = 1,
+    onChange = function(index, item)
+      chipLabel.setText("当前筛选：" .. tostring(item.text or item))
+    end,
+  })
+  page:add(chips.view, 12)
+  page:add(chipLabel, 0)
+
+  local checkOne = ui.checkRow({
+    title = "接收更新提醒",
+    subtitle = "checkRow 的 checked 状态",
+    checked = true,
+    onChange = function(state)
+      ui.toast("更新提醒：" .. (state and "开" or "关"))
+    end,
+  })
+  local checkTwo = ui.checkRow({
+    title = "仅 Wi-Fi 下载",
+    subtitle = "默认关闭",
+    checked = false,
+    onChange = function(state)
+      ui.toast("仅 Wi-Fi：" .. (state and "开" or "关"))
+    end,
+  })
+  page:add(ui.group("选择与勾选", {
+    checkOne.view,
+    checkTwo.view,
+  }, "checkRow 是整行可点的 iOS 勾选样式。"))
+
+  local sliderLabel = TextView(activity)
+  sliderLabel.setTextSize(13)
+  sliderLabel.setTextColor(palette().secondary)
+  sliderLabel.setPadding(dp(4), dp(6), dp(4), 0)
+  sliderLabel.setText("音量：35")
+
+  local slider = ui.slider({
+    label = "音量",
+    value = 35,
+    max = 100,
+    onChange = function(value)
+      sliderLabel.setText("音量：" .. tostring(value))
+    end,
+  })
+  page:add(slider.view, 14)
+  page:add(sliderLabel, 0)
+
+  local stepperLabel = TextView(activity)
+  stepperLabel.setTextSize(13)
+  stepperLabel.setTextColor(palette().secondary)
+  stepperLabel.setPadding(dp(4), dp(6), dp(4), 0)
+  stepperLabel.setText("数量：2")
+
+  local stepper = ui.stepper({
+    label = "数量",
+    value = 2,
+    min = 0,
+    max = 20,
+    onChange = function(value)
+      stepperLabel.setText("数量：" .. tostring(value))
+    end,
+  })
+  page:add(stepper.view, 14)
+  page:add(stepperLabel, 0)
+
+  local progress = ui.progress({
+    label = "下载进度",
+    value = 42,
+    max = 100,
+  })
+  page:add(progress.view, 14)
+
+  local progressRow = LinearLayout(activity)
+  progressRow.setOrientation(LinearLayout.HORIZONTAL)
+  local progressButton = ui.button({
+    text = "设为 72%",
+    style = "tinted",
+    textSize = 13,
+    onClick = function()
+      progress.setProgress(72)
+    end,
+  })
+  progressRow.addView(progressButton, LinearLayout.LayoutParams(0, dp(42), 1))
+  local progressButton2 = ui.button({
+    text = "设为 100%",
+    style = "gray",
+    textSize = 13,
+    onClick = function()
+      progress.setProgress(100)
+    end,
+  })
+  local progressParams = LinearLayout.LayoutParams(0, dp(42), 1)
+  progressParams.leftMargin = dp(8)
+  progressRow.addView(progressButton2, progressParams)
+  page:add(progressRow, 8)
+
+  local skeleton = ui.skeleton({ lines = 3 })
+  page:add(ui.card({
+    title = "骨架屏",
+    subtitle = "shimmer 循环，适合列表或详情加载",
+  }, function(box)
+    box.addView(skeleton.view, LinearLayout.LayoutParams(-1, -2))
+  end), 14)
+
+  local banner = ui.banner({
+    title = "新组件已就绪",
+    message = "chip、checkRow、slider、stepper、progress、skeleton、banner、stat、fab 都可以单独使用。",
+    action = {
+      title = "知道了",
+      onClick = function()
+        ui.toast("banner action")
+      end,
+    },
+  })
+  page:add(banner, 14)
+
+  local statRow = ui.statRow({
+    { value = "20+", label = "组件", note = "+ 新增" },
+    { value = "260ms", label = "入场动画", note = "可调" },
+    { value = "0", label = "额外依赖", note = "纯增量" },
+  }, { gap = 8 })
+  page:add(statRow, 14)
+
+  local fabRow = LinearLayout(activity)
+  fabRow.setOrientation(LinearLayout.HORIZONTAL)
+  fabRow.setGravity(Gravity.RIGHT)
+  local fab = ui.fab({
+    text = "+",
+    onClick = function()
+      ui.toast("FAB 点击")
+    end,
+  })
+  fabRow.addView(fab, LinearLayout.LayoutParams(dp(52), dp(52)))
+  page:add(fabRow, 14)
+
+  local target = ui.button({
+    text = "动画目标",
+    style = "filled",
+    textSize = 16,
+  })
+  page:add(target, 14)
+
+  page:add(ui.card({
+    title = "动画",
+    subtitle = "animate / press / reveal",
+  }, function(box)
+    box.addView(addButtonStack({
+      { text = "上移淡入", style = "tinted", onClick = function() ui.animate(target, { preset = "up" }) end },
+      { text = "缩放淡入", style = "tinted", onClick = function() ui.animate(target, { preset = "scale" }) end },
+      { text = "纯淡入", style = "gray", onClick = function() ui.animate(target, { preset = "fade" }) end },
+    }))
+  end), 14)
+
+  local pressButton = ui.button({
+    text = "按压缩放按钮",
+    style = "filled",
+    onClick = function()
+      ui.toast("按下时有 0.97 缩放")
+    end,
+  })
+  ui.press(pressButton)
+  page:add(pressButton, 8)
+
+  local toastButton = ui.button({
+    text = "自定义 toast",
+    style = "gray",
+    onClick = function()
+      ui.toast("等宽字体、圆角卡片的自定义 Toast")
+    end,
+  })
+  page:add(toastButton, 8)
+
+  local replay = ui.button({
+    text = "重播页面入场",
+    style = "plain",
+    onClick = function()
+      page:reveal({ step = 40, duration = 260 })
+    end,
+  })
+  page:add(replay, 8)
+  page:add(ui.spacer(8))
+end
+
+-- ===== 五、关于 =====
 local function buildAbout()
   page:add(heading("关于", "LuaX-UI 的边界、组件清单与接入方式"))
 
@@ -733,6 +950,7 @@ local BUILDERS = {
   buildControls,
   buildForms,
   buildDialogs,
+  buildAdvanced,
   buildAbout,
 }
 
@@ -771,6 +989,7 @@ buildShell = function(index)
       { icon = "◻", title = "控件" },
       { icon = "✎", title = "表单" },
       { icon = "◉", title = "弹窗" },
+      { icon = "✦", title = "进阶" },
       { icon = "ⓘ", title = "关于" },
     },
     onChange = function(index)

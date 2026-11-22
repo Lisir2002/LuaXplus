@@ -18,6 +18,8 @@ import "android.text.style.*"
 import "android.app.*"
 import "android.os.*"
 import "android.util.TypedValue"
+import "android.animation.*"
+import "android.view.animation.*"
 
 local M = {}
 
@@ -37,6 +39,10 @@ local LIGHT = {
   green = 0xFF34C759,
   red = 0xFFFF3B30,
   orange = 0xFFFF9500,
+  purple = 0xFFAF52DE,
+  pink = 0xFFFF2D55,
+  yellow = 0xFFFFCC00,
+  teal = 0xFF5AC8FA,
   gray = 0xFF8E8E93,
   white = 0xFFFFFFFF,
 }
@@ -55,6 +61,10 @@ local DARK = {
   green = 0xFF30D158,
   red = 0xFFFF453A,
   orange = 0xFFFF9F0A,
+  purple = 0xFFBF5AF2,
+  pink = 0xFFFF375F,
+  yellow = 0xFFFFD60A,
+  teal = 0xFF64D2FF,
   gray = 0xFF8D8D93,
   white = 0xFFFFFFFF,
 }
@@ -322,6 +332,18 @@ function M.page(options)
 
   function page:show()
     current.setContentView(root)
+    return self
+  end
+
+  function page:reveal(spec)
+    if spec == true or spec == nil then
+      spec = {}
+    end
+    local views = {}
+    for index = 0, content.getChildCount() - 1 do
+      views[#views + 1] = content.getChildAt(index)
+    end
+    M.stagger(views, spec)
     return self
   end
 
@@ -802,7 +824,7 @@ function M.empty(spec)
       style = "tinted",
       onClick = spec.action.onClick,
     }
-    local params = LinearLayout.LayoutParams(-2, dp(40))
+    local params = LinearLayout.LayoutParams(-2, dp(46))
     params.topMargin = dp(16)
     box.addView(action, params)
   end
@@ -1118,5 +1140,634 @@ function M.actionSheet(spec)
   dialog.show()
   return dialog
 end
+
+
+-- ===== 快捷页面与表单 =====
+-- 一行创建页面：content 里直接往 page.content 加组件，默认带入场动画。
+function M.show(spec)
+  spec = spec or {}
+  local page = M.page(spec)
+  if type(spec.content) == "function" then
+    spec.content(page.content, page)
+  elseif spec.content then
+    page:add(spec.content)
+  end
+  page:show()
+  if spec.animate ~= false then
+    page:reveal(spec.animate)
+  end
+  return page
+end
+
+-- 快捷表单：字段用 fieldRow，返回输入框映射和读写方法。
+function M.form(spec)
+  spec = spec or {}
+  local rows = {}
+  local inputs = {}
+  local fields = spec.fields or {}
+  for index = 1, #fields do
+    local item = M.fieldRow(fields[index])
+    rows[#rows + 1] = item.view
+    inputs[fields[index].name or index] = item.input
+  end
+  local view = M.group(spec.title or spec.header, rows, spec.footer)
+  local form = {
+    view = view,
+    inputs = inputs,
+  }
+  function form.getValues()
+    local values = {}
+    for key, input in pairs(inputs) do
+      values[key] = tostring(input.getText().toString())
+    end
+    return values
+  end
+  function form.setValues(values)
+    for key, value in pairs(values or {}) do
+      local input = inputs[key]
+      if input then
+        input.setText(tostring(value or ""))
+      end
+    end
+    return form
+  end
+  function form.reset()
+    for _, input in pairs(inputs) do
+      input.setText("")
+    end
+    return form
+  end
+  return form
+end
+
+-- ===== 高效组件 =====
+function M.chip(spec)
+  if type(spec) == "string" then
+    spec = { text = spec }
+  end
+  spec = spec or {}
+  local palette = colors()
+  local selected = spec.selected == true
+  local fill = selected and (spec.color or palette.blue) or palette.fill
+  local textColor = selected and palette.white or palette.label
+
+  local chip = textView(spec.text or "", spec.textSize or 14, textColor, true)
+  chip.setGravity(Gravity.CENTER)
+  chip.setPadding(dp(12), dp(7), dp(12), dp(7))
+  chip.setMinHeight(dp(32))
+  chip.setBackground(roundRect(fill, 16))
+  if spec.onClick then
+    chip.setOnClickListener(View.OnClickListener{
+      onClick = spec.onClick
+    })
+  end
+  return chip
+end
+
+function M.chipGroup(spec)
+  spec = spec or {}
+  local palette = colors()
+  local row = LinearLayout(activity)
+  row.setOrientation(LinearLayout.HORIZONTAL)
+  row.setGravity(Gravity.CENTER_VERTICAL)
+
+  local chips = {}
+  local items = spec.items or {}
+  local selected = spec.selected or 1
+
+  local function apply()
+    for index = 1, #chips do
+      local chip = chips[index]
+      local active = index == selected
+      chip.setTextColor(active and palette.white or palette.label)
+      chip.setBackground(roundRect(active and palette.blue or palette.fill, 16))
+    end
+  end
+
+  for index = 1, #items do
+    local item = items[index]
+    if type(item) ~= "table" then
+      item = { text = tostring(item) }
+    end
+    local chip = M.chip({ text = item.text or item.title or "", textSize = 13 })
+    local params = LinearLayout.LayoutParams(-2, -2)
+    if index > 1 then
+      params.leftMargin = dp(8)
+    end
+    row.addView(chip, params)
+    chips[index] = chip
+    chip.setOnClickListener(View.OnClickListener{
+      onClick = function()
+        selected = index
+        apply()
+        if spec.onChange then
+          spec.onChange(index, item)
+        end
+      end
+    })
+  end
+  apply()
+
+  return {
+    view = row,
+    getSelected = function()
+      return selected
+    end,
+    setSelected = function(index)
+      selected = index
+      apply()
+    end,
+  }
+end
+
+function M.checkRow(spec)
+  spec = spec or {}
+  local palette = colors()
+  local checked = spec.checked == true
+
+  local row = LinearLayout(activity)
+  row.setOrientation(LinearLayout.HORIZONTAL)
+  row.setGravity(Gravity.CENTER_VERTICAL)
+  row.setMinimumHeight(dp(46))
+  row.setPadding(dp(16), dp(7), dp(14), dp(7))
+  row.setBackground(ripple(0x00000000, 0, 0x14000000))
+
+  local textBox = LinearLayout(activity)
+  textBox.setOrientation(LinearLayout.VERTICAL)
+  row.addView(textBox, LinearLayout.LayoutParams(0, -2, 1))
+
+  local title = textView(spec.title or "", 16, palette.label, false)
+  textBox.addView(title)
+  if spec.subtitle then
+    local subtitle = textView(spec.subtitle, 13, palette.secondary, false)
+    subtitle.setPadding(0, dp(2), 0, 0)
+    textBox.addView(subtitle)
+  end
+
+  local mark = textView("", 14, palette.white, true)
+  mark.setGravity(Gravity.CENTER)
+  row.addView(mark, LinearLayout.LayoutParams(dp(24), dp(24)))
+
+  local function apply()
+    mark.setText(checked and "✓" or "")
+    mark.setTextColor(checked and palette.white or palette.tertiary)
+    mark.setBackground(checked and roundRect(palette.blue, 12) or shape(0x00000000, palette.tertiary, 12))
+  end
+
+  local function setChecked(value, notify)
+    checked = value == true
+    apply()
+    if notify and spec.onChange then
+      spec.onChange(checked)
+    end
+  end
+
+  apply()
+  row.setOnClickListener(View.OnClickListener{
+    onClick = function()
+      setChecked(not checked, true)
+    end
+  })
+
+  return {
+    view = row,
+    isChecked = function()
+      return checked
+    end,
+    setChecked = setChecked,
+  }
+end
+
+function M.slider(spec)
+  spec = spec or {}
+  local palette = colors()
+  local box = LinearLayout(activity)
+  box.setOrientation(LinearLayout.VERTICAL)
+
+  local header = LinearLayout(activity)
+  header.setOrientation(LinearLayout.HORIZONTAL)
+  header.setGravity(Gravity.CENTER_VERTICAL)
+  local valueView = textView("", 13, palette.secondary, false)
+  if spec.label then
+    local label = textView(spec.label, 14, palette.label, false)
+    header.addView(label, LinearLayout.LayoutParams(0, -2, 1))
+    header.addView(valueView)
+  else
+    header.addView(valueView, LinearLayout.LayoutParams(-1, -2))
+  end
+  box.addView(header)
+
+  local seek = SeekBar(activity)
+  seek.setMax(spec.max or 100)
+  seek.setProgress(spec.value or 0)
+  pcall(function()
+    seek.setProgressTintList(ColorStateList.valueOf(palette.blue))
+    seek.setThumbTintList(ColorStateList.valueOf(palette.blue))
+  end)
+
+  local function format(value)
+    if spec.format then
+      return tostring(spec.format(value))
+    end
+    return tostring(value)
+  end
+
+  valueView.setText(format(seek.getProgress()))
+  seek.setOnSeekBarChangeListener(SeekBar.OnSeekBarChangeListener{
+    onProgressChanged = function(_, value, fromUser)
+      valueView.setText(format(value))
+      if spec.onChange then
+        spec.onChange(value, fromUser)
+      end
+    end,
+    onStartTrackingTouch = function()
+    end,
+    onStopTrackingTouch = function()
+    end,
+  })
+  box.addView(seek, LinearLayout.LayoutParams(-1, -2))
+
+  return {
+    view = box,
+    getValue = function()
+      return seek.getProgress()
+    end,
+    setValue = function(value)
+      seek.setProgress(value)
+    end,
+  }
+end
+
+function M.stepper(spec)
+  spec = spec or {}
+  local palette = colors()
+  local minimum = spec.min or 0
+  local maximum = spec.max or 99
+  local step = spec.step or 1
+  if step <= 0 then
+    step = 1
+  end
+  local value = spec.value or minimum
+
+  local box = LinearLayout(activity)
+  box.setOrientation(LinearLayout.VERTICAL)
+  if spec.label then
+    local label = textView(spec.label, 13, palette.secondary, false)
+    label.setPadding(dp(4), dp(4), dp(4), dp(4))
+    box.addView(label)
+  end
+
+  local row = LinearLayout(activity)
+  row.setOrientation(LinearLayout.HORIZONTAL)
+  row.setGravity(Gravity.CENTER_VERTICAL)
+
+  local function control(text)
+    local view = textView(text, 22, palette.blue, false)
+    view.setGravity(Gravity.CENTER)
+    view.setBackground(roundRect(palette.fill, 10))
+    row.addView(view, LinearLayout.LayoutParams(dp(38), dp(38)))
+    return view
+  end
+
+  local minus = control("−")
+  local valueView = textView("", 17, palette.label, true)
+  valueView.setGravity(Gravity.CENTER)
+  row.addView(valueView, LinearLayout.LayoutParams(0, dp(38), 1))
+  local plus = control("+")
+  box.addView(row, LinearLayout.LayoutParams(-1, -2))
+
+  local function apply(notify)
+    valueView.setText(tostring(value))
+    if notify and spec.onChange then
+      spec.onChange(value)
+    end
+  end
+
+  local function setValue(nextValue, notify)
+    value = math.max(minimum, math.min(maximum, nextValue))
+    apply(notify)
+  end
+
+  minus.setOnClickListener(View.OnClickListener{
+    onClick = function()
+      setValue(value - step, true)
+    end,
+  })
+  plus.setOnClickListener(View.OnClickListener{
+    onClick = function()
+      setValue(value + step, true)
+    end,
+  })
+  apply(false)
+
+  return {
+    view = box,
+    getValue = function()
+      return value
+    end,
+    setValue = setValue,
+  }
+end
+
+function M.progress(spec)
+  spec = spec or {}
+  local palette = colors()
+  local bar
+  local ok, created = pcall(function()
+    return ProgressBar(activity, nil, 16842872)
+  end)
+  if ok and created then
+    bar = created
+  else
+    bar = ProgressBar(activity)
+  end
+  bar.setMax(spec.max or 100)
+  bar.setProgress(spec.value or 0)
+  if spec.indeterminate then
+    bar.setIndeterminate(true)
+  end
+  pcall(function()
+    bar.setProgressTintList(ColorStateList.valueOf(spec.color or palette.blue))
+  end)
+
+  local box = LinearLayout(activity)
+  box.setOrientation(LinearLayout.VERTICAL)
+  if spec.label then
+    local label = textView(spec.label, 13, palette.secondary, false)
+    label.setPadding(dp(4), dp(4), dp(4), dp(2))
+    box.addView(label)
+  end
+  box.addView(bar, LinearLayout.LayoutParams(-1, -2))
+
+  return {
+    view = box,
+    setProgress = function(value)
+      bar.setProgress(value)
+    end,
+    getProgress = function()
+      return bar.getProgress()
+    end,
+  }
+end
+
+function M.shimmer(view, spec)
+  spec = spec or {}
+  if type(view) == "table" and view.view and type(view.view) ~= "function" then
+    view = view.view
+  end
+  local animator = ValueAnimator.ofFloat(0.28, 0.72)
+  animator.setDuration(spec.duration or 900)
+  animator.setRepeatCount(-1)
+  animator.setRepeatMode(2)
+  animator.addUpdateListener(ValueAnimator.AnimatorUpdateListener{
+    onAnimationUpdate = function(animation)
+      view.setAlpha(animation.getAnimatedValue())
+    end,
+  })
+  animator.start()
+  return animator
+end
+
+function M.skeleton(spec)
+  spec = spec or {}
+  local palette = colors()
+  local box = LinearLayout(activity)
+  box.setOrientation(LinearLayout.VERTICAL)
+  box.setPadding(dp(16), dp(16), dp(16), dp(16))
+  box.setBackground(roundRect(palette.card, 12))
+
+  local lines = spec.lines or 3
+  for index = 1, lines do
+    local line = View(activity)
+    line.setBackground(roundRect(palette.fill, 6))
+    local width = index == lines and 0.55 or (index == 1 and 0.86 or 0.7)
+    local params = LinearLayout.LayoutParams(-1, dp(index == 1 and 16 or 12))
+    if index > 1 then
+      params.topMargin = dp(10)
+    end
+    if width < 1 then
+      local holder = LinearLayout(activity)
+      holder.setOrientation(LinearLayout.HORIZONTAL)
+      holder.addView(line, LinearLayout.LayoutParams(0, dp(index == 1 and 16 or 12), width))
+      local rest = View(activity)
+      holder.addView(rest, LinearLayout.LayoutParams(0, 1, 1 - width))
+      box.addView(holder, params)
+    else
+      box.addView(line, params)
+    end
+  end
+
+  local animator = M.shimmer(box, { duration = spec.duration or 900 })
+  return {
+    view = box,
+    stop = function()
+      pcall(function()
+        animator.cancel()
+      end)
+      box.setAlpha(1)
+    end,
+  }
+end
+
+function M.banner(spec)
+  spec = spec or {}
+  local palette = colors()
+  local card = LinearLayout(activity)
+  card.setOrientation(LinearLayout.VERTICAL)
+  card.setPadding(dp(14), dp(13), dp(14), dp(13))
+  card.setBackground(roundRect(spec.background or palette.blueSoft, 12))
+
+  local header = LinearLayout(activity)
+  header.setOrientation(LinearLayout.HORIZONTAL)
+  header.setGravity(Gravity.CENTER_VERTICAL)
+  card.addView(header)
+
+  local glyph = textView(spec.icon or "i", 14, palette.white, true)
+  glyph.setGravity(Gravity.CENTER)
+  glyph.setBackground(roundRect(spec.color or palette.blue, 9))
+  header.addView(glyph, LinearLayout.LayoutParams(dp(28), dp(28)))
+
+  local title = textView(spec.title or "提示", 15, palette.label, true)
+  title.setPadding(dp(10), 0, 0, 0)
+  header.addView(title, LinearLayout.LayoutParams(0, -2, 1))
+
+  if spec.message then
+    local message = textView(spec.message, 13, palette.secondary, false)
+    message.setPadding(dp(38), dp(4), 0, 0)
+    card.addView(message)
+  end
+
+  if spec.action then
+    local action = M.button({
+      text = spec.action.title or "查看",
+      style = "plain",
+      textSize = 13,
+      onClick = spec.action.onClick,
+    })
+    local params = LinearLayout.LayoutParams(-2, dp(44))
+    params.leftMargin = dp(38)
+    params.topMargin = dp(4)
+    card.addView(action, params)
+  end
+  return card
+end
+
+function M.stat(spec)
+  spec = spec or {}
+  local palette = colors()
+  local card = LinearLayout(activity)
+  card.setOrientation(LinearLayout.VERTICAL)
+  card.setPadding(dp(14), dp(14), dp(14), dp(14))
+  card.setBackground(roundRect(palette.card, 12))
+
+  local value = textView(spec.value or "0", spec.valueSize or 28, spec.color or palette.label, true)
+  value.setIncludeFontPadding(false)
+  card.addView(value)
+
+  local label = textView(spec.label or "", 13, palette.secondary, false)
+  label.setPadding(0, dp(4), 0, 0)
+  card.addView(label)
+
+  if spec.note then
+    local note = textView(spec.note, 11, spec.noteColor or palette.blue, true)
+    note.setPadding(0, dp(6), 0, 0)
+    card.addView(note)
+  end
+  return card
+end
+
+function M.statRow(items, spec)
+  spec = spec or {}
+  local row = LinearLayout(activity)
+  row.setOrientation(LinearLayout.HORIZONTAL)
+  for index = 1, #(items or {}) do
+    local params = LinearLayout.LayoutParams(0, -2, 1)
+    if index > 1 then
+      params.leftMargin = dp(spec.gap or 8)
+    end
+    row.addView(M.stat(items[index]), params)
+  end
+  return row
+end
+
+function M.fab(spec)
+  if type(spec) == "string" then
+    spec = { text = spec }
+  end
+  spec = spec or {}
+  local palette = colors()
+  local fab = textView(spec.text or "+", spec.textSize or 26, palette.white, true)
+  fab.setGravity(Gravity.CENTER)
+  fab.setBackground(roundRect(spec.color or palette.blue, 26))
+  fab.setMinWidth(dp(52))
+  fab.setMinHeight(dp(52))
+  fab.setElevation(dp(6))
+  if spec.onClick then
+    fab.setOnClickListener(View.OnClickListener{
+      onClick = spec.onClick
+    })
+  end
+  return fab
+end
+
+function M.toast(spec)
+  if type(spec) == "string" then
+    spec = { text = spec }
+  end
+  spec = spec or {}
+  local palette = colors()
+  local box = LinearLayout(activity)
+  box.setPadding(dp(16), dp(10), dp(16), dp(10))
+  box.setBackground(roundRect(palette.card, 18))
+  local text = textView(spec.text or "", 13, palette.label, false)
+  box.addView(text)
+
+  local toast = Toast.makeText(activity, "", spec.long and Toast.LENGTH_LONG or Toast.LENGTH_SHORT)
+  toast.setView(box)
+  toast.setGravity(Gravity.BOTTOM, 0, dp(spec.offset or 72))
+  toast.show()
+  return toast
+end
+
+-- ===== 动画 =====
+function M.animate(view, spec)
+  spec = spec or {}
+  if type(view) == "table" and view.view and type(view.view) ~= "function" then
+    view = view.view
+  end
+  if not view then
+    return nil
+  end
+
+  local preset = spec.preset or "up"
+  local duration = spec.duration or 260
+  view.setAlpha(0)
+  if preset == "scale" then
+    view.setScaleX(0.92)
+    view.setScaleY(0.92)
+  elseif preset == "down" then
+    view.setTranslationY(-dp(14))
+  elseif preset ~= "fade" then
+    view.setTranslationY(dp(14))
+  end
+
+  local animator = ValueAnimator.ofFloat(0, 1)
+  animator.setDuration(duration)
+  if spec.delay and spec.delay > 0 then
+    animator.setStartDelay(spec.delay)
+  end
+  pcall(function()
+    animator.setInterpolator(DecelerateInterpolator())
+  end)
+  animator.addUpdateListener(ValueAnimator.AnimatorUpdateListener{
+    onAnimationUpdate = function(animation)
+      local progress = animation.getAnimatedValue()
+      view.setAlpha(progress)
+      if preset == "scale" then
+        view.setScaleX(0.92 + 0.08 * progress)
+        view.setScaleY(0.92 + 0.08 * progress)
+      elseif preset == "down" then
+        view.setTranslationY(-dp(14) * (1 - progress))
+      elseif preset ~= "fade" then
+        view.setTranslationY(dp(14) * (1 - progress))
+      end
+    end,
+  })
+  animator.start()
+  return animator
+end
+
+function M.stagger(views, spec)
+  spec = spec or {}
+  views = views or {}
+  for index = 1, #views do
+    local delay = (spec.delay or 0) + (index - 1) * (spec.step or 55)
+    M.animate(views[index], {
+      preset = spec.preset or "up",
+      duration = spec.duration or 280,
+      delay = delay,
+    })
+  end
+end
+
+function M.press(view, spec)
+  spec = spec or {}
+  if type(view) == "table" and view.view and type(view.view) ~= "function" then
+    view = view.view
+  end
+  view.setOnTouchListener(View.OnTouchListener{
+    onTouch = function(target, event)
+      local action = event.getAction()
+      if action == 0 then
+        target.animate().scaleX(spec.scale or 0.97).scaleY(spec.scale or 0.97).setDuration(90).start()
+      elseif action == 1 or action == 3 then
+        target.animate().scaleX(1).scaleY(1).setDuration(120).start()
+      end
+      return false
+    end,
+  })
+  return view
+end
+
 
 return M

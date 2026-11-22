@@ -1,5 +1,14 @@
 # 更新日志
 
+## 1.0.0-rc5
+
+### 新功能
+- 快捷接入：新增 ui.show/ui.form 一行式页面与表单，附极简快速上手示例。
+- 组件拓展：新增 chip、checkRow、slider、stepper、progress、skeleton、banner、stat、fab 与 toast。
+- 动画封装：新增 animate、stagger、press 与 page:reveal，统一 260ms 入场节奏。
+
+---
+
 ## 1.0.0-rc4
 
 ### 修复

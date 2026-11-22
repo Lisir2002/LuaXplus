@@ -521,3 +521,17 @@
 示例内容：`assets/examples/luax-ui-demo`，四个页签覆盖页面骨架、分组行、按钮样式、表单、搜索、分段、卡片、弹窗、操作菜单、空态、加载、头像、徽标、分割线、间距、标签栏和明暗主题。
 
 验证：新增脚本通过 `luac5.3 -p`；release 构建成功；APK 内确认包含 `assets/examples.lua` 与示例工程文件。
+
+## 三十七、快捷 API、进阶组件与动画
+
+需求：降低上手门槛，同时补充更高效的组件和统一动画，不改变组件库的纯增量边界。
+
+新增：
+
+- `ui.show`：创建页面、执行 content 回调、显示并播放入场动画。
+- `ui.form`：一行生成 fieldRow 表单，返回 `view`、`inputs`、`getValues`、`setValues`、`reset`。
+- 进阶组件：chip/chipGroup、checkRow、slider、stepper、progress、skeleton、banner、stat/statRow、fab、toast。
+- 动画：`ui.animate` 支持 up/down/fade/scale、duration、delay；`ui.stagger` 错峰入场；`ui.press` 按压缩放；`page:reveal` 页面整体入场。
+- 新示例：`assets/examples/luax-ui-quick`，用极简页面展示 `ui.show` 与 `ui.form`。
+
+验证：组件库与两个示例通过 `luac5.3 -p`；五个页签与快速上手示例用 Android 替身跑过构建逻辑；教程 22 段示例语法通过。
