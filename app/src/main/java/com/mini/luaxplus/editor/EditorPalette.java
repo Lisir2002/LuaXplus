@@ -15,6 +15,10 @@ public final class EditorPalette {
     }
 
     public static void apply(LuaEditor editor, boolean dark) {
+        apply(editor, dark, dark ? 0xFF141A20 : 0xFFF7F1E6);
+    }
+
+    public static void apply(LuaEditor editor, boolean dark, int background) {
         if (editor == null) {
             return;
         }
@@ -25,7 +29,7 @@ public final class EditorPalette {
         }
 
         int text;
-        int identifier;
+        int baseword;
         int call;
         int comment;
         int keyword;
@@ -34,39 +38,39 @@ public final class EditorPalette {
         int lineNumber;
         int punctuation;
         if (dark) {
-            text = 0xFFE8EEF4;
-            identifier = 0xFFE8EEF4;
+            text = 0xFFF2F6FA;
+            baseword = 0xFFA9D6FF;
             call = 0xFF9CDCFE;
-            comment = 0xFF8A9AA6;
-            keyword = 0xFFC792EA;
-            string = 0xFFF48FB1;
-            number = 0xFF8FD3F4;
-            lineNumber = 0xFF6F7F8A;
-            punctuation = 0xFFB8C4CE;
+            comment = 0xFF9AAAB6;
+            keyword = 0xFFD6A8FF;
+            string = 0xFFFFA8C8;
+            number = 0xFFA8E6CF;
+            lineNumber = 0xFF8494A0;
+            punctuation = 0xFFC7D2DB;
         } else {
-            text = 0xFF1C2B3A;
-            identifier = 0xFF1C2B3A;
+            text = 0xFF17222C;
+            baseword = 0xFF0B4F7A;
             call = 0xFF1F5F8B;
-            comment = 0xFF6F7F72;
-            keyword = 0xFF7A3E9D;
-            string = 0xFFB03A5B;
-            number = 0xFF1F5F8B;
-            lineNumber = 0xFF7D8B96;
-            punctuation = 0xFF5F6F7C;
+            comment = 0xFF5E6F68;
+            keyword = 0xFF6E2E92;
+            string = 0xFFA3264B;
+            number = 0xFF0F6B4F;
+            lineNumber = 0xFF6C7B86;
+            punctuation = 0xFF4F5F6C;
         }
 
         scheme.d(b.a.a, text);
-        scheme.d(b.a.b, identifier);
-        scheme.d(b.a.c, identifier);
+        scheme.d(b.a.b, background);
+        scheme.d(b.a.c, text);
         scheme.d(b.a.d, call);
-        scheme.d(b.a.e, identifier);
+        scheme.d(b.a.e, text);
         scheme.d(b.a.f, number);
         scheme.d(b.a.g, comment);
         // b.a.h 是选区底色，保持默认透明度。
         scheme.d(b.a.i, lineNumber);
         scheme.d(b.a.j, comment);
         scheme.d(b.a.k, keyword);
-        scheme.d(b.a.l, identifier);
+        scheme.d(b.a.l, baseword);
         scheme.d(b.a.m, call);
         scheme.d(b.a.n, string);
         scheme.d(b.a.o, call);

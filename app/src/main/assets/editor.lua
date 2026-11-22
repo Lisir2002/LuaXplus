@@ -251,8 +251,8 @@ local editor = LuaEditor(activity)
 
 -- 高亮色不能只依赖编辑器默认配色，否则标识符会和深色背景混在一起。
 local function applyEditorColors(isDark)
-  EditorPalette.apply(editor, isDark)
-  editor.setBackgroundColor(isDark and EDITOR_DARK_BG or PAPER)
+  local background = isDark and EDITOR_DARK_BG or PAPER
+  EditorPalette.apply(editor, isDark, background)
   pcall(function()
     editor.respan()
   end)
