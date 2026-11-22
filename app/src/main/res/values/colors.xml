@@ -13,4 +13,9 @@
     <color name="color_surface_dark">@color/google_grey_900</color>
     <color name="color_surface">@color/color_surface_light</color>
     <color name="ic_launcher_background">#F5EEE1</color>
+
+    <color name="editor_light_primary">#0F9E97</color>
+    <color name="editor_light_surface">#FFFDF8</color>
+    <color name="editor_light_background">#F7F1E6</color>
+    <color name="editor_light_on_surface">#1C2B3A</color>
 </resources>

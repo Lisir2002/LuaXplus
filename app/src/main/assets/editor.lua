@@ -14,7 +14,18 @@ import "autotheme"
 
 -- 独立编辑页：顶部操作栏、代码区、查找替换、符号条、状态栏
 
-activity.setTheme(autotheme())
+-- 编辑器先固定为浅色纸张主题，不跟随系统深色；深色适配单独重做后再恢复。
+local editorStyle = activity.getResources().getIdentifier(
+  "Theme.MiniLuaXPLUS.EditorLight", "style", activity.getPackageName())
+if not editorStyle or editorStyle == 0 then
+  editorStyle = activity.getResources().getIdentifier(
+    "Theme_MiniLuaXPLUS_EditorLight", "style", activity.getPackageName())
+end
+if editorStyle and editorStyle > 0 then
+  activity.setTheme(editorStyle)
+else
+  activity.setTheme(autotheme())
+end
 
 local theme = require "luaxplus.theme"
 local icons = require "luaxplus.icons"
@@ -22,21 +33,21 @@ local lint = require "luaxplus.lint"
 local EditorPalette = luajava.bindClass("com.mini.luaxplus.editor.EditorPalette")
 local C = theme.colors
 local PAPER = C.paper
-local PANEL = C.panel
-local PANEL_SOFT = C.panelSoft
-local PANEL_LINE = C.panelLine
-local TEXT_MAIN = C.panelText
-local TEXT_MUTED = C.panelMuted
+local PANEL = C.paper
+local PANEL_SOFT = C.card
+local PANEL_LINE = C.line
+local TEXT_MAIN = C.ink
+local TEXT_MUTED = C.muted
 local ACCENT = C.accent
 local INK = C.ink
 local CARD = C.card
 local LINE = C.line
-local PANEL_DEEP = C.panelDeep
-local PANEL_KEY = C.panelKey
-local PANEL_TEXT_SOFT = C.panelTextSoft
-local EDITOR_DARK_BG = C.editorDarkBg
+local PANEL_DEEP = C.paperSoft
+local PANEL_KEY = C.paperSoft
+local PANEL_TEXT_SOFT = C.mutedSoft
+local EDITOR_BG = C.card
 local ON_ACCENT_DEEP = C.onAccentDeep
-local SUCCESS_TEXT = C.successText
+local SUCCESS_TEXT = C.success
 
 local args = {...}
 local filePath = args[1]
@@ -94,7 +105,6 @@ end
 local fileName = File(filePath).getName()
 local fileExists = File(filePath).exists()
 local savedText = readFile(filePath)
-local darkMode = false
 
 -- 语法高亮只按文件扩展名自动识别，不提供手动切换
 local languageId = EditorLanguage.detect(filePath)
@@ -126,7 +136,7 @@ local root = LinearLayout(activity)
 root.setOrientation(LinearLayout.VERTICAL)
 root.setBackgroundColor(PANEL)
 root.setFitsSystemWindows(true)
-theme.apply(activity, { background = PANEL, statusBar = PANEL, navigationBar = PANEL, root = root, dark = true })
+theme.apply(activity, { background = PAPER, statusBar = PANEL_SOFT, navigationBar = PAPER, root = root, dark = false })
 activity.setContentView(root)
 
 -- ===== 顶部操作栏 =====
@@ -249,16 +259,15 @@ root.addView(bar, LinearLayout.LayoutParams(-1, -2))
 -- ===== 代码区 =====
 local editor = LuaEditor(activity)
 
--- 高亮色不能只依赖编辑器默认配色，否则标识符会和深色背景混在一起。
-local function applyEditorColors(isDark)
-  local background = isDark and EDITOR_DARK_BG or PAPER
-  EditorPalette.apply(editor, isDark, background)
+-- 高亮固定使用浅色方案，避免深色主题反复出现对比度问题。
+local function applyEditorColors()
+  EditorPalette.apply(editor, false, EDITOR_BG)
   pcall(function()
     editor.respan()
   end)
 end
 
-applyEditorColors(darkMode)
+applyEditorColors()
 editor.setShowLineNumbers(true)
 editor.setHighlightCurrentRow(true)
 editor.setWordWrap(false)
@@ -450,7 +459,7 @@ local function applyAutoLanguage()
 end
 
 applyAutoLanguage()
-applyEditorColors(darkMode)
+applyEditorColors()
 
 -- ===== 保存与状态 =====
 local function currentText()
@@ -1159,7 +1168,6 @@ local MENU_ITEMS = {
   { name = "当前行下移", action = "down" },
   { name = "字号加大", action = "bigger" },
   { name = "字号减小", action = "smaller" },
-  { name = "切换明暗主题", action = "theme" },
   { name = "撤销上次修复", action = "undoRepair" },
   { name = "代码检查", action = "lint" },
   { name = "另存为", action = "saveas" },
@@ -1225,12 +1233,6 @@ local function menuActions(action)
     end
     editor.setTextSize(size)
     toast("字号 " .. size)
-  elseif action == "theme" then
-    darkMode = not darkMode
-    applyEditorColors(darkMode)
-    pcall(function()
-      editor.respan()
-    end)
   elseif action == "saveas" then
     local box = LinearLayout(activity)
     box.setOrientation(LinearLayout.VERTICAL)
