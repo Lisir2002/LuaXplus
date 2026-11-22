@@ -1619,8 +1619,13 @@ end
 function M.avatar(name, color, size)
   local palette = colors()
   local initial = "?"
-  if name and #tostring(name) > 0 then
-    initial = string.sub(tostring(name), 1, 1)
+  local text = tostring(name or "")
+  if text ~= "" then
+    -- 按 UTF-8 码点取首字，避免中文被按字节截成“?”。
+    local ok, first = pcall(function()
+      return utf8.char(utf8.codepoint(text, 1))
+    end)
+    initial = ok and first or string.sub(text, 1, 1)
   end
   local avatarSize = dimension(size or K.avatar, K.avatar)
   local avatarFont = math.floor(avatarSize / numberValue(K.avatarFontRatio, 2.4))
@@ -3452,7 +3457,7 @@ function M.avatarGroup(spec)
     local avatar = M.avatar(names[index], spec.color, size)
     local params = LinearLayout.LayoutParams(dp(size), dp(size))
     if index > 1 then
-      params.leftMargin = -dp(size / 3)
+      params.leftMargin = -dp(size / 4)
     end
     avatar.setLayoutParams(params)
     row.addView(avatar)
@@ -3462,7 +3467,7 @@ function M.avatarGroup(spec)
     more.setTextColor(palette.secondary)
     more.setGravity(Gravity.CENTER)
     local params = LinearLayout.LayoutParams(dp(size), dp(size))
-    params.leftMargin = -dp(size / 3)
+    params.leftMargin = -dp(size / 4)
     row.addView(more, params)
   end
   return row
@@ -3500,7 +3505,13 @@ function M.pagination(spec)
     return view
   end
 
-  row.addView(item("‹", current - 1, false, current > 1))
+  local function arrowItem(label, target, enabled)
+    local view = item(label, target, false, enabled)
+    view.setTextSize(TY.body.size)
+    return view
+  end
+
+  row.addView(arrowItem("‹", current - 1, current > 1), LinearLayout.LayoutParams(dp(36), dp(space(32))))
   local start = math.max(1, current - 2)
   local finish = math.min(total, start + 4)
   start = math.max(1, finish - 4)
@@ -3510,7 +3521,7 @@ function M.pagination(spec)
     params.leftMargin = dp(space(4))
     row.addView(view, params)
   end
-  row.addView(item("›", current + 1, false, current < total), LinearLayout.LayoutParams(-2, dp(space(32))))
+  row.addView(arrowItem("›", current + 1, current < total), LinearLayout.LayoutParams(dp(36), dp(space(32))))
   return row
 end
 

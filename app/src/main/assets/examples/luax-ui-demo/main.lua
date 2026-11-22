@@ -101,14 +101,26 @@ ui.show{
   code.setTextSize(12)
   code.setTextColor(palette().label)
   code.setTypeface(Typeface.MONOSPACE)
-  code.setBackgroundColor(palette().fill)
-  code.setPadding(dp(12), dp(12), dp(12), dp(12))
+  code.setBackgroundColor(0x00000000)
+  code.setPadding(0, 0, 0, 0)
+
+  local codeScroll = HorizontalScrollView(activity)
+  codeScroll.setHorizontalScrollBarEnabled(false)
+  codeScroll.addView(code, LinearLayout.LayoutParams(-2, -2))
 
   page:add(ui.card({
     title = "最小页面",
     subtitle = "ui.show 一行建页面，ui.form 一行建表单",
   }, function(box)
-    box.addView(code, LinearLayout.LayoutParams(-1, -2))
+    local codeWrap = ui.surface({
+      background = palette().fill,
+      radius = "10px",
+      padding = "12px",
+      elevation = false,
+    }, function(wrap)
+      wrap.addView(codeScroll, LinearLayout.LayoutParams(-1, -2))
+    end)
+    box.addView(codeWrap, LinearLayout.LayoutParams(-1, -2))
   end), 12)
 
   local quick = ui.form({
@@ -191,7 +203,13 @@ ui.show{
     title = "原子组件",
     subtitle = "text / icon / surface / stack / grid / checkbox",
   }, function(box)
-    local panel = ui.surface({ padding = "12px", radius = "12px" }, function(body)
+    local panel = ui.surface({
+      background = palette().fill,
+      stroke = palette().line,
+      padding = "12px",
+      radius = "12px",
+      elevation = false,
+    }, function(body)
       body.addView(ui.hstack({ gap = "8px", align = "center" }, function(add)
         add(ui.icon({
           glyph = "A",
@@ -216,6 +234,7 @@ ui.show{
     box.addView(ui.input({
       hint = "这是一个裸输入框",
       padding = "10px",
+      background = palette().fill,
     }), LinearLayout.LayoutParams(-1, -2))
 
     local tabs = ui.hstack({ gap = "4px" }, function(add)
@@ -225,9 +244,23 @@ ui.show{
     box.addView(tabs, LinearLayout.LayoutParams(-1, -2))
 
     local function tile(text)
-      return ui.surface({ padding = "8px", radius = "10px" }, function(body)
-        body.addView(ui.text({ text = text, type = "caption", align = "center" }))
+      local surface = ui.surface({
+        background = palette().fill,
+        stroke = palette().line,
+        padding = "10px",
+        radius = "10px",
+        elevation = false,
+      }, function(body)
+        body.addView(ui.text({
+          text = text,
+          type = "callout",
+          bold = true,
+          align = "center",
+          color = palette().label,
+        }))
       end)
+      surface.setMinimumHeight(dp(46))
+      return surface
     end
     box.addView(ui.grid({
       columns = 3,
@@ -240,7 +273,7 @@ ui.show{
     title = "项目信息",
     items = {
       { label = "包名", value = "com.mini.luaxplus" },
-      { label = "当前版本", value = "1.0.0-rc23" },
+      { label = "当前版本", value = "1.0.0-rc24" },
       { label = "构建渠道", value = "Release" },
     },
     footer = "键值列表适合详情页、设置摘要和订单信息。",
@@ -265,7 +298,7 @@ ui.show{
   local avatars = ui.avatarGroup({
     names = { "林", "周", "陈", "王", "赵" },
     max = 4,
-    size = "34px",
+    size = "36px",
   })
   page:add(avatars, 14)
 
@@ -1027,18 +1060,6 @@ local function buildAdvanced()
     style = "filled",
     textSize = 16,
   })
-  page:add(target, 14)
-
-  page:add(ui.card({
-    title = "动画",
-    subtitle = "animate / press / reveal",
-  }, function(box)
-    box.addView(addButtonStack({
-      { text = "上移淡入", style = "tinted", onClick = function() ui.animate(target, { preset = "up" }) end },
-      { text = "缩放淡入", style = "tinted", onClick = function() ui.animate(target, { preset = "scale" }) end },
-      { text = "纯淡入", style = "gray", onClick = function() ui.animate(target, { preset = "fade" }) end },
-    }))
-  end), 14)
 
   local pressButton = ui.button({
     text = "按压缩放按钮",
@@ -1048,25 +1069,53 @@ local function buildAdvanced()
     end,
   })
   ui.press(pressButton)
-  page:add(pressButton, 8)
 
   local toastButton = ui.button({
     text = "自定义 toast",
-    style = "gray",
+    style = "tinted",
     onClick = function()
       ui.toast("等宽字体、圆角卡片的自定义 Toast")
     end,
   })
-  page:add(toastButton, 8)
 
   local replay = ui.button({
     text = "重播页面入场",
-    style = "plain",
+    style = "tinted",
     onClick = function()
       page:reveal({ step = 40, duration = 260 })
     end,
   })
-  page:add(replay, 8)
+
+  page:add(ui.card({
+    title = "动画与反馈",
+    subtitle = "animate / press / toast / reveal",
+  }, function(box)
+    box.addView(ui.text({ text = "动画目标", type = "footnote", color = palette().secondary }))
+    local targetParams = LinearLayout.LayoutParams(-1, -2)
+    targetParams.topMargin = dp(8)
+    box.addView(target, targetParams)
+
+    local animationButtons = addButtonStack({
+      { text = "上移淡入", style = "tinted", onClick = function() ui.animate(target, { preset = "up" }) end },
+      { text = "缩放淡入", style = "tinted", onClick = function() ui.animate(target, { preset = "scale" }) end },
+      { text = "纯淡入", style = "gray", onClick = function() ui.animate(target, { preset = "fade" }) end },
+    })
+    local animationParams = LinearLayout.LayoutParams(-1, -2)
+    animationParams.topMargin = dp(8)
+    box.addView(animationButtons, animationParams)
+
+    local pressParams = LinearLayout.LayoutParams(-1, -2)
+    pressParams.topMargin = dp(12)
+    box.addView(pressButton, pressParams)
+
+    local toastParams = LinearLayout.LayoutParams(-1, -2)
+    toastParams.topMargin = dp(8)
+    box.addView(toastButton, toastParams)
+
+    local replayParams = LinearLayout.LayoutParams(-1, -2)
+    replayParams.topMargin = dp(8)
+    box.addView(replay, replayParams)
+  end), 14)
 
   local heroPath = activity.getLuaExtDir("examples/luax-ui-demo") .. "/hero.jpg"
   local hero = ui.background({
@@ -1107,44 +1156,78 @@ local function buildAdvanced()
 
   page:add(ui.card({
     title = "图片与透明度",
-    subtitle = "image / background / withAlpha；数值支持 10px、35%",
+    subtitle = "image / background / withAlpha；点击色块即时调整预览",
   }, function(box)
     local thumb = ui.image({
       src = heroPath,
-      height = "104px",
+      height = "120px",
       radius = "12px",
       scale = "cover",
+      adjust = false,
     })
-    box.addView(thumb, LinearLayout.LayoutParams(-1, dp(104)))
+    box.addView(thumb, LinearLayout.LayoutParams(-1, dp(120)))
 
-    local alphaLabel = ui.text({
-      text = "withAlpha 支持 0-1 和 0-255 两种透明度",
+    local alphaValue = ui.text({
+      text = "当前透明度 72%",
       type = "footnote",
+      color = palette().label,
+    })
+    alphaValue.setPadding(0, dp(10), 0, 0)
+    box.addView(alphaValue)
+
+    local alphaHint = ui.text({
+      text = "点击下面的色块，图片会变成对应透明度；withAlpha 支持 0-1 和 0-255。",
+      type = "caption",
       color = palette().secondary,
     })
-    alphaLabel.setPadding(0, dp(8), 0, 0)
-    box.addView(alphaLabel)
+    alphaHint.setPadding(0, dp(2), 0, 0)
+    box.addView(alphaHint)
 
+    local alphaValues = { 0.08, 0.24, 0.48, 0.72 }
+    local tiles = {}
     local alphaRow = LinearLayout(activity)
     alphaRow.setOrientation(LinearLayout.HORIZONTAL)
-    alphaRow.setPadding(0, dp(8), 0, 0)
-    for _, value in ipairs({ 0.08, 0.24, 0.48, 0.72 }) do
+    alphaRow.setPadding(0, dp(10), 0, 0)
+
+    local function paintTile(tile, active, value)
+      local tileBackground = GradientDrawable()
+      tileBackground.setShape(GradientDrawable.RECTANGLE)
+      tileBackground.setColor(active and palette().accent or ui.withAlpha(palette().accent, "12%"))
+      tileBackground.setCornerRadius(dp(9))
+      tileBackground.setStroke(dp(1), active and palette().accentDeep or palette().accentLine)
+      tile.setBackground(tileBackground)
+      tile.setTextColor(active and palette().onAccent or palette().label)
+      tile.setTypeface(Typeface.create(active and "sans-serif-medium" or "sans-serif", Typeface.NORMAL))
+    end
+
+    local function applyAlpha(value)
+      thumb.setAlpha(value)
+      alphaValue.setText(string.format("当前透明度 %.0f%%", value * 100))
+      for index, tile in ipairs(tiles) do
+        paintTile(tile, alphaValues[index] == value, value)
+      end
+    end
+
+    for index, value in ipairs(alphaValues) do
       local tile = TextView(activity)
       tile.setText(string.format("%.0f%%", value * 100))
-      tile.setTextSize(ui.tokens.type.caption.size)
-      tile.setTextColor(palette().label)
+      tile.setTextSize(ui.tokens.type.footnote.size)
       tile.setGravity(Gravity.CENTER)
-      local tileBackground = GradientDrawable()
-      tileBackground.setColor(ui.withAlpha(palette().accent, string.format("%.0f%%", value * 100)))
-      tileBackground.setCornerRadius(dp(8))
-      tile.setBackground(tileBackground)
-      local params = LinearLayout.LayoutParams(0, dp(34), 1)
-      if value ~= 0.08 then
-        params.leftMargin = dp(6)
+      tile.setPadding(dp(4), 0, dp(4), 0)
+      tile.setOnClickListener(View.OnClickListener{
+        onClick = function()
+          applyAlpha(value)
+        end,
+      })
+      local params = LinearLayout.LayoutParams(0, dp(40), 1)
+      if index > 1 then
+        params.leftMargin = dp(8)
       end
       alphaRow.addView(tile, params)
+      tiles[index] = tile
     end
     box.addView(alphaRow)
+    applyAlpha(0.72)
   end), 14)
 
   page:add(ui.spacer(8))
