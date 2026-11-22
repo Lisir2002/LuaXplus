@@ -12,7 +12,7 @@ import "android.graphics.drawable.*"
 local ui = require "luaxplus.ui"
 local dp = ui.dp
 
-local TAB_TITLES = {"控件", "表单", "弹窗", "进阶", "关于"}
+local TAB_TITLES = {"快速", "控件", "表单", "弹窗", "进阶", "关于"}
 
 local page
 local tabBar
@@ -75,6 +75,84 @@ local function showInfo(title, message)
       { title = "知道了" },
     },
   })
+end
+
+-- ===== 快速 =====
+local function buildQuick()
+  page:add(heading("快速", "先跑通一个页面，再看完整组件"))
+
+  local code = TextView(activity)
+  code.setText([[local ui = require "luaxplus.ui"
+
+ui.show{
+  title = "设置",
+  content = function(_, page)
+    page:add(ui.form{
+      title = "账号",
+      fields = {
+        { name = "nickname", label = "昵称" },
+        { name = "email", label = "邮箱", email = true },
+      },
+    }.view)
+  end,
+}]])
+  code.setTextSize(12)
+  code.setTextColor(palette().label)
+  code.setTypeface(Typeface.MONOSPACE)
+  code.setBackgroundColor(palette().fill)
+  code.setPadding(dp(12), dp(12), dp(12), dp(12))
+
+  page:add(ui.card({
+    title = "最小页面",
+    subtitle = "ui.show 一行建页面，ui.form 一行建表单",
+  }, function(box)
+    box.addView(code, LinearLayout.LayoutParams(-1, -2))
+  end), 12)
+
+  local quick = ui.form({
+    title = "试一下 form",
+    fields = {
+      { name = "nickname", label = "昵称", placeholder = "输入昵称", value = "LuaX" },
+      { name = "email", label = "邮箱", placeholder = "name@example.com", email = true },
+      { name = "password", label = "密码", placeholder = "输入密码", secure = true },
+    },
+    footer = "ui.form 返回 view、inputs、getValues、setValues、reset。",
+  })
+  page:add(quick.view, 14)
+
+  local save = ui.button({
+    text = "保存",
+    style = "filled",
+    onClick = function()
+      local values = quick.getValues()
+      ui.alert({
+        title = "已保存",
+        message = "昵称：" .. values.nickname .. "\n邮箱：" .. values.email,
+        actions = { { title = "好" } },
+      })
+    end,
+  })
+  page:add(save, 8)
+
+  local reset = ui.button({
+    text = "重置",
+    style = "gray",
+    onClick = function()
+      quick.reset()
+      ui.toast("已重置")
+    end,
+  })
+  page:add(reset, 8)
+
+  local next = ui.button({
+    text = "下一步：控件",
+    style = "tinted",
+    onClick = function()
+      showTab(2)
+    end,
+  })
+  page:add(next, 8)
+  page:add(ui.spacer(8))
 end
 
 -- ===== 一、控件 =====
@@ -554,8 +632,8 @@ local function buildDialogs()
       else
         ui.setAppearance("auto")
       end
-      currentTab = 3
-      buildShell(3)
+      currentTab = 4
+      buildShell(4)
     end,
   })
   page:add(modeSegment.view, 14)
@@ -578,8 +656,8 @@ local function buildDialogs()
       textSize = 13,
       onClick = function()
         ui.setAccent(item[2])
-        currentTab = 3
-        buildShell(3)
+        currentTab = 4
+        buildShell(4)
       end,
     })
     local params = LinearLayout.LayoutParams(0, dp(40), 1)
@@ -939,7 +1017,7 @@ local function buildAbout()
     text = "回到控件页",
     style = "filled",
     onClick = function()
-      showTab(1)
+      showTab(2)
     end,
   })
   page:add(back, 14)
@@ -947,6 +1025,7 @@ local function buildAbout()
 end
 
 local BUILDERS = {
+  buildQuick,
   buildControls,
   buildForms,
   buildDialogs,
@@ -986,6 +1065,7 @@ buildShell = function(index)
   tabBar = ui.tabBar({
     selected = currentTab,
     items = {
+      { icon = "◐", title = "快速" },
       { icon = "◻", title = "控件" },
       { icon = "✎", title = "表单" },
       { icon = "◉", title = "弹窗" },

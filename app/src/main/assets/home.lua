@@ -713,11 +713,19 @@ sideEntry("例", 0xff0b6f6a, 0xffdff3f0, "官方示例", "内置完整组件示�
     Toast.makeText(activity, "示例页启动失败：" .. tostring(err), Toast.LENGTH_SHORT).show()
   end
 end)
+sideEntry("册", 0xff0b6f6a, 0xffdff3f0, "使用手册", "从快速开始查到打包排错", function()
+  local ok, err = pcall(function()
+    activity.newActivity("luadoc")
+  end)
+  if not ok then
+    Toast.makeText(activity, "手册启动失败：" .. tostring(err), Toast.LENGTH_SHORT).show()
+  end
+end)
 sideEntry("关", 0xff0b6f6a, 0xffdff3f0, "关于", "版本信息与开发说明", showAbout)
 sideEntry("设", 0xff7a6a56, 0xfff0e4d4, "设置", "偏好与行为配置", showSettings)
 
 local sideFooter = TextView(activity)
-sideFooter.setText(appVersion ~= "" and appVersion or "1.0.0-rc1")
+sideFooter.setText(appVersion ~= "" and appVersion or "1.0.0-rc6")
 sideFooter.setTextSize(10.5)
 sideFooter.setTextColor(MUTED)
 sideFooter.setPadding(dp(12), dp(20), 0, 0)

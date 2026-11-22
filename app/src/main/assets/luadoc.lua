@@ -50,7 +50,7 @@ settings.setBuiltInZoomControls(false)
 settings.setDisplayZoomControls(false)
 settings.setTextZoom(100)
 
-doc_web.setBackgroundColor(0xfff7f1e6)
+doc_web.setBackgroundColor(0xfff2f2f7)
 doc_web.loadUrl(HOME)
 
 doc_web.setOnKeyListener(View.OnKeyListener{

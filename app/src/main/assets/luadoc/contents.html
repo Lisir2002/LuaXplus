@@ -15,66 +15,127 @@
 </div>
 
 <div class="wrap">
-  <div class="hero">
+  <div class="hero" id="contents">
+    <span class="eyebrow"><i></i> 1.0.0-rc6 · 内置离线手册</span>
     <h1>在手机上写 Lua 应用</h1>
-    <p>从新建工程到导出安装包，按顺序读三个分区即可上手；遇到问题直接查排错页。</p>
+    <p>从新建工程到导出安装包，三条路径就能跑通。写界面时查组件库，出问题直接看排查页。</p>
+    <div class="hero-actions">
+      <a href="start.html">开始上手 →</a>
+      <a class="ghost" href="uikit.html">看 UI 组件库</a>
+    </div>
   </div>
 
   <div class="search">
-    <input id="doc-search" type="search" placeholder="搜索：打包、权限、日志、布局、网络…">
+    <div class="glass">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l5 5"></path>
+      </svg>
+      <input id="doc-search" type="search" placeholder="搜索：打包、权限、组件、动画、报错…" aria-label="搜索手册">
+      <button id="search-clear" class="clear" type="button" aria-label="清空搜索">✕</button>
+    </div>
+  </div>
+  <div id="search-count" class="search-meta">共 7 个章节</div>
+
+  <div class="sec-head">
+    <h2>先读这三页</h2>
+    <span>按顺序约 15 分钟</span>
   </div>
 
   <div class="grid">
-    <a class="card" href="start.html">
-      <h3>快速开始</h3>
-      <p>界面在哪里、如何新建工程、怎样运行第一个脚本，以及文件都放在什么位置。</p>
+    <a class="card primary" href="start.html" data-keywords="新建 工程 运行 目录 main.lua 入口 五分钟 应用列表 详情页">
+      <div class="top">
+        <span class="glyph green">启</span>
+        <h3>快速开始</h3>
+        <span class="arrow">›</span>
+      </div>
+      <p>界面在哪里、如何新建工程、怎样运行第一个脚本，以及工程目录、私有目录和日志位置。</p>
       <span class="tag">建议先读</span>
     </a>
 
-    <a class="card" href="api.html">
-      <h3>常用接口</h3>
-      <p>import、luajava、布局与控件、事件、对话框、文件、网络、数据、线程、权限、日志。</p>
+    <a class="card" href="api.html" data-keywords="import luajava 布局 控件 事件 对话框 文件 网络 线程 权限 日志 接口">
+      <div class="top">
+        <span class="glyph">接</span>
+        <h3>常用接口</h3>
+      </div>
+      <p>import、luajava、布局与控件、事件、对话框、文件、网络、数据、线程、权限和日志的速查。</p>
       <span class="tag">写代码时查</span>
     </a>
 
-    <a class="card" href="uikit.html">
-      <h3>LuaX-UI 组件库</h3>
-      <p>iOS 风格的原生组件：页面骨架、分组列表、按钮、表单、弹窗、标签栏，附完整可运行示例。</p>
+    <a class="card" href="uikit.html" data-keywords="ui 组件 按钮 表单 弹窗 动画 主题 示例 页面 show form animate 快捷">
+      <div class="top">
+        <span class="glyph orange">UI</span>
+        <h3>LuaX-UI 组件库</h3>
+      </div>
+      <p>iOS 风格的原生组件：页面骨架、分组列表、按钮、表单、弹窗、标签栏、快捷页面与动画，附完整可运行示例。</p>
       <span class="tag">写界面时看</span>
     </a>
+  </div>
 
-    <a class="card" href="pack.html">
-      <h3>打包与权限</h3>
+  <div class="sec-head">
+    <h2>常用任务</h2>
+    <span>直接跳到对应章节</span>
+  </div>
+  <div class="task-wrap">
+    <a class="task-chip" href="start.html"><em>＋</em> 新建工程</a>
+    <a class="task-chip" href="uikit.html"><em>◻</em> 写一个设置页</a>
+    <a class="task-chip" href="api.html"><em>⌘</em> 调 Java 接口</a>
+    <a class="task-chip" href="pack.html"><em>▣</em> 打包安装包</a>
+    <a class="task-chip" href="faq.html"><em>?</em> 排查报错</a>
+    <a class="task-chip" href="manual.html"><em>§</em> 查 Lua 语法</a>
+  </div>
+
+  <div class="sec-head">
+    <h2>全部章节</h2>
+    <span>发布、排错与参考</span>
+  </div>
+  <div class="grid">
+    <a class="card" href="pack.html" data-keywords="打包 签名 安装 权限 成品 日志 apk 发布">
+      <div class="top">
+        <span class="glyph">包</span>
+        <h3>打包与权限</h3>
+      </div>
       <p>打包流程、签名与安装、权限清单、成品包日志位置，以及导出前的检查项。</p>
       <span class="tag">发版前看</span>
     </a>
 
-    <a class="card" href="faq.html">
-      <h3>常见问题</h3>
+    <a class="card" href="faq.html" data-keywords="报错 模块 找不到 闪退 安装 日志 排查 权限 界面错误">
+      <div class="top">
+        <span class="glyph red">问</span>
+        <h3>常见问题</h3>
+      </div>
       <p>模块找不到、界面错误、安装被拒、日志在哪、脚本不刷新等问题的排查顺序。</p>
       <span class="tag">出问题时看</span>
     </a>
 
-    <a class="card" href="manual.html">
-      <h3>Lua 语言参考</h3>
-      <p>Lua 语法、元表、协程、标准库的完整中文参考，脚本语言层面的问题查这里。</p>
+    <a class="card" href="manual.html" data-keywords="lua 语法 元表 协程 标准库 string table math io os 参考">
+      <div class="top">
+        <span class="glyph">典</span>
+        <h3>Lua 语言参考</h3>
+      </div>
+      <p>Lua 5.3 语法、元表、协程、标准库与 C API 的完整中文参考，脚本语言层面的问题查这里。</p>
       <span class="tag">标准手册</span>
     </a>
 
-    <a class="card" href="glossary.html">
-      <h3>术语表</h3>
+    <a class="card" href="glossary.html" data-keywords="术语 名词 目录 app_lua dex 快照 运行时 铺设 私有目录">
+      <div class="top">
+        <span class="glyph">术</span>
+        <h3>术语表</h3>
+      </div>
       <p>工程目录、私有目录、外部目录、app_lua、dex、快照等名词的通俗解释。</p>
       <span class="tag">概念对照</span>
     </a>
   </div>
 
+  <div id="search-empty" class="empty">没有匹配的章节，换个关键词试试。</div>
+
   <div class="note">
-    手册内容随版本更新。遇到手册没写到的接口，可以在编辑器里用
+    手册内容随版本更新。遇到没写到的接口，可以在编辑器里用
     <code class="inline">import "模块名"</code> 试探，或直接打开对应模块文件查看实现。
+    官方示例在首页侧栏「官方示例」，与自建工程分开存放。
   </div>
 
   <footer>
-    Mini-LuaXPLUS 内置手册 · 版本 1.0.0-rc1
+    Mini-LuaXPLUS 内置手册 · 版本 1.0.0-rc6
   </footer>
 </div>
 

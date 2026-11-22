@@ -518,7 +518,7 @@
 - 示例文件首次打开从 `assets/examples` 铺设到 examples 目录，之后改动保留；应用版本变化或手动恢复时才用内置版本覆盖。
 - 编辑示例属性时会保留 `official` 标记，避免保存后从示例页消失。
 
-示例内容：`assets/examples/luax-ui-demo`，四个页签覆盖页面骨架、分组行、按钮样式、表单、搜索、分段、卡片、弹窗、操作菜单、空态、加载、头像、徽标、分割线、间距、标签栏和明暗主题。
+示例内容：`assets/examples/luax-ui-demo`，六个页签覆盖快速上手、页面骨架、分组行、按钮样式、表单、搜索、分段、卡片、弹窗、操作菜单、空态、加载、头像、徽标、分割线、间距、标签栏、进阶组件、动画和明暗主题。
 
 验证：新增脚本通过 `luac5.3 -p`；release 构建成功；APK 内确认包含 `assets/examples.lua` 与示例工程文件。
 
@@ -532,6 +532,25 @@
 - `ui.form`：一行生成 fieldRow 表单，返回 `view`、`inputs`、`getValues`、`setValues`、`reset`。
 - 进阶组件：chip/chipGroup、checkRow、slider、stepper、progress、skeleton、banner、stat/statRow、fab、toast。
 - 动画：`ui.animate` 支持 up/down/fade/scale、duration、delay；`ui.stagger` 错峰入场；`ui.press` 按压缩放；`page:reveal` 页面整体入场。
-- 新示例：`assets/examples/luax-ui-quick`，用极简页面展示 `ui.show` 与 `ui.form`。
+- 示例合并：`assets/examples/luax-ui-demo` 首个「快速」页签展示 `ui.show` 与 `ui.form`，其余页签保留全量组件。
 
-验证：组件库与两个示例通过 `luac5.3 -p`；五个页签与快速上手示例用 Android 替身跑过构建逻辑；教程 22 段示例语法通过。
+验证：组件库与合并后的单一示例通过 `luac5.3 -p`；六个页签均能从示例工程运行；教程 22 段示例语法通过。
+
+
+## 三十八、示例合并与使用手册改版
+
+需求：把两个官方示例合并成一个工程；首页侧栏新增「使用手册」；优化手册首页、视觉与操作交互，同时保持示例工程与自建工程隔离。
+
+实现：
+
+- 示例合并：`assets/examples/luax-ui-quick` 删除，`luax-ui-demo` 增加「快速」页签，首屏展示 `ui.show`、`ui.form` 与保存/重置，后续页签保留控件、表单、弹窗、进阶和关于。
+- 入口：`home.lua` 侧栏新增「使用手册」，调用现有 `luadoc` Activity；示例仍走 `examples` Activity。
+- 手册首页：重排为 Hero、搜索、先读三页、常用任务、全部章节；搜索支持标题/描述/关键词过滤、结果计数与空态。
+- 手册视觉：`theme.css` 改为 iOS 风格浅色/深色自适应，统一顶栏、卡片、代码块、表格、提示块与焦点态。
+- 阅读交互：桌面固定侧栏、移动抽屉、本页目录折叠与滚动高亮、阅读进度、返回顶部、上一页/下一页、代码语言标签与复制。
+- 全局搜索：任意页点击顶栏搜索或按 `/`，可按标题与关键词跳转章节；语言参考页默认只列顶层目录。
+- 兼容：`manual.html` 保留原有 Lua 5.3 正文，由 `doc.js` 注入统一顶栏、面包屑、目录和代码样式，不改写正文内容。
+
+隔离边界保持不变：官方示例根目录仍是 `LuaXPlus/examples`，自建工程仍是 `LuaXPlus/project`；首页项目列表排除 examples，示例页只显示 `official=true`。
+
+验证：示例、首页与手册脚本通过 `luac5.3 -p`；`doc.js` 通过 `node --check`；Chromium 以 390×844 与 1280×900 两种视口、浅色/暗色打开首页、快速开始、组件教程与语言参考，无控制台或页面错误；首页搜索、抽屉、目录与上下页均可用。

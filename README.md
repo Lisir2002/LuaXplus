@@ -49,7 +49,7 @@ docs/                     审计与规范文档
 - 进阶组件：chip、checkRow、slider、stepper、progress、skeleton、banner、stat、fab、toast。
 - 动画：`ui.animate`、`ui.stagger`、`ui.press` 与 `page:reveal`，默认 260ms 上移淡入。
 - 自绘开关：`app/src/main/java/com/mini/luaxplus/ui/IosSwitch.java`，失败时自动回退系统 `Switch`。
-- 打包携带：`assets/luaxplus/` 在打包白名单内，新打包的成品会自动带上组件库；已安装的旧成品需重新打包。
+- 打包携带：`assets/lua/luaxplus/` 在打包白名单内，新打包的成品会自动带上组件库；已安装的旧成品需重新打包。
 - 教程：应用内“手册 → LuaX-UI 组件库”，含字段表、明暗主题与可直接运行的完整页面示例。
 
 ## 官方示例
@@ -59,7 +59,15 @@ docs/                     审计与规范文档
 - 示例源码位于 `app/src/main/assets/examples/`，首次打开会铺设到 `LuaXPlus/examples`。
 - 自建工程只存放在 `LuaXPlus/project`，两边目录与列表完全隔离，删除或改名互不影响。
 - 示例工程和普通工程一样，可以进入属性页、目录页编辑文件、运行和打包。
-- 「LuaX-UI 组件库示例」覆盖全部组件与动画；「LuaX-UI 快速上手」用几十行演示 `ui.show` 和 `ui.form`。
+- 官方示例合并为一个工程，第一个页签「快速」用几十行演示 `ui.show` 与 `ui.form`，其余页签覆盖控件、表单、弹窗、进阶组件与动画。
+
+## 使用手册
+
+首页侧栏新增「使用手册」入口，直接打开安装包内置的离线手册。
+
+- 手册首页按「先读这三页 / 常用任务 / 全部章节」组织，支持关键词筛选与全局搜索。
+- 宽屏使用固定侧栏，手机上使用抽屉；正文带本页目录、阅读进度、上一页/下一页与返回顶部。
+- 语言参考页保留原有 Lua 5.3 正文，统一顶栏、目录和代码块样式，不依赖网络。
 
 ## 版本号规范
 
