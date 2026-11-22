@@ -8,6 +8,7 @@ import "android.graphics.drawable.*"
 import "android.text.*"
 import "java.io.File"
 import "com.androlua.LuaEditor"
+import "com.mini.luaxplus.editor.EditorLanguage"
 import "com.google.android.material.dialog.MaterialAlertDialogBuilder"
 import "autotheme"
 
@@ -83,6 +84,14 @@ local fileName = File(filePath).getName()
 local fileExists = File(filePath).exists()
 local savedText = readFile(filePath)
 local darkMode = false
+
+-- 语法高亮按文件扩展名识别，菜单里可以手动覆盖
+local languageId = EditorLanguage.detect(filePath)
+local languageName = EditorLanguage.displayName(languageId)
+local languageText
+local applyLanguage
+local showLanguageMenu
+local refreshStatus
 
 activity.setTitle(fileName)
 
@@ -160,6 +169,31 @@ pathText.setSingleLine(true)
 pathText.setEllipsize(TextUtils.TruncateAt.MIDDLE)
 titleBox.addView(pathText, LinearLayout.LayoutParams(-1, -2))
 
+local undoBtn = barButton("↶", 28)
+undoBtn.setTextSize(17)
+undoBtn.setTextColor(TEXT_MUTED)
+local redoBtn = barButton("↷", 28)
+redoBtn.setTextSize(17)
+redoBtn.setTextColor(TEXT_MUTED)
+
+undoBtn.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    pcall(function()
+      editor.undo()
+    end)
+    refreshStatus()
+  end
+})
+
+redoBtn.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    pcall(function()
+      editor.redo()
+    end)
+    refreshStatus()
+  end
+})
+
 local wrapBtn = barButton("换行")
 wrapBtn.setTextSize(11)
 wrapBtn.setTextColor(TEXT_MUTED)
@@ -195,6 +229,7 @@ editor.setWordWrap(false)
 editor.setAutoIndent(true)
 editor.setAutoIndentWidth(4)
 editor.setTabSpaces(4)
+editor.setAutoComplete(true)
 editor.setTextSize(17)
 editor.setText(savedText)
 editor.requestFocus()
@@ -352,12 +387,91 @@ statusText.setTextSize(11)
 statusText.setTextColor(TEXT_MUTED)
 statusBar.addView(statusText, LinearLayout.LayoutParams(0, -2, 1))
 
+languageText = TextView(activity)
+languageText.setTextSize(11)
+languageText.setTextColor(TEXT_MUTED)
+languageText.setPadding(dp(7), 0, dp(7), 0)
+languageText.setText(languageName)
+languageText.setOnClickListener(View.OnClickListener{
+  onClick = function()
+    if showLanguageMenu then
+      showLanguageMenu()
+    end
+  end
+})
+statusBar.addView(languageText, LinearLayout.LayoutParams(-2, -2))
+
 local dirtyText = TextView(activity)
 dirtyText.setTextSize(11)
 dirtyText.setTextColor(ACCENT)
 statusBar.addView(dirtyText, LinearLayout.LayoutParams(-2, -2))
 
 root.addView(statusBar, LinearLayout.LayoutParams(-1, -2))
+
+-- 高亮切换只影响当前编辑器，不改变文件内容或原生编辑逻辑
+applyLanguage = function(id)
+  id = tostring(id or "lua")
+  languageId = id
+  languageName = EditorLanguage.displayName(id)
+  pcall(function()
+    EditorLanguage.applyById(editor, id)
+  end)
+  if languageText then
+    languageText.setText(languageName)
+  end
+end
+
+local LANGUAGE_ITEMS = {
+  { id = "lua", name = "Lua / Aide Lua" },
+  { id = "java", name = "Java" },
+  { id = "kotlin", name = "Kotlin" },
+  { id = "javascript", name = "JavaScript" },
+  { id = "typescript", name = "TypeScript" },
+  { id = "python", name = "Python" },
+  { id = "c", name = "C" },
+  { id = "cpp", name = "C++" },
+  { id = "csharp", name = "C#" },
+  { id = "go", name = "Go" },
+  { id = "rust", name = "Rust" },
+  { id = "swift", name = "Swift" },
+  { id = "php", name = "PHP" },
+  { id = "ruby", name = "Ruby" },
+  { id = "shell", name = "Shell" },
+  { id = "html", name = "HTML / XML" },
+  { id = "css", name = "CSS / SCSS" },
+  { id = "json", name = "JSON" },
+  { id = "yaml", name = "YAML" },
+  { id = "sql", name = "SQL" },
+  { id = "markdown", name = "Markdown" },
+  { id = "groovy", name = "Groovy / Gradle" },
+  { id = "dart", name = "Dart" },
+  { id = "plain", name = "纯文本" }
+}
+
+showLanguageMenu = function()
+  local names = {}
+  local current = 1
+  for index = 1, #LANGUAGE_ITEMS do
+    local item = LANGUAGE_ITEMS[index]
+    names[#names + 1] = item.name .. (item.id == languageId and "  ✓" or "")
+    if item.id == languageId then
+      current = index
+    end
+  end
+  MaterialAlertDialogBuilder(activity)
+    .setTitle("语法高亮")
+    .setItems(names, function(_, which)
+      local item = LANGUAGE_ITEMS[which + 1]
+      if item then
+        applyLanguage(item.id)
+        toast("已切换为 " .. item.name)
+      end
+    end)
+    .setNegativeButton("取消", nil)
+    .show()
+end
+
+applyLanguage(languageId)
 
 -- ===== 保存与状态 =====
 local function currentText()
@@ -388,7 +502,7 @@ local cacheLength = -1
 local cacheLine = 1
 local cacheColumn = 1
 
-local function refreshStatus()
+refreshStatus = function()
   local text = currentText()
   local caret = editor.getSelectionEnd()
   local total = lineCount(text)
@@ -699,20 +813,97 @@ local function moveLine(offset)
   refreshStatus()
 end
 
+local function commentStyle()
+  if languageId == "lua" then
+    return "--", nil, nil
+  elseif languageId == "python" or languageId == "ruby"
+    or languageId == "shell" or languageId == "yaml"
+    or languageId == "markdown" then
+    return "#", nil, nil
+  elseif languageId == "sql" then
+    return "--", "/*", "*/"
+  elseif languageId == "html" then
+    return nil, "<!--", "-->"
+  elseif languageId == "css" then
+    return nil, "/*", "*/"
+  elseif languageId == "json" then
+    return nil, nil, nil
+  end
+  return "//", "/*", "*/"
+end
+
+local function selectedLineBounds()
+  local text = currentText()
+  local from = editor.getSelectionStart()
+  local to = editor.getSelectionEnd()
+  if to < from then
+    from, to = to, from
+  end
+  local startIndex = TextUtil.lastIndexOf(text, "\n", from - 1) + 1
+  local endIndex = TextUtil.indexOf(text, "\n", to)
+  if endIndex < 0 then
+    endIndex = TextUtil.length(text)
+  end
+  return startIndex, endIndex
+end
+
 local function toggleComment()
   local text = currentText()
-  local startIndex, endIndex = caretLineBounds()
-  local line = tostring(TextUtil.substring(text, startIndex, endIndex))
-  local trimmed = line:match("^%s*")
-  local body = line:sub(#trimmed + 1)
-  local replacement
-  if body:sub(1, 2) == "--" then
-    replacement = trimmed .. body:sub(3)
-  else
-    replacement = trimmed .. "--" .. body
+  local startIndex, endIndex = selectedLineBounds()
+  local selected = tostring(TextUtil.substring(text, startIndex, endIndex))
+  local prefix, blockStart, blockEnd = commentStyle()
+
+  if not prefix then
+    if not blockStart or not blockEnd then
+      toast(languageName .. " 不支持行注释")
+      return
+    end
+    local body = selected
+    if body:sub(1, #blockStart) == blockStart and body:sub(-#blockEnd) == blockEnd then
+      body = body:sub(#blockStart + 1, #body - #blockEnd)
+    else
+      body = blockStart .. body .. blockEnd
+    end
+    pcall(function()
+      editor.replaceText(startIndex, endIndex, body)
+    end)
+    refreshStatus()
+    return
+  end
+
+  local lines = {}
+  local allPrefix = true
+  local hasBody = false
+  for line in (selected .. "\n"):gmatch("(.-)\n") do
+    local indent = line:match("^%s*") or ""
+    local body = line:sub(#indent + 1)
+    if body ~= "" then
+      hasBody = true
+      if body:sub(1, #prefix) ~= prefix then
+        allPrefix = false
+      end
+    end
+    lines[#lines + 1] = line
+  end
+  if not hasBody then
+    return
+  end
+
+  local result = {}
+  for index = 1, #lines do
+    local line = lines[index]
+    local indent = line:match("^%s*") or ""
+    local body = line:sub(#indent + 1)
+    if body == "" then
+      result[index] = line
+    elseif allPrefix then
+      result[index] = indent .. body:sub(#prefix + 1)
+    else
+      result[index] = indent .. prefix .. body
+    end
   end
   pcall(function()
-    editor.replaceText(startIndex, endIndex, replacement)
+    editor.replaceText(startIndex, endIndex, table.concat(result, "\n"))
   end)
   refreshStatus()
 end
@@ -721,9 +912,12 @@ end
 local MENU_ITEMS = {
   { name = "跳转行", action = "goto" },
   { name = "查找替换", action = "find" },
+  { name = "撤销", action = "undo" },
+  { name = "重做", action = "redo" },
+  { name = "语法高亮", action = "language" },
   { name = "格式化代码", action = "format" },
   { name = "复制当前行", action = "duplicate" },
-  { name = "注释当前行", action = "comment" },
+  { name = "注释 / 取消注释", action = "comment" },
   { name = "当前行上移", action = "up" },
   { name = "当前行下移", action = "down" },
   { name = "字号加大", action = "bigger" },
@@ -756,7 +950,23 @@ local function menuActions(action)
       .show()
   elseif action == "find" then
     toggleFind()
+  elseif action == "undo" then
+    pcall(function()
+      editor.undo()
+    end)
+    refreshStatus()
+  elseif action == "redo" then
+    pcall(function()
+      editor.redo()
+    end)
+    refreshStatus()
+  elseif action == "language" then
+    showLanguageMenu()
   elseif action == "format" then
+    if languageId ~= "lua" then
+      toast("格式化目前只支持 Lua，当前是 " .. languageName)
+      return
+    end
     pcall(function()
       editor.format()
     end)
@@ -788,6 +998,9 @@ local function menuActions(action)
       editor.setBackgroundColor(PAPER)
       editor.setTextColor(INK)
     end
+    pcall(function()
+      editor.respan()
+    end)
   elseif action == "saveas" then
     local box = LinearLayout(activity)
     box.setOrientation(LinearLayout.VERTICAL)
@@ -817,6 +1030,7 @@ local function menuActions(action)
   elseif action == "info" then
     local file = File(filePath)
     local message = "路径：" .. filePath
+      .. "\n语言：" .. languageName
       .. "\n大小：" .. file.length() .. " 字节"
       .. "\n修改时间：" .. os.date("%Y-%m-%d %H:%M:%S", math.floor(file.lastModified() / 1000))
       .. "\n行数：" .. lineCount(currentText())

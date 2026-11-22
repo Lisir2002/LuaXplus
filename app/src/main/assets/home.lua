@@ -721,6 +721,14 @@ sideEntry("册", 0xff0b6f6a, 0xffdff3f0, "使用手册", "从快速开始查到�
     Toast.makeText(activity, "手册启动失败：" .. tostring(err), Toast.LENGTH_SHORT).show()
   end
 end)
+sideEntry("J", 0xff1f5f8b, 0xffe3f0fa, "Java 浏览器", "浏览类、方法、字段与事件说明", function()
+  local ok, err = pcall(function()
+    activity.newActivity("javaapi/main")
+  end)
+  if not ok then
+    Toast.makeText(activity, "Java 浏览器启动失败：" .. tostring(err), Toast.LENGTH_SHORT).show()
+  end
+end)
 sideEntry("关", 0xff0b6f6a, 0xffdff3f0, "关于", "版本信息与开发说明", showAbout)
 sideEntry("设", 0xff7a6a56, 0xfff0e4d4, "设置", "偏好与行为配置", showSettings)
 
