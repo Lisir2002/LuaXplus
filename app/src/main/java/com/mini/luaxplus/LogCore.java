@@ -122,11 +122,13 @@ public final class LogCore {
         write("E", "Lua", message);
         synchronized (LOCK) {
             long now = System.currentTimeMillis();
-            if (message != null && message.equals(lastLuaMessage) && now - lastLuaTime < 3000L) {
+            String signature = (message == null ? "" : message) + "|"
+                    + (traceback == null ? "" : traceback.substring(0, Math.min(200, traceback.length())));
+            if (signature.equals(lastLuaMessage) && now - lastLuaTime < 3000L) {
                 write("W", "Lua", "重复错误在 3 秒内出现，仅记录到运行日志: " + message);
                 return;
             }
-            lastLuaMessage = message;
+            lastLuaMessage = signature;
             lastLuaTime = now;
         }
         synchronized (LOCK) {

@@ -365,7 +365,8 @@ function buildDirPage(keepPage)
   dirScroll = scroll
 
   local breadcrumb = TextView(activity)
-  breadcrumb.setText(currentDir:gsub(projectDir, "工程根目录"))
+  local crumb = currentDir:gsub(projectDir, "工程根目录")
+  breadcrumb.setText((crumb))
   breadcrumb.setTextSize(12)
   breadcrumb.setTextColor(MUTED)
   breadcrumb.setPadding(dp(2), dp(6), dp(2), dp(10))
