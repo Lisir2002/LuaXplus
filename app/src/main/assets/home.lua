@@ -3,6 +3,7 @@ import "android.app.*"
 import "android.os.*"
 import "android.widget.*"
 import "android.view.*"
+import "android.text.TextWatcher"
 import "android.graphics.drawable.*"
 import "android.graphics.Typeface"
 import "java.io.File"
@@ -33,6 +34,7 @@ pcall(function()
 end)
 
 local theme = require "luaxplus.theme"
+local pkgname = require "luaxplus.pkgname"
 local C = theme.colors
 local PAPER = C.paper
 local CARD = C.card
@@ -126,6 +128,21 @@ local function readInfo(dir)
   end
   info.path = dir
   return info
+end
+
+local function collectPackages()
+  local used = {}
+  local list = File(projectRoot).listFiles()
+  if not list then
+    return used
+  end
+  for index = 0, #list - 1 do
+    local info = readInfo(list[index].getPath())
+    if info and info.packagename then
+      used[info.packagename] = true
+    end
+  end
+  return used
 end
 
 local function dirSize(dir)
@@ -490,6 +507,7 @@ end
 
 newBtn.setOnClickListener(View.OnClickListener{
   onClick = function()
+    local usedPackages = collectPackages()
     local box = LinearLayout(activity)
     box.setOrientation(LinearLayout.VERTICAL)
     box.setPadding(dp(20), dp(8), dp(20), 0)
@@ -499,30 +517,57 @@ newBtn.setOnClickListener(View.OnClickListener{
     nameInput.setSingleLine(true)
     box.addView(nameInput, LinearLayout.LayoutParams(-1, -2))
 
-    local pkgInput = EditText(activity)
-    pkgInput.setHint("包名，例如 com.mini.notes")
-    pkgInput.setSingleLine(true)
-    pkgInput.setText("com.mini.app")
-    local pkgParams = LinearLayout.LayoutParams(-1, -2)
-    pkgParams.topMargin = dp(10)
-    box.addView(pkgInput, pkgParams)
+    local pkgPreview = TextView(activity)
+    pkgPreview.setTextSize(12)
+    pkgPreview.setTextColor(MUTED)
+    pkgPreview.setPadding(0, dp(8), 0, 0)
+    pkgPreview.setSingleLine(false)
+    box.addView(pkgPreview, LinearLayout.LayoutParams(-1, -2))
+
+    local function cleanName()
+      return tostring(nameInput.getText().toString() or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    end
+
+    local function previewPackage()
+      local name = cleanName()
+      if name == "" then
+        pkgPreview.setText("填写应用名称后自动生成包名")
+      else
+        pkgPreview.setText("包名：" .. pkgname.generate(name, usedPackages) .. "（自动生成）")
+      end
+    end
+
+    nameInput.addTextChangedListener(TextWatcher{
+      beforeTextChanged = function()
+      end,
+      onTextChanged = function()
+      end,
+      afterTextChanged = function()
+        previewPackage()
+      end
+    })
+    previewPackage()
 
     MaterialAlertDialogBuilder(activity)
       .setTitle("新建应用")
       .setView(box)
       .setNegativeButton("取消", nil)
       .setPositiveButton("创建", function()
-        local name = nameInput.getText().toString()
-        local pkg = pkgInput.getText().toString()
+        local name = cleanName()
         if name == "" then
           toast("请填写应用名称")
           return
         end
-        if not pkg:find("%.") then
-          pkg = "com.mini." .. pkg
+
+        local safe = name:gsub("[/\\%s]", "_")
+        if File(projectRoot .. "/" .. safe).exists() then
+          toast("同名应用已存在，请换一个名称")
+          return
         end
+
+        local pkg = pkgname.generate(name, usedPackages)
         createProject(name, pkg)
-        toast("已创建「" .. name .. "」")
+        toast("已创建「" .. name .. "」\n包名：" .. pkg)
         refresh()
       end)
       .show()
