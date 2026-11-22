@@ -40,7 +40,7 @@ public final class LogCore {
     private static final SimpleDateFormat DAY =
             new SimpleDateFormat("yyyyMMdd", Locale.US);
     private static final SimpleDateFormat CLOCK =
-            new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US);
+            new SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US);
 
     private static Context appContext;
     private static File activeDir;
@@ -51,6 +51,8 @@ public final class LogCore {
     private static boolean external;
     private static boolean initialized;
     private static long lastExternalRetry;
+    private static String lastLuaMessage;
+    private static long lastLuaTime;
 
     private LogCore() {
     }
@@ -112,6 +114,15 @@ public final class LogCore {
     /** 记录 Lua 运行时错误，单独成文件便于定位 */
     public static void luaError(String message, String traceback) {
         write("E", "Lua", message);
+        synchronized (LOCK) {
+            long now = System.currentTimeMillis();
+            if (message != null && message.equals(lastLuaMessage) && now - lastLuaTime < 3000L) {
+                write("W", "Lua", "重复错误在 3 秒内出现，仅记录到运行日志: " + message);
+                return;
+            }
+            lastLuaMessage = message;
+            lastLuaTime = now;
+        }
         synchronized (LOCK) {
             ensureReady();
             File target = new File(activeDir, "luaerror_" + CLOCK.format(new Date()) + ".log");

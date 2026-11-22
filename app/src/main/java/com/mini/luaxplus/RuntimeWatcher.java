@@ -5,6 +5,12 @@ import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
+
+import java.util.Map;
+import java.util.WeakHashMap;
 
 /**
  * 运行时观察者：接管未捕获异常并记录页面生命周期，覆盖崩溃与操作轨迹。
@@ -13,6 +19,8 @@ public final class RuntimeWatcher {
 
     private static final String TAG = "Watcher";
     private static boolean installed;
+    /** 已记录过的错误页文本，按页面实例隔离，避免重复快照 */
+    private static final Map<Object, String> SEEN_ERROR = new WeakHashMap<>();
 
     private RuntimeWatcher() {
     }
@@ -66,6 +74,7 @@ public final class RuntimeWatcher {
                     @Override
                     public void onActivityResumed(Activity activity) {
                         LogCore.d(TAG, "前台 " + name(activity));
+                        snapshotErrorScreen(activity);
                     }
 
                     @Override
@@ -86,8 +95,56 @@ public final class RuntimeWatcher {
                     @Override
                     public void onActivityDestroyed(Activity activity) {
                         LogCore.i(TAG, "销毁 " + name(activity));
+                        synchronized (SEEN_ERROR) {
+                            SEEN_ERROR.remove(activity);
+                        }
                     }
                 });
+    }
+
+
+    /** 兜底：页面若呈现运行时错误文本，直接截取整段内容存成快照 */
+    private static void snapshotErrorScreen(Activity activity) {
+        try {
+            View root = activity.getWindow().getDecorView();
+            String text = findErrorText(root);
+            if (text == null) {
+                return;
+            }
+            synchronized (SEEN_ERROR) {
+                String previous = SEEN_ERROR.get(activity);
+                if (text.equals(previous)) {
+                    return;
+                }
+                SEEN_ERROR.put(activity, text);
+            }
+            LogCore.luaError("界面错误 " + activity.getClass().getName(), text);
+        } catch (Throwable ignored) {
+            // 截屏兜底失败不能影响页面
+        }
+    }
+
+    private static String findErrorText(View view) {
+        if (view instanceof TextView) {
+            CharSequence content = ((TextView) view).getText();
+            if (content != null) {
+                String text = content.toString();
+                if (text.contains("Runtime error") || text.startsWith("error")
+                        || text.contains("stack traceback")) {
+                    return text;
+                }
+            }
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int index = 0; index < group.getChildCount(); index++) {
+                String text = findErrorText(group.getChildAt(index));
+                if (text != null) {
+                    return text;
+                }
+            }
+        }
+        return null;
     }
 
     private static Intent getIntent(Activity activity) {

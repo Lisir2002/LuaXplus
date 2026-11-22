@@ -502,6 +502,19 @@ luajava_mt.__index = function(t, k)
 end
 setmetatable(luajava, luajava_mt)
 
+-- 统一错误快照：运行时在弹出错误页前会调用 onError(name, error)，
+-- 这里把它落成独立文件，返回 false 保持原有错误页展示。
+if type(_G.onError) ~= "function" then
+  _G.onError = function(name, err)
+    pcall(function()
+      luajava.bindClass("com.mini.luaxplus.LogCore").luaError(
+        tostring(name) .. ": " .. tostring(err),
+        debug.traceback("", 2))
+    end)
+    return false
+  end
+end
+
 return env_import
 
 

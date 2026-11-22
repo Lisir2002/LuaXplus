@@ -226,3 +226,18 @@
 原因：`LuaApplication.getLuaLpath()` 由 `getDir("lua")`（即 `app_lua`）构造，用户脚本的 `package.path` 只包含工程目录与 `app_lua`，不含主界面使用的 `files` 目录。铺设逻辑只把脚本复制到 `files`，`app_lua` 是空的。
 
 处置：启动铺设时额外把 `assets/lua` 复制到 `context.getDir("lua")`，使 `import`、`loadlayout`、`console` 等基础模块在用户工程运行时也能被 `require` 命中。
+
+## 十八、错误快照覆盖不全
+
+现象：只有入口脚本错误会生成 `luaerror_*` 文件，用户脚本运行报错、运行时错误页都不产生新快照，旧文件时间停在首次报错那一刻。
+
+原因：
+
+1. `LuaActivity.sendError` 会先调用脚本全局 `onError(name, error)`，返回 true 才抑制默认错误页。用户脚本在独立 Lua 状态中执行，没有装载我们的日志钩子，所以只弹页面不落文件。
+2. 入口包装层只在 `main.lua` 生效，覆盖不到其他脚本。
+
+处置：
+
+- `import.lua` 末尾注册全局 `onError`：写入 `luaerror` 快照后返回 false，保留原有错误页展示。绝大多数脚本都会 `require "import"`，可覆盖模板与用户工程。
+- `RuntimeWatcher` 增加错误页兜底扫描：页面恢复前台时检查视图树，若出现 `Runtime error` 文本则整段截取存快照，覆盖未加载 import 的脚本。
+- 快照文件名精确到毫秒（`luaerror_yyyyMMdd_HHmmss_SSS.log`），3 秒内完全相同的错误只记入运行日志，避免同一错误刷出大量文件。
