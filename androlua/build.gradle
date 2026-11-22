@@ -44,3 +44,11 @@ dependencies {
     api libs.androidx.appcompat.appcompat
     api libs.google.material
 }
+
+// 手动入口：生成 Lua 5.5 原生库，产物在 build/native/<abi>，不参与默认 assemble
+tasks.register('buildLua55Native', Exec) {
+    group = 'native'
+    description = 'Build Lua 5.5.1 runtime and native modules for armeabi-v7a and arm64-v8a'
+    workingDir rootProject.projectDir
+    commandLine 'bash', 'tools/native/build.sh'
+}
