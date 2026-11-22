@@ -1,0 +1,22 @@
+{
+  LinearLayout;
+  orientation="vertical";
+  layout_width="fill";
+  padding="12dp";
+  {
+    TextView;
+    id="title";
+    layout_width="fill";
+    textSize="15dp";
+    textColor=0xFF1C2B3A;
+    singleLine=true;
+  };
+  {
+    TextView;
+    id="subtitle";
+    layout_width="fill";
+    textSize="11dp";
+    textColor=0xFF5F6F7C;
+    singleLine=true;
+  };
+};
