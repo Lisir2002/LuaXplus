@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>打包与权限 · Mini-LuaXPLUS 手册</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<div class="topbar">
+  <a class="home" href="contents.html">←</a>
+  <span class="title">打包与权限</span>
+  <span class="sub">发版前看</span>
+</div>
+
+<div class="wrap">
+  <h1 class="page">打包、签名与权限</h1>
+  <p>打包会把当前工程组装成独立安装包，带上运行时模块、完整权限清单与日志系统。下面按顺序说明每一步做了什么、可能卡在哪。</p>
+
+  <div class="tocbox" id="auto-toc"></div>
+
+  <h2>打包做了什么</h2>
+  <ol>
+    <li>以主程序安装包为模板，替换包名、应用名、版本号与图标等清单信息。</li>
+    <li>把工程脚本编译进安装包，同时保留运行时基础模块与日志脚本。</li>
+    <li>重排归档结构，资源索引表改为不压缩并按四字节对齐，满足系统解析要求。</li>
+    <li>在设备上完成 v1 + v2 + v3 三段签名，然后自动拉起安装界面。</li>
+  </ol>
+
+  <div class="note">
+    成品包与主程序共用同一套 Java 运行时，所以启动页、日志、崩溃监控、权限申请都不需要工程自己实现。
+  </div>
+
+  <h2>成品包里带了什么</h2>
+  <table>
+    <tr><th>内容</th><th>说明</th></tr>
+    <tr><td>工程脚本</td><td>工程目录下的 Lua 文件，编译后写入安装包</td></tr>
+    <tr><td>运行时模块</td><td><code class="inline">import</code>、<code class="inline">loadlayout</code>、<code class="inline">permissions</code>、日志模块等</td></tr>
+    <tr><td>完整权限清单</td><td>继承模板的全部权限，不再按工程声明裁剪</td></tr>
+    <tr><td>日志与监控</td><td>启动即初始化，错误、警告、崩溃各自留快照</td></tr>
+  </table>
+
+  <h2>权限</h2>
+  <p>权限分两层：清单声明与运行时授权。清单已由打包自动注入，你只需要在用到时申请：</p>
+
+<pre>import "permissions"
+permissions.ensure("storage")   -- 打开所有文件访问授权页
+permissions.ensure("camera", "microphone")</pre>
+
+  <ul>
+    <li>存储权限在成品首次启动时也会自动申请一次。</li>
+    <li>系统级授权（所有文件访问）必须在设置页手动打开，脚本无法代劳。</li>
+    <li>拒绝授权不会导致崩溃，只会让相关功能不可用，日志会记录一条警告。</li>
+  </ul>
+
+  <h2>成品日志在哪</h2>
+  <p>每个成品独立一个目录，包名即目录名：</p>
+
+<pre>/storage/emulated/0/LuaXPlus/products/你的包名/logs
+    app_日期.log                  当天运行日志
+    warn_日期_时分秒_毫秒_进程.log   警告快照
+    luaerror_日期_时分秒_毫秒.log    脚本错误快照
+    crash_日期_时分秒_毫秒_进程.log   崩溃快照</pre>
+
+  <p>未获得存储授权时，日志先写在成品自己的私有目录，授权后 30 秒内自动切换。</p>
+
+  <h2>安装被拒的常见原因</h2>
+  <table>
+    <tr><th>提示</th><th>原因与处理</th></tr>
+    <tr><td>与当前系统有兼容性问题</td><td>归档结构或签名不满足系统要求，重新打包即可；本版本已内置处理</td></tr>
+    <tr><td>签名冲突</td><td>设备上已有同包名、不同签名的版本，先卸载旧包</td></tr>
+    <tr><td>解析包错误</td><td>安装包传输中被截断，重新拷贝或重新打包</td></tr>
+    <tr><td>应用未安装</td><td>空间不足、包名与已有应用冲突，或系统拦截了来源</td></tr>
+  </table>
+
+  <h2>导出前的检查项</h2>
+  <ul>
+    <li>包名不与设备上已有应用冲突，版本号按需递增。</li>
+    <li>工程内 <code class="inline">main.lua</code> 能在主程序里正常运行，没有报错。</li>
+    <li>需要的权限已在脚本里申请，或首次启动时自动申请。</li>
+    <li>打包完成后先在本机装一次，确认能进入界面再看日志目录是否生成。</li>
+  </ul>
+
+  <div class="danger">
+    打包成品使用的是内置测试密钥，仅适合本机测试与分发试用。对外发布的正式应用应使用自己的发布密钥签名的安装包，避免身份混用。
+  </div>
+
+  <footer>Mini-LuaXPLUS 内置手册 · 版本 1.0.0-rc1</footer>
+</div>
+
+<script src="doc.js"></script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>常见问题 · Mini-LuaXPLUS 手册</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<div class="topbar">
+  <a class="home" href="contents.html">←</a>
+  <span class="title">常见问题</span>
+  <span class="sub">出问题时看</span>
+</div>
+
+<div class="wrap">
+  <h1 class="page">常见问题与排查顺序</h1>
+  <p>遇到问题时按这个顺序走：先确认日志目录，再读最新快照的堆栈第一行，最后对照下面的现象处理。</p>
+
+  <div class="tocbox" id="auto-toc"></div>
+
+  <h2>先看日志，不要猜</h2>
+  <ul>
+    <li>主程序日志：<code class="inline">/storage/emulated/0/LuaXPlus/logs</code></li>
+    <li>成品日志：<code class="inline">/storage/emulated/0/LuaXPlus/products/包名/logs</code></li>
+    <li>按修改时间排序，最新的 <code class="inline">luaerror_*</code> 或 <code class="inline">crash_*</code> 就是现场。</li>
+  </ul>
+
+  <div class="tip">
+    快照文件名带毫秒，每次报错都是独立文件，不会互相覆盖。堆栈里的第一条通常直接指出脚本与行号。
+  </div>
+
+  <h2>module 'import' not found</h2>
+  <p>脚本第一行就 <code class="inline">require "import"</code> 时报找不到模块，说明基础模块没有铺设到运行时目录。</p>
+  <ol>
+    <li>确认设备已授权存储权限；未授权时铺设可能中断。</li>
+    <li>到私有目录 <code class="inline">files/lua</code> 看是否存在 <code class="inline">import.lua</code>。</li>
+    <li>清理应用数据后重装，让启动铺设重新执行一次。</li>
+    <li>成品包出现这个问题，通常是打包时没带上运行时模块，重新打包即可。</li>
+  </ol>
+
+  <h2>界面报「不是字段」或方法调用无效</h2>
+  <p>典型提示如 <code class="inline">xxx@Listener is not a field</code>、<code class="inline">Invalid method call</code>，多半是脚本里用了不存在的属性或方法。</p>
+  <ul>
+    <li>Java 控件只有 setter 方法，没有同名属性字段；用 <code class="inline">setOnClickListener</code> 而不是字段赋值。</li>
+    <li>回调要写成表：<code class="inline">View.OnClickListener{ onClick = function(v) ... end }</code>。</li>
+    <li>接口版本差异会导致方法签名不同，报错时按堆栈给出的类名核对。</li>
+  </ul>
+
+  <h2>启动就闪退</h2>
+  <ol>
+    <li>找最新的 <code class="inline">crash_*.log</code>，看异常类型与第一行「由谁抛出」。</li>
+    <li>如果是脚本层错误，会先有 <code class="inline">luaerror_*.log</code>，两者按时间对照看。</li>
+    <li>覆盖安装旧版本仍闪退时，先清理应用数据再试，排除残留脚本干扰。</li>
+    <li>把快照文件保留下来，它记录了版本、线程、机型与完整堆栈。</li>
+  </ol>
+
+  <h2>安装提示与系统不兼容</h2>
+  <p>这是安装包归档或签名不满足系统要求，不是代码问题。当前版本已在打包环节处理：资源索引表不压缩且四字节对齐、签名补齐 v1/v2/v3。</p>
+  <ul>
+    <li>确认用的是最新主程序打的包，旧包不会自动变好。</li>
+    <li>同包名旧版本先卸载，避免签名冲突被误判成兼容性问题。</li>
+  </ul>
+
+  <h2>权限开关是灰的</h2>
+  <p>说明安装包清单里没有声明对应权限。当前版本打包会继承完整权限清单；如果仍为灰色，检查是不是用了旧版本打的包。</p>
+
+  <h2>改了脚本但运行结果没变</h2>
+  <ul>
+    <li>主程序在版本变化或重装后才重新铺设运行时脚本，工程脚本本身每次都重新读取。</li>
+    <li>成品包是打包时的快照，改脚本必须重新打包。</li>
+    <li>确认改的是当前工程目录下的文件，而不是外部目录里的另一份副本。</li>
+  </ul>
+
+  <h2>日志文件一直不更新</h2>
+  <p>早期版本只有入口脚本错误会写快照。当前版本已覆盖：</p>
+  <table>
+    <tr><th>场景</th><th>落盘位置</th></tr>
+    <tr><td>脚本运行报错</td><td><code class="inline">luaerror_*.log</code></td></tr>
+    <tr><td>运行时错误页</td><td>错误页内容整段截取为快照</td></tr>
+    <tr><td>未捕获异常</td><td><code class="inline">crash_*.log</code></td></tr>
+    <tr><td>警告</td><td><code class="inline">warn_*.log</code> 与当天日志</td></tr>
+  </table>
+
+  <h2>成品打开白屏或直接退出</h2>
+  <ol>
+    <li>先看 <code class="inline">products/包名/logs</code> 是否生成日志；没有日志说明启动阶段就出问题。</li>
+    <li>有 <code class="inline">luaerror</code> 时按堆栈定位脚本；有 <code class="inline">crash</code> 时看是否为 Java 层异常。</li>
+    <li>确认成品已获得存储权限，否则部分依赖外部目录的脚本会失败。</li>
+  </ol>
+
+  <h2>怎么彻底重置</h2>
+  <ul>
+    <li>系统设置里清除应用数据：会清空私有目录脚本，下次启动重新铺设。</li>
+    <li>删除外部目录 <code class="inline">LuaXPlus/logs</code> 只清日志，不影响工程。</li>
+    <li>成品包各自独立，卸载成品只影响它自己的目录。</li>
+  </ul>
+
+  <footer>Mini-LuaXPLUS 内置手册 · 版本 1.0.0-rc1</footer>
+</div>
+
+<script src="doc.js"></script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>快速开始 · Mini-LuaXPLUS 手册</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<div class="topbar">
+  <a class="home" href="contents.html">←</a>
+  <span class="title">快速开始</span>
+  <span class="sub">约 5 分钟</span>
+</div>
+
+<div class="wrap">
+  <h1 class="page">五分钟写出第一个界面</h1>
+  <p>这一页只讲最短路径：找到工程、写脚本、运行、看到结果。更细的接口在「常用接口」，导出安装包在「打包与权限」。</p>
+
+  <div class="tocbox" id="auto-toc"></div>
+
+  <h2>界面与入口</h2>
+  <p>启动后先看到品牌启动页，随后进入编辑器。编辑器顶部是菜单，常用项包括新建工程、打开工程、运行、打包、设置。</p>
+  <ul>
+    <li><strong>运行</strong>：直接执行当前工程脚本，错误会以独立页面提示，同时写入日志快照。</li>
+    <li><strong>打包</strong>：把当前工程组装成可以安装的成品包，详见「打包与权限」。</li>
+    <li><strong>设置</strong>：主题、编辑器字号、存储目录等开关。</li>
+  </ul>
+
+  <h2>目录都在哪</h2>
+  <table>
+    <tr><th>位置</th><th>路径</th><th>用途</th></tr>
+    <tr><td>外部目录</td><td><code class="inline">/storage/emulated/0/LuaXPlus</code></td><td>工程文件、日志，卸载后仍保留</td></tr>
+    <tr><td>主程序日志</td><td><code class="inline">/storage/emulated/0/LuaXPlus/logs</code></td><td>运行日志、警告/错误/崩溃快照</td></tr>
+    <tr><td>成品日志</td><td><code class="inline">/storage/emulated/0/LuaXPlus/products/包名/logs</code></td><td>每个打包成品各自一套日志</td></tr>
+    <tr><td>私有目录</td><td><code class="inline">/data/user/0/com.mini.luaxplus/files</code></td><td>运行时脚本，首次启动自动铺设</td></tr>
+  </table>
+
+  <div class="tip">
+    首次安装后，程序会申请「所有文件访问」权限。授权前日志暂存在私有目录，授权后自动切换到外部目录；工程读写同样依赖这项权限。
+  </div>
+
+  <h2>第一个脚本</h2>
+  <p>新建工程后，把下面内容写进 <code class="inline">main.lua</code>，运行时就会看到标题和一个居中文本。</p>
+
+<pre>require "import"
+import "android.widget.*"
+import "android.view.*"
+import "autotheme"
+
+activity.setTitle("你好")
+activity.setTheme(autotheme())
+
+local layout = LinearLayout(activity)
+layout.setOrientation(LinearLayout.VERTICAL)
+layout.setGravity(Gravity.CENTER)
+
+local text = TextView(activity)
+text.setText("Hello, Mini-LuaXPLUS")
+text.setTextSize(20)
+layout.addView(text)
+
+activity.setContentView(layout)</pre>
+
+  <p>脚本里的 <code class="inline">activity</code> 是当前页面对象，几乎所有界面操作都从它出发；<code class="inline">import</code> 负责引入 Java 类与 Lua 模块。</p>
+
+  <h2>让它响应点击</h2>
+  <p>给控件挂监听，写法和 Android 原生一致，只是用 Lua 函数代替匿名类：</p>
+
+<pre>local button = Button(activity)
+button.setText("点我")
+button.setOnClickListener(View.OnClickListener{
+  onClick = function(v)
+    Toast.makeText(activity, "被点了一下", Toast.LENGTH_SHORT).show()
+  end
+})
+layout.addView(button)</pre>
+
+  <div class="note">
+    监听回调要写成表的形式（<code class="inline">{ onClick = function(...) ... end }</code>），Lua 会自动转换成 Java 接口实现。
+  </div>
+
+  <h2>脚本放在哪、怎么被加载</h2>
+  <p>运行时程序把内置的脚本基础模块铺到私有目录，再执行你工程的 <code class="inline">main.lua</code>。因此工程里可以直接 <code class="inline">require "import"</code>、<code class="inline">import "loadlayout"</code> 等，不需要自己拷贝依赖。</p>
+  <ul>
+    <li>工程内的其它 <code class="inline">.lua</code> 文件按相对路径 <code class="inline">require</code> 即可。</li>
+    <li>基础模块位于私有目录的 <code class="inline">lua</code> 子目录，模块搜索路径已自动包含。</li>
+    <li>同名文件以工程内为准，会覆盖内置版本。</li>
+  </ul>
+
+  <h2>出错了看哪里</h2>
+  <p>脚本报错会弹出错误页，同时生成一份快照。文件命名规则：</p>
+  <table>
+    <tr><th>文件名</th><th>含义</th></tr>
+    <tr><td><code class="inline">luaerror_日期_时分秒_毫秒.log</code></td><td>脚本运行错误，含错误正文与堆栈</td></tr>
+    <tr><td><code class="inline">warn_日期_时分秒_毫秒_进程号.log</code></td><td>警告快照，同一警告 5 秒内只留首条</td></tr>
+    <tr><td><code class="inline">crash_日期_时分秒_毫秒_进程号.log</code></td><td>程序崩溃，含完整堆栈与设备信息</td></tr>
+    <tr><td><code class="inline">app_日期.log</code></td><td>当天运行日志，含普通信息与警告行</td></tr>
+  </table>
+
+  <p>下一步：读「常用接口」了解布局、网络、数据、权限；准备发版时读「打包与权限」。</p>
+
+  <footer>Mini-LuaXPLUS 内置手册 · 版本 1.0.0-rc1</footer>
+</div>
+
+<script src="doc.js"></script>
+</body>
+</html>

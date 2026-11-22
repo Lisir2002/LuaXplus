@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>常用接口 · Mini-LuaXPLUS 手册</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<div class="topbar">
+  <a class="home" href="contents.html">←</a>
+  <span class="title">常用接口</span>
+  <span class="sub">写代码时查</span>
+</div>
+
+<div class="wrap">
+  <h1 class="page">常用接口速查</h1>
+  <p>按使用频次排列：先搞清 import 与 luajava，再看界面、数据、网络，最后是权限和日志。</p>
+
+  <div class="tocbox" id="auto-toc"></div>
+
+  <h2>import 与模块</h2>
+  <p><code class="inline">require</code> 找 Lua 模块，<code class="inline">import</code> 既能引入 Lua 模块，也能把 Java 包的类变成可用名字。</p>
+
+<pre>require "import"          -- 引入 import 机制本身
+import "android.widget.*" -- 引入一整个 Java 包
+import "loadlayout"       -- 引入内置 Lua 模块
+import "http"</pre>
+
+  <ul>
+    <li>模块搜索路径已包含工程目录、私有目录 <code class="inline">lua</code> 与 <code class="inline">app_lua</code>，普通模块直接写名字即可。</li>
+    <li>工程内文件与内置模块重名时，工程内优先。</li>
+    <li>模块名里的点按目录层级解析，例如 <code class="inline">require "luaxplus.log"</code> 对应 <code class="inline">luaxplus/log.lua</code>。</li>
+  </ul>
+
+  <h2>luajava：直接调用 Java</h2>
+  <p>三类最常用操作：取类、建对象、实现接口。</p>
+
+<pre>local Intent = luajava.bindClass("android.content.Intent")
+local intent = Intent(activity, activity.getClass())
+activity.startActivity(intent)
+
+-- 实现接口（表转 Java 接口对象）
+local runnable = luajava.newInstance("java.lang.Runnable", {
+  run = function()
+    print("在子线程里执行")
+  end
+})
+local Thread = luajava.bindClass("java.lang.Thread")
+Thread(runnable).start()</pre>
+
+  <h2>布局与控件</h2>
+  <p>两种写法：代码直接搭，或用表描述交给 <code class="inline">loadlayout</code> 生成。</p>
+
+<pre>require "import"
+import "android.widget.*"
+import "android.view.*"
+import "loadlayout"
+
+local layout = {
+  LinearLayout,
+  orientation = "vertical",
+  padding = "16dp",
+  {
+    TextView,
+    id = "title",
+    text = "标题",
+    textSize = "20sp",
+    textColor = "#1C2B3A",
+  },
+  {
+    Button,
+    id = "ok",
+    text = "确定",
+  },
+}
+
+activity.setContentView(loadlayout(layout))
+title.setText("已加载布局")</pre>
+
+  <div class="note">
+    表里第一个元素是控件类，字符串键对应 setter 方法（<code class="inline">text</code> 对应 <code class="inline">setText</code>），子表是子控件。
+  </div>
+
+  <h2>事件与回调</h2>
+
+<pre>ok.setOnClickListener(View.OnClickListener{
+  onClick = function(v)
+    Toast.makeText(activity, "点击生效", Toast.LENGTH_SHORT).show()
+  end
+})
+
+-- 长按
+ok.setOnLongClickListener(View.OnLongClickListener{
+  onLongClick = function(v)
+    return true
+  end
+})</pre>
+
+  <h2>对话框与菜单</h2>
+
+<pre>import "android.app.*"
+AlertDialog.Builder(activity)
+  .setTitle("提示")
+  .setMessage("这是一段说明")
+  .setPositiveButton("知道了", nil)
+  .show()
+
+-- 由 Lua 函数注册的菜单，在 onCreateOptionsMenu 里返回 true 即可显示</pre>
+
+  <p>菜单与位图相关工具：<code class="inline">import "loadmenu"</code> 构造菜单，<code class="inline">import "loadbitmap"</code> 从路径或资源加载图片。</p>
+
+  <h2>网页与编辑器</h2>
+  <ul>
+    <li><code class="inline">LuaWebView(activity)</code>：内置浏览器控件，支持加载本地页面与网址，本手册就是用它展示的。</li>
+    <li><code class="inline">LuaEditor(activity)</code>：带行号、语法高亮的代码编辑控件，主界面编辑器基于它。</li>
+    <li><code class="inline">LuaUtil</code>：<code class="inline">LuaUtil.copyFile(源, 目标)</code>、读取文本等工具方法。</li>
+  </ul>
+
+  <h2>文件与路径</h2>
+
+<pre>local path = activity.getLuaDir()              -- 当前工程所在目录
+local ext = activity.getLuaExtDir()            -- 外部存储根目录（LuaXPlus）
+local f = io.open(path .. "/data.txt", "w")
+f:write("内容")
+f:close()
+
+LuaUtil.copyFile(path .. "/a.txt", ext .. "/b.txt")</pre>
+
+  <table>
+    <tr><th>方法</th><th>返回</th></tr>
+    <tr><td><code class="inline">activity.getLuaDir()</code></td><td>当前脚本所在目录</td></tr>
+    <tr><td><code class="inline">activity.getLuaExtDir()</code></td><td>外部存储下的程序目录</td></tr>
+    <tr><td><code class="inline">activity.getLuaPath("名称")</code></td><td>拼接出当前目录下的完整路径</td></tr>
+  </table>
+
+  <h2>网络请求</h2>
+
+<pre>require "http"
+
+local body = {}
+local code, headers, status = http.request{
+  url = "https://www.example.com/",
+  method = "GET",
+  headers = {
+    ["User-Agent"] = "Mini-LuaXPLUS",
+  },
+  sink = ltn12.sink.table(body),
+}</pre>
+
+  <ul>
+    <li><code class="inline">http.request</code> 返回状态码、响应头与状态行，响应正文按 <code class="inline">sink</code> 收集。</li>
+    <li>需要长连接或自定义协议时用 <code class="inline">require "socket"</code>。</li>
+    <li>另有 <code class="inline">ftp</code>、<code class="inline">smtp</code> 模块，分别处理文件传输与发信。</li>
+  </ul>
+
+  <h2>数据格式</h2>
+
+<pre>require "json"
+local text = encode({ name = "豆包", tags = { "lua", "android" } })
+local obj = decode(text)
+
+require "base64"
+local encoded = encode("原始内容")
+local raw = decode(encoded)
+
+require "hex"
+local h = encode("AB")      -- 十六进制
+local raw2 = decode(h)
+
+require "xml"
+local doc = xml.new()       -- 构造与遍历 XML
+local node = xml.tag(doc, "root")</pre>
+
+  <div class="note">
+    <code class="inline">json</code> 与 <code class="inline">base64</code>、<code class="inline">hex</code> 引入后直接提供全局
+    <code class="inline">encode</code> / <code class="inline">decode</code>，同时使用时注意先后覆盖，建议显式写成模块调用或分开作用域。
+  </div>
+
+  <h2>线程与定时任务</h2>
+
+<pre>import "android.os.Handler"
+import "android.os.Looper"
+
+local main = Handler(Looper.getMainLooper())
+local task = luajava.newInstance("java.lang.Runnable", {
+  run = function()
+    -- 回到界面线程刷新控件
+  end
+})
+
+main.postDelayed(task, 1000)   -- 1 秒后执行一次
+main.post(task)                -- 立即投递到界面线程</pre>
+
+  <p>耗时任务放到子线程执行，结果通过主线程 Handler 回投，避免界面卡顿或跨线程改控件。</p>
+
+  <h2>权限</h2>
+  <p>成品包已内置完整权限清单，脚本只需要在用到时申请一次：</p>
+
+<pre>import "permissions"
+
+permissions.ensure("storage")            -- 所有文件访问，会打开系统授权页
+permissions.ensure("camera", "microphone")
+permissions.ensure("location", "contacts")
+
+if permissions.granted("camera") then
+  -- 已授权
+end</pre>
+
+  <p>可用的简写：<code class="inline">storage</code>、<code class="inline">read_storage</code>、<code class="inline">write_storage</code>、
+  <code class="inline">camera</code>、<code class="inline">microphone</code>、<code class="inline">contacts</code>、<code class="inline">calendar</code>、
+  <code class="inline">location</code>、<code class="inline">phone</code>、<code class="inline">sms</code>、<code class="inline">notification</code>、
+  <code class="inline">overlay</code>，也可以直接写完整权限名。</p>
+
+  <h2>日志</h2>
+  <p>内置日志模块会把内容写进与崩溃快照同一套目录，排查时非常有用：</p>
+
+<pre>local log = require "luaxplus.log"
+
+log.i("业务", "流程开始")
+log.w("业务", "参数为空，使用默认值")   -- 会额外生成警告快照
+log.e("业务", "请求失败: " .. tostring(err))
+
+print(log.dir())   -- 当前日志目录</pre>
+
+  <p>直接用 Java 侧接口也可以：<code class="inline">luajava.bindClass("com.mini.luaxplus.LogCore").i("标签", "内容")</code>。</p>
+
+  <h2>调试技巧</h2>
+  <ul>
+    <li>用 <code class="inline">print</code> 或 <code class="inline">log.i</code> 观察执行顺序，日志里带毫秒时间戳。</li>
+    <li>报错后先看 <code class="inline">luaerror_*.log</code> 的堆栈第一条，通常直接指出脚本与行号。</li>
+    <li>界面白屏但没有报错时，检查是否在子线程里改了控件。</li>
+  </ul>
+
+  <footer>Mini-LuaXPLUS 内置手册 · 版本 1.0.0-rc1</footer>
+</div>
+
+<script src="doc.js"></script>
+</body>
+</html>

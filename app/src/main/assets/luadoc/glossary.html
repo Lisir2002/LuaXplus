@@ -1,57 +1,72 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<HTML>
-<HEAD>
-<TITLE>Lua 5.3 术语中英对照表</TITLE>
-<LINK REL="stylesheet" TYPE="text/css" HREF="lua.css">
-<META HTTP-EQUIV="content-type" CONTENT="text/html; charset=utf-8">
-<STYLE TYPE="text/css">
-ul {
-	list-style-type: none ;
-	list-style-position: outside ;
-}
-</STYLE>
-</HEAD>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>术语表 · Mini-LuaXPLUS 手册</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
 
-<BODY>
+<div class="topbar">
+  <a class="home" href="contents.html">←</a>
+  <span class="title">术语表</span>
+  <span class="sub">概念对照</span>
+</div>
 
-<HR>
-<H1>
-<A HREF="http://www.lua.org/"><IMG SRC="logo.gif" ALT="" BORDER=0></A>
-Lua 5.3 术语中英对照表
-</H1>
+<div class="wrap">
+  <h1 class="page">名词对照与通俗解释</h1>
+  <p>手册和日志里出现的名词，这里给出工程语境下的含义，避免和 Lua 语言术语混淆。</p>
 
-<P>
-译者在翻译时，使用了一些尚未统一的中文术语译词，统一罗列如下：
+  <div class="tocbox" id="auto-toc"></div>
 
-<TABLE>
-<TR><TD>元表<TD>metatable
-<TR><TD>元方法<TD>metamethod
-<TR><TD>弱表<TD>weak table
-<TR><TD>协程<TD>coroutine
-<TR><TD>闭包<TD>closure
-<TR><TD>注册表<TD>registry
-<TR><TD>让出<TD>yield
-<TR><TD>表<TD>table
-<TR><TD>用户数据<TD>userdata
-<TR><TD>延续点<TD>continuation
-<TR><TD>宿主<TD>host
-<TR><TD>一等公民<TD>first-class
-<TR><TD>语法糖<TD>syntactic sugar
-<TR><TD>序列<TD>sequence
-<TR><TD>异构<TD>heterogeneous
-<TR><TD>终结器<TD>finalizer
-<TR><TD>暂时表<TD>ephemeron table
-<TR><TD>符记<TD>token
-<TR><TD>字面串<TD>literal string
-<TR><TD>代码块<TD>chunk
-<TR><TD>标签<TD>label
-<TR><TD>实例化<TD>instantiated
-<TR><TD>上值<TD>upvalue
-</TABLE>
-<HR>
-<SMALL CLASS="footer">
-最后修改时间:
-2015年1月14日23:07
-</SMALL>
-</BODY>
-</HTML>
+  <h2>工程与目录</h2>
+  <table>
+    <tr><th>名词</th><th>含义</th></tr>
+    <tr><td>工程目录</td><td>一个应用的脚本与资源所在目录，打包时以它为输入</td></tr>
+    <tr><td>私有目录</td><td>系统分配给应用的内部空间，卸载即清空；运行时脚本铺在这里</td></tr>
+    <tr><td>外部目录</td><td><code class="inline">/storage/emulated/0/LuaXPlus</code>，工程与日志所在，卸载后保留</td></tr>
+    <tr><td>app_lua</td><td>私有目录下给脚本用的模块目录，脚本的模块搜索路径包含它</td></tr>
+    <tr><td>入口脚本</td><td><code class="inline">main.lua</code>，运行或打包时的起点</td></tr>
+  </table>
+
+  <h2>运行时</h2>
+  <table>
+    <tr><th>名词</th><th>含义</th></tr>
+    <tr><td>铺设</td><td>首次启动把安装包内的脚本与模块复制到私有目录的动作</td></tr>
+    <tr><td>dex</td><td>安卓可执行的字节码文件；打包组件也用 dex 形式随包分发</td></tr>
+    <tr><td>activity</td><td>当前页面对象，脚本里的界面操作入口</td></tr>
+    <tr><td>luajava</td><td>脚本调用 Java 类的桥梁，可取类、建对象、实现接口</td></tr>
+    <tr><td>签名</td><td>给安装包打上身份标记；系统据此判断能否覆盖安装</td></tr>
+    <tr><td>归档对齐</td><td>安装包内部条目的存放规则，资源表需不压缩且四字节对齐</td></tr>
+  </table>
+
+  <h2>日志与排错</h2>
+  <table>
+    <tr><th>名词</th><th>含义</th></tr>
+    <tr><td>运行日志</td><td><code class="inline">app_日期.log</code>，当天所有记录按时间顺序</td></tr>
+    <tr><td>快照</td><td>单个错误或崩溃独立成文件，含时间、版本、线程、堆栈</td></tr>
+    <tr><td>警告快照</td><td><code class="inline">warn_*.log</code>，非致命问题也留证据</td></tr>
+    <tr><td>堆栈</td><td>错误发生时的调用链，第一条通常指向真正出错的位置</td></tr>
+    <tr><td>成品包</td><td>由工程打包出的独立安装包，日志单独一套目录</td></tr>
+  </table>
+
+  <h2>Lua 语言术语</h2>
+  <p>以下为 Lua 标准手册的译名，方便阅读原文文档时对照：</p>
+  <table>
+    <tr><th>中文</th><th>英文</th><th>中文</th><th>英文</th></tr>
+    <tr><td>元表</td><td>metatable</td><td>元方法</td><td>metamethod</td></tr>
+    <tr><td>弱表</td><td>weak table</td><td>协程</td><td>coroutine</td></tr>
+    <tr><td>闭包</td><td>closure</td><td>上值</td><td>upvalue</td></tr>
+    <tr><td>表</td><td>table</td><td>序列</td><td>sequence</td></tr>
+    <tr><td>用户数据</td><td>userdata</td><td>代码块</td><td>chunk</td></tr>
+    <tr><td>语法糖</td><td>syntactic sugar</td><td>宿主</td><td>host</td></tr>
+    <tr><td>让出</td><td>yield</td><td>终结器</td><td>finalizer</td></tr>
+  </table>
+
+  <footer>Mini-LuaXPLUS 内置手册 · 版本 1.0.0-rc1</footer>
+</div>
+
+<script src="doc.js"></script>
+</body>
+</html>
