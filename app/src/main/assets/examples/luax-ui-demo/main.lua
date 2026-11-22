@@ -922,10 +922,10 @@ local function buildAdvanced()
   local heroPath = activity.getLuaExtDir("examples/luax-ui-demo") .. "/hero.jpg"
   local hero = ui.background({
     src = heroPath,
-    height = 190,
-    radius = 18,
+    height = "190px",
+    radius = "18px",
     scale = "cover",
-    overlay = ui.withAlpha(0xFF000000, 0.24),
+    overlay = ui.withAlpha(0xFF000000, "24%"),
   }, function(box)
     local title = TextView(activity)
     title.setText("背景图片")
@@ -936,15 +936,15 @@ local function buildAdvanced()
 
     local note = TextView(activity)
     note.setText("ui.background 支持封面裁切、圆角、遮罩和内容叠加。")
-    note.setTextSize(ui.tokens.type.footnote.size)
-    note.setTextColor(ui.withAlpha(ui.tokens.color.onAccent, 0.82))
+    note.setTextSize("13px")
+    note.setTextColor(ui.withAlpha(ui.tokens.color.onAccent, "82%"))
     note.setPadding(0, dp(4), 0, 0)
     box.addView(note)
 
     local cta = ui.button({
       text = "查看图片组件",
       style = "tinted",
-      textSize = ui.tokens.type.footnote.size,
+      textSize = "13px",
       onClick = function()
         showInfo("图片与背景", "image 负责图片和圆角，background 负责铺底、遮罩和内容叠加。")
       end,
@@ -957,19 +957,19 @@ local function buildAdvanced()
 
   page:add(ui.card({
     title = "图片与透明度",
-    subtitle = "image / background / withAlpha",
+    subtitle = "image / background / withAlpha；数值支持 10px、35%",
   }, function(box)
     local thumb = ui.image({
       src = heroPath,
-      height = 104,
-      radius = 12,
+      height = "104px",
+      radius = "12px",
       scale = "cover",
     })
     box.addView(thumb, LinearLayout.LayoutParams(-1, dp(104)))
 
     local alphaLabel = TextView(activity)
     alphaLabel.setText("withAlpha 支持 0-1 和 0-255 两种透明度")
-    alphaLabel.setTextSize(ui.tokens.type.footnote.size)
+    alphaLabel.setTextSize("13px")
     alphaLabel.setTextColor(palette().secondary)
     alphaLabel.setPadding(0, dp(8), 0, 0)
     box.addView(alphaLabel)
@@ -980,11 +980,11 @@ local function buildAdvanced()
     for _, value in ipairs({ 0.08, 0.24, 0.48, 0.72 }) do
       local tile = TextView(activity)
       tile.setText(string.format("%.0f%%", value * 100))
-      tile.setTextSize(ui.tokens.type.caption.size)
+      tile.setTextSize("11px")
       tile.setTextColor(palette().label)
       tile.setGravity(Gravity.CENTER)
       local tileBackground = GradientDrawable()
-      tileBackground.setColor(ui.withAlpha(palette().accent, value))
+      tileBackground.setColor(ui.withAlpha(palette().accent, string.format("%.0f%%", value * 100)))
       tileBackground.setCornerRadius(dp(8))
       tile.setBackground(tileBackground)
       local params = LinearLayout.LayoutParams(0, dp(34), 1)

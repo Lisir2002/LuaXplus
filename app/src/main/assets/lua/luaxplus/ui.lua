@@ -108,6 +108,16 @@ local BASE = {
     [52] = 52,
     [57] = 57,
     [72] = 72,
+    page = 16,
+    card = 16,
+    section = 24,
+    row = 12,
+    gap = 8,
+    tight = 6,
+    buttonX = 14,
+    buttonY = 12,
+    navX = 12,
+    navY = 7,
   },
   radius = {
     [0] = 0,
@@ -119,9 +129,30 @@ local BASE = {
     [14] = 14,
     [16] = 16,
     [18] = 18,
+    [20] = 20,
     [22] = 22,
     [26] = 26,
     [999] = 999,
+    card = 12,
+    button = 12,
+    input = 12,
+    chip = 16,
+    sheet = 14,
+    dialog = 14,
+    search = 10,
+    segment = 9,
+    segmentItem = 7,
+    badge = 8,
+    iconBadge = 7,
+    banner = 12,
+    toast = 18,
+    avatar = 20,
+    fab = 26,
+    nav = 22,
+    check = 12,
+    skeleton = 6,
+    glyph = 9,
+    stepper = 10,
   },
   type = {
     display = { size = 34, weight = 700, lineHeight = 40 },
@@ -133,8 +164,8 @@ local BASE = {
     callout = { size = 15, weight = 400, lineHeight = 20 },
     subhead = { size = 14, weight = 400, lineHeight = 19 },
     footnote = { size = 13, weight = 400, lineHeight = 18 },
-    caption = { size = 11, weight = 400, lineHeight = 15 },
-    micro = { size = 10, weight = 400, lineHeight = 14 },
+    caption = { size = 11, weight = 400, lineHeight = 15, tracking = 0.04 },
+    micro = { size = 10, weight = 400, lineHeight = 14, tracking = 0.02 },
     icon = { size = 20, weight = 400, lineHeight = 24 },
     glyph = { size = 27, weight = 400, lineHeight = 30 },
     stat = { size = 28, weight = 600, lineHeight = 34 },
@@ -155,6 +186,11 @@ local BASE = {
     searchHeight = 36,
     segment = 28,
     checkMark = 24,
+    chipHeight = 32,
+    stepper = 38,
+    bannerGlyph = 28,
+    avatar = 40,
+    avatarFontRatio = 2.4,
     alertWidth = 270,
     hitTarget = 44,
     border = 1,
@@ -167,6 +203,8 @@ local BASE = {
     stagger = 55,
     shimmer = 900,
     staggerItem = 280,
+    pressScale = 0.97,
+    enterScale = 0.92,
   },
   elevation = {
     card = 0,
@@ -186,6 +224,8 @@ local BASE = {
     pressed = 0.7,
     overlay = 0.35,
     scrim = 0.55,
+    shimmerLow = 0.28,
+    shimmerHigh = 0.72,
   },
 }
 
@@ -347,24 +387,79 @@ local MO = M.tokens.motion
 local EL = M.tokens.elevation
 local OP = M.tokens.opacity
 
-local function space(value)
-  return S[value] or value
+-- 所有尺寸、字号、圆角和透明度共用同一套数值解析：
+-- 既接受令牌档位（space("card")、radius("button")、textSize="body"），
+-- 也接受无级数值（12、"12px"、"12dp"、"12sp"、"12pt"、"35%"）。
+local baseDp = dp
+if type(baseDp) ~= "function" then
+  baseDp = function(number)
+    local density = activity and activity.getResources().getDisplayMetrics().density or 1
+    return math.floor((number or 0) * density + 0.5)
+  end
 end
 
-local function radiusToken(value)
-  return R[value] or value
+local function numberValue(value, fallback)
+  if type(value) == "number" then
+    return value
+  end
+  if type(value) ~= "string" then
+    return fallback
+  end
+  local text = value:gsub("%s+", "")
+  local number, unit = text:match("^([%-+]?%d*%.?%d+)([%%%a]*)$")
+  number = tonumber(number)
+  if not number then
+    return fallback
+  end
+  if unit == "%" then
+    return number / 100
+  end
+  return number
+end
+
+local function dimension(value, fallback)
+  return numberValue(value, fallback or 0)
+end
+
+-- 本地 dp 包一层，既保留原生 dp 的取整行为，也让所有传入 dp 的令牌支持字符串数值。
+local function dp(value)
+  return baseDp(dimension(value, 0))
+end
+
+local function space(value, fallback)
+  return dimension(S[value] or value, fallback or 0)
+end
+
+local function radiusToken(value, fallback)
+  return dimension(R[value] or value, fallback or 0)
 end
 
 local function typeSize(name)
   local item = TY[name]
-  return item and item.size or TY.body.size
+  return dimension(item and item.size or TY.body.size, TY.body.size)
 end
 
 local function sizeToken(value)
   if type(value) == "string" then
+    local number = numberValue(value, nil)
+    if number then
+      return number
+    end
     return typeSize(value)
   end
-  return value or TY.body.size
+  return dimension(value, TY.body.size)
+end
+
+local function timeValue(value, fallback)
+  if type(value) == "string" then
+    local number = value:match("^([%-+]?%d*%.?%d+)")
+    number = tonumber(number)
+    if number then
+      return number
+    end
+    return fallback
+  end
+  return type(value) == "number" and value or fallback
 end
 
 local function colors()
@@ -465,20 +560,32 @@ local function cssColor(value)
   return string.format("rgba(%d, %d, %d, %.2f)", red, green, blue, alpha / 255)
 end
 
+local function cssNumber(value)
+  if type(value) == "number" then
+    return tostring(value)
+  end
+  if type(value) == "string" and value:match("^[%-+]?%d*%.?%d+$") then
+    return value
+  end
+  return nil
+end
+
 local function cssValue(path, value)
   if path:match("^color%-") then
     return cssColor(value)
   end
   if path:match("^motion%-") then
-    return tostring(value) .. "ms"
+    local number = cssNumber(value)
+    return number and (number .. "ms") or tostring(value)
   end
-  if path:match("^opacity%-") or path:match("%-weight$") then
+  if path:match("^opacity%-") or path:match("%-weight$") or path:match("%-tracking$") then
     return tostring(value)
   end
   if path:match("^spacing%-") or path:match("^radius%-")
       or path:match("^control%-") or path:match("^elevation%-")
       or path:match("%-size$") or path:match("%-line%-height$") then
-    return tostring(value) .. "px"
+    local number = cssNumber(value)
+    return number and (number .. "px") or tostring(value)
   end
   return tostring(value)
 end
@@ -586,24 +693,40 @@ local function applySystemBars(dark)
 end
 
 -- ===== 图片、透明度与背景 =====
-local function alphaByte(value)
-  if type(value) == "string" then
-    value = OP[value] or 1
+local function alphaRatio(value, fallback)
+  if value == nil then
+    return fallback == nil and 1 or fallback
+  end
+  if type(value) == "string" and OP[value] ~= nil then
+    value = OP[value]
+  elseif type(value) == "string" then
+    local number = numberValue(value, nil)
+    if number == nil then
+      return fallback == nil and 1 or fallback
+    end
+    value = number
+  end
+  if type(value) ~= "number" then
+    return fallback == nil and 1 or fallback
   end
   if value > 1 then
-    return math.floor(value)
+    value = value / 255
   end
-  return math.floor(value * 255 + 0.5)
+  if value < 0 then
+    return 0
+  end
+  if value > 1 then
+    return 1
+  end
+  return value
+end
+
+local function alphaByte(value)
+  return math.floor(alphaRatio(value, 1) * 255 + 0.5)
 end
 
 local function alphaValue(value)
-  if type(value) == "string" then
-    return OP[value] or 1
-  end
-  if value > 1 then
-    return value / 255
-  end
-  return value
+  return alphaRatio(value, 1)
 end
 
 -- 将颜色按透明度混合，0-1 或 0-255 都接受。
@@ -704,7 +827,7 @@ function M.image(spec)
   if drawable then
     view.setImageDrawable(drawable)
   else
-    view.setBackgroundColor(spec.placeholder or colors().fill)
+    view.setBackgroundColor(parseColor(spec.placeholder or colors().fill))
   end
   if spec.alpha ~= nil then
     view.setAlpha(alphaValue(spec.alpha))
@@ -731,9 +854,9 @@ function M.background(spec, content)
   local frame = FrameLayout(activity)
   if spec.radius then
     frame.setClipToOutline(true)
-    frame.setBackground(roundRect(spec.background or 0x00000000, spec.radius))
+    frame.setBackground(roundRect(parseColor(spec.background or 0x00000000), spec.radius))
   elseif spec.background then
-    frame.setBackgroundColor(spec.background)
+    frame.setBackgroundColor(parseColor(spec.background))
   end
   if spec.src then
     local image = M.image({
@@ -748,14 +871,14 @@ function M.background(spec, content)
   end
   if spec.overlay ~= false then
     local scrim = View(activity)
-    scrim.setBackgroundColor(spec.overlay or palette.scrim)
+    scrim.setBackgroundColor(parseColor(spec.overlay or palette.scrim))
     frame.addView(scrim, FrameLayout.LayoutParams(-1, -1))
   end
   if content then
     local body = LinearLayout(activity)
     body.setOrientation(LinearLayout.VERTICAL)
     body.setGravity(spec.gravity or Gravity.CENTER_VERTICAL)
-    local padding = spec.contentPadding or 16
+    local padding = spec.contentPadding or S.card
     body.setPadding(dp(space(padding)), dp(space(padding)), dp(space(padding)), dp(space(padding)))
     if type(content) == "function" then
       content(body, frame)
@@ -808,12 +931,12 @@ function M.page(options)
     frame.addView(backdrop, FrameLayout.LayoutParams(-1, -1))
     if options.backgroundOverlay ~= false then
       local scrim = View(current)
-      scrim.setBackgroundColor(options.backgroundOverlay or palette.scrim)
+      scrim.setBackgroundColor(parseColor(options.backgroundOverlay or palette.scrim))
       frame.addView(scrim, FrameLayout.LayoutParams(-1, -1))
     end
     root.setBackgroundColor(0x00000000)
   else
-    root.setBackgroundColor(options.background or palette.bg)
+    root.setBackgroundColor(parseColor(options.background or palette.bg))
   end
   frame.addView(root, FrameLayout.LayoutParams(-1, -1))
 
@@ -830,7 +953,7 @@ function M.page(options)
   if options.back then
     local back = textView("‹", TY.glyph.size, palette.accent, false)
     back.setGravity(Gravity.CENTER)
-    back.setBackground(ripple(0x00000000, 22, palette.press))
+    back.setBackground(ripple(0x00000000, R.nav, palette.press))
     local backParams = FrameLayout.LayoutParams(dp(K.navHeight), -1)
     backParams.gravity = Gravity.LEFT
     nav.addView(back, backParams)
@@ -854,7 +977,7 @@ function M.page(options)
     local right = textView(rightSpec.title or "完成", TY.body.size, palette.accent, true)
     right.setGravity(Gravity.CENTER)
     right.setPadding(dp(space(12)), 0, dp(space(12)), 0)
-    right.setBackground(ripple(0x00000000, 22, palette.press))
+    right.setBackground(ripple(0x00000000, R.nav, palette.press))
     local rightParams = FrameLayout.LayoutParams(-2, -1)
     rightParams.gravity = Gravity.RIGHT
     nav.addView(right, rightParams)
@@ -969,7 +1092,7 @@ function M.row(spec)
     if type(spec.icon) == "string" then
       local badge = textView(spec.icon, TY.callout.size, palette.onAccent, true)
       badge.setGravity(Gravity.CENTER)
-      badge.setBackground(roundRect(spec.iconBg or palette.accent, 7))
+      badge.setBackground(roundRect(parseColor(spec.iconBg or palette.accent), R.iconBadge))
       local params = LinearLayout.LayoutParams(dp(K.iconBadge), dp(K.iconBadge))
       params.rightMargin = dp(space(11))
       row.addView(badge, params)
@@ -1051,7 +1174,7 @@ function M.row(spec)
   end
 
   if spec.disabled then
-    row.setAlpha(OP.disabled)
+    row.setAlpha(alphaValue(OP.disabled))
     row.setEnabled(false)
   elseif spec.onClick then
     row.setOnClickListener(View.OnClickListener{
@@ -1069,14 +1192,14 @@ function M.group(header, rows, footer)
 
   if header then
     local caption = textView(string.upper(tostring(header)), TY.footnote.size, palette.secondary, false)
-    caption.setLetterSpacing(0.04)
+    caption.setLetterSpacing(numberValue(TY.caption.tracking, 0.04))
     caption.setPadding(dp(space(4)), dp(space(6)), dp(space(4)), dp(space(6)))
     box.addView(caption)
   end
 
   local card = LinearLayout(activity)
   card.setOrientation(LinearLayout.VERTICAL)
-  card.setBackground(roundRect(palette.surface, 12))
+  card.setBackground(roundRect(palette.surface, R.card))
   card.setClipToOutline(true)
   box.addView(card, LinearLayout.LayoutParams(-1, -2))
 
@@ -1131,7 +1254,7 @@ function M.button(spec)
   elseif style == "tinted" then
     fill = palette.accentSoft
     textColor = palette.accent
-    rippleColor = overlay(palette.accent, 0x22)
+    rippleColor = overlay(palette.accent, alphaByte(OP.light))
   elseif style == "gray" then
     fill = palette.fill
     textColor = palette.label
@@ -1139,7 +1262,7 @@ function M.button(spec)
   elseif style == "plain" then
     fill = 0x00000000
     textColor = palette.accent
-    rippleColor = overlay(palette.accent, 0x14)
+    rippleColor = overlay(palette.accent, alphaByte(OP.subtle))
   elseif style == "destructive" then
     fill = palette.danger
     textColor = palette.onAccent
@@ -1154,9 +1277,9 @@ function M.button(spec)
   button.setGravity(Gravity.CENTER)
   button.setPadding(dp(space(14)), dp(space(12)), dp(space(14)), dp(space(12)))
   button.setMinimumHeight(dp(K.buttonHeight))
-  button.setBackground(ripple(fill, spec.radius or 12, rippleColor))
+  button.setBackground(ripple(fill, spec.radius or R.button, rippleColor))
   if spec.enabled == false then
-    button.setAlpha(OP.disabled)
+    button.setAlpha(alphaValue(OP.disabled))
     button.setEnabled(false)
   elseif spec.onClick then
     button.setOnClickListener(View.OnClickListener{
@@ -1244,7 +1367,7 @@ function M.field(spec)
   end
   local holder = LinearLayout(activity)
   holder.setOrientation(LinearLayout.VERTICAL)
-  holder.setBackground(roundRect(palette.surface, 12))
+  holder.setBackground(roundRect(palette.surface, R.input))
   holder.setPadding(dp(space(16)), dp(space(10)), dp(space(16)), dp(space(10)))
   local input = EditText(activity)
   configureInput(input, spec)
@@ -1270,7 +1393,7 @@ function M.searchBar(spec)
   local bar = LinearLayout(activity)
   bar.setOrientation(LinearLayout.HORIZONTAL)
   bar.setGravity(Gravity.CENTER_VERTICAL)
-  bar.setBackground(roundRect(palette.fill, 10))
+  bar.setBackground(roundRect(palette.fill, R.search))
   bar.setPadding(dp(space(10)), 0, dp(space(10)), 0)
 
   local glyph = textView("⌕", TY.callout.size, palette.secondary, false)
@@ -1282,7 +1405,7 @@ function M.searchBar(spec)
     value = spec.value,
     onChange = spec.onChange,
   })
-  input.setTextSize(TY.callout.size)
+  input.setTextSize(sizeToken(TY.callout.size))
   local params = LinearLayout.LayoutParams(0, dp(K.searchHeight), 1)
   params.leftMargin = dp(space(6))
   bar.addView(input, params)
@@ -1296,7 +1419,7 @@ function M.segmented(spec)
   local palette = colors()
   local track = LinearLayout(activity)
   track.setOrientation(LinearLayout.HORIZONTAL)
-  track.setBackground(roundRect(palette.fill, 9))
+  track.setBackground(roundRect(palette.fill, R.segment))
   track.setPadding(dp(space(2)), dp(space(2)), dp(space(2)), dp(space(2)))
 
   local labels = {}
@@ -1307,7 +1430,7 @@ function M.segmented(spec)
     for index = 1, #labels do
       local item = labels[index]
       if index == selected then
-        item.setBackground(roundRect(palette.surface, 7))
+        item.setBackground(roundRect(palette.surface, R.segmentItem))
         item.setTextColor(palette.label)
         item.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL))
       else
@@ -1358,7 +1481,7 @@ function M.card(spec, content)
   local palette = colors()
   local card = LinearLayout(activity)
   card.setOrientation(LinearLayout.VERTICAL)
-  card.setBackground(roundRect(palette.surface, 12))
+  card.setBackground(roundRect(palette.surface, R.card))
   card.setPadding(dp(space(16)), dp(space(16)), dp(space(16)), dp(space(16)))
 
   if spec.title then
@@ -1455,19 +1578,21 @@ function M.avatar(name, color, size)
   if name and #tostring(name) > 0 then
     initial = string.sub(tostring(name), 1, 1)
   end
-  local avatar = textView(string.upper(initial), math.floor((size or 40) / 2.4), palette.onAccent, true)
+  local avatarSize = dimension(size or K.avatar, K.avatar)
+  local avatarFont = math.floor(avatarSize / numberValue(K.avatarFontRatio, 2.4))
+  local avatar = textView(string.upper(initial), avatarFont, palette.onAccent, true)
   avatar.setGravity(Gravity.CENTER)
-  avatar.setBackground(roundRect(color or palette.accent, (size or 40) / 2))
-  avatar.setLayoutParams(LinearLayout.LayoutParams(dp(size or 40), dp(size or 40)))
+  avatar.setBackground(roundRect(parseColor(color or palette.accent), avatarSize / 2))
+  avatar.setLayoutParams(LinearLayout.LayoutParams(dp(avatarSize), dp(avatarSize)))
   return avatar
 end
 
 function M.badge(text, color)
   local palette = colors()
-  local badge = textView(text or "", TY.caption.size, color or palette.danger, true)
+  local badge = textView(text or "", TY.caption.size, parseColor(color or palette.danger), true)
   badge.setGravity(Gravity.CENTER)
   badge.setPadding(dp(space(6)), dp(space(2)), dp(space(6)), dp(space(2)))
-  badge.setBackground(roundRect(palette.fill, 8))
+  badge.setBackground(roundRect(palette.fill, R.badge))
   return badge
 end
 
@@ -1568,7 +1693,7 @@ function M.alert(spec)
 
   local card = LinearLayout(current)
   card.setOrientation(LinearLayout.VERTICAL)
-  card.setBackground(roundRect(palette.surface, 14))
+  card.setBackground(roundRect(palette.surface, R.dialog))
   card.setClipToOutline(true)
 
   local title = textView(spec.title or "提示", TY.body.size, palette.label, true)
@@ -1644,7 +1769,7 @@ function M.alert(spec)
   if window then
     window.setBackgroundDrawable(ColorDrawable(0x00000000))
     window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-    window.setDimAmount(OP.overlay)
+    window.setDimAmount(alphaValue(OP.overlay))
     window.setGravity(Gravity.CENTER)
     window.setLayout(dp(K.alertWidth), -2)
   end
@@ -1666,7 +1791,7 @@ function M.actionSheet(spec)
 
   local group = LinearLayout(current)
   group.setOrientation(LinearLayout.VERTICAL)
-  group.setBackground(roundRect(palette.surface, 14))
+  group.setBackground(roundRect(palette.surface, R.sheet))
   group.setClipToOutline(true)
 
   if spec.title or spec.message then
@@ -1714,7 +1839,7 @@ function M.actionSheet(spec)
 
   local cancel = textView(spec.cancelText or "取消", TY.bodyLarge.size, palette.accent, true)
   cancel.setGravity(Gravity.CENTER)
-  cancel.setBackground(ripple(palette.surface, 14, palette.press))
+  cancel.setBackground(ripple(palette.surface, R.sheet, palette.press))
   local cancelParams = LinearLayout.LayoutParams(-1, dp(K.sheetItem))
   cancelParams.topMargin = dp(space(8))
   root.addView(cancel, cancelParams)
@@ -1729,7 +1854,7 @@ function M.actionSheet(spec)
   if window then
     window.setBackgroundDrawable(ColorDrawable(0x00000000))
     window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-    window.setDimAmount(OP.overlay)
+    window.setDimAmount(alphaValue(OP.overlay))
     window.setGravity(Gravity.BOTTOM)
     window.setLayout(-1, -2)
   end
@@ -1810,8 +1935,8 @@ function M.chip(spec)
   local chip = textView(spec.text or "", spec.textSize or TY.subhead.size, textColor, true)
   chip.setGravity(Gravity.CENTER)
   chip.setPadding(dp(space(12)), dp(space(7)), dp(space(12)), dp(space(7)))
-  chip.setMinHeight(dp(space(32)))
-  chip.setBackground(roundRect(fill, 16))
+  chip.setMinHeight(dp(K.chipHeight))
+  chip.setBackground(roundRect(parseColor(fill), R.chip))
   if spec.onClick then
     chip.setOnClickListener(View.OnClickListener{
       onClick = spec.onClick
@@ -1836,7 +1961,7 @@ function M.chipGroup(spec)
       local chip = chips[index]
       local active = index == selected
       chip.setTextColor(active and palette.onAccent or palette.label)
-      chip.setBackground(roundRect(active and palette.accent or palette.fill, 16))
+      chip.setBackground(roundRect(active and palette.accent or palette.fill, R.chip))
     end
   end
 
@@ -1845,7 +1970,7 @@ function M.chipGroup(spec)
     if type(item) ~= "table" then
       item = { text = tostring(item) }
     end
-    local chip = M.chip({ text = item.text or item.title or "", textSize = 13 })
+    local chip = M.chip({ text = item.text or item.title or "", textSize = TY.footnote.size })
     local params = LinearLayout.LayoutParams(-2, -2)
     if index > 1 then
       params.leftMargin = dp(space(8))
@@ -1907,7 +2032,7 @@ function M.checkRow(spec)
   local function apply()
     mark.setText(checked and "✓" or "")
     mark.setTextColor(checked and palette.onAccent or palette.tertiary)
-    mark.setBackground(checked and roundRect(palette.accent, 12) or shape(0x00000000, palette.tertiary, 12))
+    mark.setBackground(checked and roundRect(palette.accent, R.check) or shape(0x00000000, palette.tertiary, R.check))
   end
 
   local function setChecked(value, notify)
@@ -2020,15 +2145,15 @@ function M.stepper(spec)
   local function control(text)
     local view = textView(text, TY.action.size, palette.accent, false)
     view.setGravity(Gravity.CENTER)
-    view.setBackground(roundRect(palette.fill, 10))
-    row.addView(view, LinearLayout.LayoutParams(dp(space(38)), dp(space(38))))
+    view.setBackground(roundRect(palette.fill, R.stepper))
+    row.addView(view, LinearLayout.LayoutParams(dp(K.stepper), dp(K.stepper)))
     return view
   end
 
   local minus = control("−")
   local valueView = textView("", TY.body.size, palette.label, true)
   valueView.setGravity(Gravity.CENTER)
-  row.addView(valueView, LinearLayout.LayoutParams(0, dp(space(38)), 1))
+  row.addView(valueView, LinearLayout.LayoutParams(0, dp(K.stepper), 1))
   local plus = control("+")
   box.addView(row, LinearLayout.LayoutParams(-1, -2))
 
@@ -2083,7 +2208,7 @@ function M.progress(spec)
     bar.setIndeterminate(true)
   end
   pcall(function()
-    bar.setProgressTintList(ColorStateList.valueOf(spec.color or palette.accent))
+    bar.setProgressTintList(ColorStateList.valueOf(parseColor(spec.color or palette.accent)))
   end)
 
   local box = LinearLayout(activity)
@@ -2111,8 +2236,8 @@ function M.shimmer(view, spec)
   if type(view) == "table" and view.view and type(view.view) ~= "function" then
     view = view.view
   end
-  local animator = ValueAnimator.ofFloat(float{0.28, 0.72})
-  animator.setDuration(spec.duration or MO.shimmer)
+  local animator = ValueAnimator.ofFloat(float{alphaValue(OP.shimmerLow), alphaValue(OP.shimmerHigh)})
+  animator.setDuration(timeValue(spec.duration or MO.shimmer, 900))
   animator.setRepeatCount(-1)
   animator.setRepeatMode(2)
   animator.addUpdateListener(ValueAnimator.AnimatorUpdateListener{
@@ -2130,12 +2255,12 @@ function M.skeleton(spec)
   local box = LinearLayout(activity)
   box.setOrientation(LinearLayout.VERTICAL)
   box.setPadding(dp(space(16)), dp(space(16)), dp(space(16)), dp(space(16)))
-  box.setBackground(roundRect(palette.surface, 12))
+  box.setBackground(roundRect(palette.surface, R.card))
 
   local lines = spec.lines or 3
   for index = 1, lines do
     local line = View(activity)
-    line.setBackground(roundRect(palette.fill, 6))
+    line.setBackground(roundRect(palette.fill, R.skeleton))
     local width = index == lines and 0.55 or (index == 1 and 0.86 or 0.7)
     local params = LinearLayout.LayoutParams(-1, dp(space(index == 1 and 16 or 12)))
     if index > 1 then
@@ -2171,7 +2296,7 @@ function M.banner(spec)
   local card = LinearLayout(activity)
   card.setOrientation(LinearLayout.VERTICAL)
   card.setPadding(dp(space(14)), dp(space(13)), dp(space(14)), dp(space(13)))
-  card.setBackground(roundRect(spec.background or palette.accentSoft, 12))
+  card.setBackground(roundRect(parseColor(spec.background or palette.accentSoft), R.banner))
 
   local header = LinearLayout(activity)
   header.setOrientation(LinearLayout.HORIZONTAL)
@@ -2180,8 +2305,8 @@ function M.banner(spec)
 
   local glyph = textView(spec.icon or "i", TY.subhead.size, palette.onAccent, true)
   glyph.setGravity(Gravity.CENTER)
-  glyph.setBackground(roundRect(spec.color or palette.accent, 9))
-  header.addView(glyph, LinearLayout.LayoutParams(dp(space(28)), dp(space(28))))
+  glyph.setBackground(roundRect(parseColor(spec.color or palette.accent), R.glyph))
+  header.addView(glyph, LinearLayout.LayoutParams(dp(K.bannerGlyph), dp(K.bannerGlyph)))
 
   local title = textView(spec.title or "提示", TY.callout.size, palette.label, true)
   title.setPadding(dp(space(10)), 0, 0, 0)
@@ -2214,9 +2339,9 @@ function M.stat(spec)
   local card = LinearLayout(activity)
   card.setOrientation(LinearLayout.VERTICAL)
   card.setPadding(dp(space(14)), dp(space(14)), dp(space(14)), dp(space(14)))
-  card.setBackground(roundRect(palette.surface, 12))
+  card.setBackground(roundRect(palette.surface, R.card))
 
-  local value = textView(spec.value or "0", spec.valueSize or TY.stat.size, spec.color or palette.label, true)
+  local value = textView(spec.value or "0", spec.valueSize or TY.stat.size, parseColor(spec.color or palette.label), true)
   value.setIncludeFontPadding(false)
   card.addView(value)
 
@@ -2254,7 +2379,7 @@ function M.fab(spec)
   local palette = colors()
   local fab = textView(spec.text or "+", spec.textSize or TY.fab.size, palette.onAccent, true)
   fab.setGravity(Gravity.CENTER)
-  fab.setBackground(roundRect(spec.color or palette.accent, 26))
+  fab.setBackground(roundRect(parseColor(spec.color or palette.accent), R.fab))
   fab.setMinWidth(dp(K.fab))
   fab.setMinHeight(dp(K.fab))
   fab.setElevation(dp(EL.fab))
@@ -2274,7 +2399,7 @@ function M.toast(spec)
   local palette = colors()
   local box = LinearLayout(activity)
   box.setPadding(dp(space(16)), dp(space(10)), dp(space(16)), dp(space(10)))
-  box.setBackground(roundRect(palette.surface, 18))
+  box.setBackground(roundRect(palette.surface, R.toast))
   local text = textView(spec.text or "", TY.footnote.size, palette.label, false)
   box.addView(text)
 
@@ -2296,11 +2421,12 @@ function M.animate(view, spec)
   end
 
   local preset = spec.preset or "up"
-  local duration = spec.duration or MO.slow
+  local duration = timeValue(spec.duration or MO.slow, 260)
   view.setAlpha(0)
+  local enterScale = numberValue(MO.enterScale, 0.92)
   if preset == "scale" then
-    view.setScaleX(0.92)
-    view.setScaleY(0.92)
+    view.setScaleX(enterScale)
+    view.setScaleY(enterScale)
   elseif preset == "down" then
     view.setTranslationY(-dp(space(14)))
   elseif preset ~= "fade" then
@@ -2310,7 +2436,7 @@ function M.animate(view, spec)
   local animator = ValueAnimator.ofFloat(float{0, 1})
   animator.setDuration(duration)
   if spec.delay and spec.delay > 0 then
-    animator.setStartDelay(spec.delay)
+    animator.setStartDelay(timeValue(spec.delay, 0))
   end
   pcall(function()
     animator.setInterpolator(DecelerateInterpolator())
@@ -2320,8 +2446,8 @@ function M.animate(view, spec)
       local progress = animation.getAnimatedValue()
       view.setAlpha(progress)
       if preset == "scale" then
-        view.setScaleX(0.92 + 0.08 * progress)
-        view.setScaleY(0.92 + 0.08 * progress)
+        view.setScaleX(enterScale + (1 - enterScale) * progress)
+        view.setScaleY(enterScale + (1 - enterScale) * progress)
       elseif preset == "down" then
         view.setTranslationY(-dp(space(14)) * (1 - progress))
       elseif preset ~= "fade" then
@@ -2337,7 +2463,7 @@ function M.stagger(views, spec)
   spec = spec or {}
   views = views or {}
   for index = 1, #views do
-    local delay = (spec.delay or 0) + (index - 1) * (spec.step or MO.stagger)
+    local delay = timeValue(spec.delay, 0) + (index - 1) * timeValue(spec.step or MO.stagger, 55)
     M.animate(views[index], {
       preset = spec.preset or "up",
       duration = spec.duration or MO.staggerItem,
@@ -2355,9 +2481,10 @@ function M.press(view, spec)
     onTouch = function(target, event)
       local action = event.getAction()
       if action == 0 then
-        target.animate().scaleX(spec.scale or 0.97).scaleY(spec.scale or 0.97).setDuration(MO.fast).start()
+        local pressScale = numberValue(spec.scale or MO.pressScale, 0.97)
+        target.animate().scaleX(pressScale).scaleY(pressScale).setDuration(timeValue(MO.fast, 90)).start()
       elseif action == 1 or action == 3 then
-        target.animate().scaleX(1).scaleY(1).setDuration(MO.normal).start()
+        target.animate().scaleX(1).scaleY(1).setDuration(timeValue(MO.normal, 120)).start()
       end
       return false
     end,
@@ -2365,5 +2492,8 @@ function M.press(view, spec)
   return view
 end
 
+M.dp = dp
+M.number = numberValue
+M.metric = dimension
 
 return M

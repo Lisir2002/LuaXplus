@@ -547,17 +547,21 @@ page:reveal({ step = 45, duration = 280 })</pre>
 
   <h2>二十、设计令牌：默认主题与自定义主题</h2>
   <p>组件库的颜色、间距、圆角、字体、控件尺寸、动效和透明度都来自 <code class="inline">ui.tokens</code>。组件创建时读取令牌，所以换主题后重建页面即可整体换肤。</p>
-  <p>Lua 侧直接点号访问，数字间距用数字键；所有颜色同时接受整数和 <code class="inline">#RRGGBB</code>：</p>
+  <p>同一套令牌既支持“档位选择”，也支持“数值填入”：<code>spacing.page</code>、<code>radius.button</code>、<code>textSize = "body"</code> 是档位；<code>spacing = "18px"</code>、<code>radius = 14</code>、<code>textSize = "15px"</code> 是无级数值。所有颜色同时接受整数和 <code class="inline">#RRGGBB</code>：</p>
 <pre>local t = ui.tokens
 
 t.color.accent
 t.color.label
 t.color.surface
 t.spacing[16]
+t.spacing.page
 t.radius[12]
+t.radius.button
 t.type.body.size
-t.type.title.lineHeight
+t.type.caption.tracking
 t.control.buttonHeight
+t.control.avatar
+t.opacity.scrim
 t.motion.slow</pre>
   <table>
     <thead><tr><th>分类</th><th>用途</th></tr></thead>
@@ -566,10 +570,68 @@ t.motion.slow</pre>
       <tr><td><code>spacing</code></td><td>页面、卡片、行、间距和图标尺寸的 dp 数值，数字键可直接访问。</td></tr>
       <tr><td><code>radius</code></td><td>卡片、按钮、输入框、标签和胶囊圆角。</td></tr>
       <tr><td><code>type</code></td><td>display/title/body/callout/footnote 等字号、字重和行高。</td></tr>
-      <tr><td><code>control</code></td><td>导航、按钮、输入框、标签栏、悬浮按钮和弹窗动作高度。</td></tr>
-      <tr><td><code>motion / opacity / elevation</code></td><td>动效时长、错峰间隔、禁用透明度和阴影高度。</td></tr>
+      <tr><td><code>control</code></td><td>导航、按钮、输入框、标签栏、悬浮按钮、头像、步进器和弹窗动作高度。</td></tr>
+      <tr><td><code>motion / opacity / elevation</code></td><td>动效时长、错峰间隔、透明度刻度、按压缩放和阴影高度。</td></tr>
     </tbody>
   </table>
+
+  <h3>组件令牌覆盖</h3>
+  <p>页面、行、分组、按钮、输入、搜索、分段、卡片、弹窗、动作菜单、标签、选择行、步进器、进度、骨架屏、横幅、统计、悬浮按钮、Toast 和动画都已接入令牌；没有组件再直接写死颜色、字号或主要尺寸。</p>
+  <table>
+    <thead><tr><th>组件</th><th>主要令牌</th></tr></thead>
+    <tbody>
+      <tr><td><code>page</code></td><td><code>color</code>、<code>spacing</code>、<code>control.navHeight</code>、<code>radius.nav</code></td></tr>
+      <tr><td><code>row / group</code></td><td><code>spacing</code>、<code>control.rowHeight/iconBadge</code>、<code>radius.iconBadge/card</code></td></tr>
+      <tr><td><code>button / field</code></td><td><code>control.buttonHeight/inputHeight</code>、<code>radius.button/input</code>、<code>type.body</code></td></tr>
+      <tr><td><code>alert / actionSheet</code></td><td><code>control.alertWidth/actionHeight/sheetItem</code>、<code>radius.dialog/sheet</code>、<code>opacity.overlay</code></td></tr>
+      <tr><td><code>chip / checkRow / stepper</code></td><td><code>control.chipHeight/checkMark/stepper</code>、<code>radius.chip/check/stepper</code></td></tr>
+      <tr><td><code>avatar / banner / fab / toast</code></td><td><code>control.avatar/bannerGlyph/fab</code>、<code>radius.avatar/glyph/fab/toast</code>、<code>elevation.fab</code></td></tr>
+      <tr><td><code>skeleton / shimmer</code></td><td><code>radius.skeleton</code>、<code>opacity.shimmerLow/shimmerHigh</code>、<code>motion.shimmer</code></td></tr>
+      <tr><td><code>animate / stagger / press</code></td><td><code>motion.slow/normal/fast/stagger</code>、<code>motion.enterScale/pressScale</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>数值无级调节</h3>
+  <p>所有需要尺寸、字号、圆角、透明度的字段都走同一个解析器。除了数字，还可以写带单位的字符串：<code>"10px"</code>、<code>"12dp"</code>、<code>"15sp"</code>、<code>"18pt"</code>，以及透明度百分比 <code>"35%"</code>。没有单位的字符串按数字处理。</p>
+<pre>ui.button({
+  text = "保存",
+  textSize = "15px",      -- 字号
+  radius = "14px",        -- 圆角
+})
+
+ui.background({
+  src = "hero.jpg",
+  height = "190px",
+  radius = 18,
+  contentPadding = "20px",
+}, content)
+
+ui.withAlpha(ui.tokens.color.accent, "35%")   -- 透明度
+ui.withAlpha("#000000", 140)                  -- 0-255 也可以</pre>
+  <table>
+    <thead><tr><th>字段类型</th><th>可用写法</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>尺寸/间距/高度</td><td>数字、<code>"12px"</code>、<code>"12dp"</code>、<code>"page"</code>、<code>"card"</code></td><td>后缀按 Android 的逻辑尺寸处理，最终换算为 dp。</td></tr>
+      <tr><td>字号</td><td>数字、<code>"15px"</code>、<code>"15sp"</code>、<code>"body"</code>、<code>"caption"</code></td><td>最终写入 SP；字号令牌名仍然优先。</td></tr>
+      <tr><td>圆角</td><td>数字、<code>"14px"</code>、<code>"button"</code>、<code>"card"</code></td><td>语义圆角可统一改主题。</td></tr>
+      <tr><td>透明度</td><td>0-1、0-255、<code>"35%"</code>、<code>"scrim"</code></td><td>百分比会换算成 0-1，再写入 alpha。</td></tr>
+      <tr><td>动效时长</td><td>数字、<code>"200ms"</code>、<code>"slow"</code></td><td>毫秒数值。</td></tr>
+    </tbody>
+  </table>
+  <p>常用的语义圆角可以直接写名称，不必记数字：</p>
+<pre>radius.card      = 12
+radius.button    = 12
+radius.input     = 12
+radius.chip      = 16
+radius.sheet     = 14
+radius.nav       = 22
+radius.avatar    = 20
+radius.fab       = 26</pre>
+  <p>需要自己算尺寸时，可以复用组件库的解析器：</p>
+<pre>ui.dp("12px")       -- 转成 Android 像素
+ui.number("35%")    -- 0.35
+ui.metric("12dp")   -- 12</pre>
+
   <p>注册自定义主题。顶层字段同时覆盖浅色和深色，<code class="inline">dark</code> 只写深色差异：</p>
 <pre>ui.defineTheme("brand", {
   extends = "light",
@@ -577,8 +639,9 @@ t.motion.slow</pre>
     accent = "#FF6B00",
     accentSoft = "#FFF0E6",
   },
-  spacing = { [16] = 20 },
-  radius = { [12] = 14 },
+  spacing = { page = "20px", [16] = 20 },
+  radius = { button = "14px", [12] = 14 },
+  type = { body = { size = "18px" } },
   dark = {
     color = {
       accent = "#FF9F45",
@@ -599,16 +662,16 @@ ui.token("type.body.size", 17)</pre>
 print(ui.cssVars("brand", "dark"))</pre>
 <pre>:root {
   --lx-color-accent: #FF6B00;
-  --lx-spacing-16: 20px;
-  --lx-radius-12: 14px;
-  --lx-type-body-size: 17px;
+  --lx-spacing-page: 20px;
+  --lx-radius-button: 14px;
+  --lx-type-body-size: 18px;
 }</pre>
   <div class="tip">
     令牌在创建 View 时读取，不是响应式绑定。切换主题或自定义主题后，重建当前页面；不要在旧页面上期待自动换色。
   </div>
 
   <h2>二十一、透明度、图片与背景</h2>
-  <p>透明度、图片和背景都复用同一套令牌，不额外引入图片库。透明度既可以传 0-1 的小数，也可以传 0-255 的整数，或直接传 <code class="inline">ui.tokens.opacity</code> 里的名称。</p>
+  <p>透明度、图片和背景都复用同一套令牌，不额外引入图片库。透明度既可以传 0-1 的小数、0-255 的整数、<code>"35%"</code> 百分比，也可以直接传 <code class="inline">ui.tokens.opacity</code> 里的名称。</p>
   <table>
     <thead><tr><th>令牌</th><th>值</th><th>典型用途</th></tr></thead>
     <tbody>
@@ -624,6 +687,8 @@ print(ui.cssVars("brand", "dark"))</pre>
       <tr><td><code>pressed</code></td><td>0.7</td><td>按压缩放层</td></tr>
       <tr><td><code>overlay</code></td><td>0.35</td><td>弹窗遮罩</td></tr>
       <tr><td><code>scrim</code></td><td>0.55</td><td>图片上的文字保护层</td></tr>
+      <tr><td><code>shimmerLow</code></td><td>0.28</td><td>骨架屏循环的低透明度</td></tr>
+      <tr><td><code>shimmerHigh</code></td><td>0.72</td><td>骨架屏循环的高透明度</td></tr>
     </tbody>
   </table>
 <pre>local veil = ui.withAlpha("#000000", 0.35)
@@ -638,7 +703,7 @@ local cover = ui.image({
   src = activity.getLuaExtDir("examples/luax-ui-demo") .. "/hero.jpg",
   scale = "cover",     -- cover / contain / fill / center / inside
   radius = 12,         -- 圆角，可传 radius 令牌键
-  alpha = 0.9,
+  alpha = "90%",
   tint = ui.tokens.color.accent,
 })
 page:add(cover, 12)
@@ -669,8 +734,8 @@ page:add(avatar)</pre>
   <p><code class="inline">ui.background</code> 在图片上叠加遮罩，再放内容，适合头图、登录页、专题卡和活动入口。内容可以是 View，也可以是函数。</p>
 <pre>local hero = ui.background({
   src = "hero.jpg",
-  height = 190,
-  radius = 18,
+  height = "190px",
+  radius = "18px",
   scale = "cover",
   overlay = ui.withAlpha("#000000", "medium"),
 }, function(box)
@@ -732,7 +797,7 @@ page:add(hero, 14)</pre>
   </ul>
 
   <footer>
-    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc16
+    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc17
   </footer>
 </div>
 

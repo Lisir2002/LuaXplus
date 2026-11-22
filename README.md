@@ -48,8 +48,9 @@ docs/                     审计与规范文档
 - 组件范围：页面骨架、分组列表、按钮、表单、搜索栏、分段控件、卡片、弹窗、操作菜单、底部标签栏、空态与加载态。
 - 进阶组件：chip、checkRow、slider、stepper、progress、skeleton、banner、stat、fab、toast。
 - 设计令牌：`ui.tokens` 统一颜色、间距、圆角、字体、控件尺寸、动效和透明度；支持 `ui.defineTheme` 自定义主题、`ui.useTheme` 切换、`ui.cssVars` 导出 CSS 变量。
+- 数值无级调节：尺寸、字号、圆角、透明度和动效都同时接受令牌档位与数值字符串，例如 `textSize="15px"`、`radius="14px"`、`withAlpha(..., "35%")`；`ui.dp`、`ui.number`、`ui.metric` 可直接复用解析器。
 - 图片与背景：`ui.image` 支持本地/网络路径、Bitmap/Drawable、圆角、圆形、缩放和透明度；`ui.background` 支持图片铺底、遮罩、圆角和内容叠加；`ui.page` 支持整页背景图。
-- 透明度：`ui.tokens.opacity` 提供 12 档刻度，`ui.withAlpha` 接受 0-1、0-255 或令牌名，适合遮罩、状态色和文字压图。
+- 透明度：`ui.tokens.opacity` 提供 14 档刻度，`ui.withAlpha` 接受 0-1、0-255、百分比或令牌名，适合遮罩、状态色和文字压图。
 - 动画：`ui.animate`、`ui.stagger`、`ui.press` 与 `page:reveal`，默认 260ms 上移淡入。
 - 自绘开关：`app/src/main/java/com/mini/luaxplus/ui/IosSwitch.java`，失败时自动回退系统 `Switch`。
 - 打包携带：`assets/lua/luaxplus/` 在打包白名单内，新打包的成品会自动带上组件库；已安装的旧成品需重新打包。
