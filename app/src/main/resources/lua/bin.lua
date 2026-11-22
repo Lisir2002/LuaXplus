@@ -6,7 +6,6 @@ import "android.widget.Toast"
 import "java.util.zip.CheckedInputStream"
 import "java.io.FileInputStream"
 import "android.content.Intent"
-import "java.security.Signer"
 import "java.util.ArrayList"
 import "java.io.FileOutputStream"
 import "java.io.BufferedOutputStream"
@@ -401,11 +400,15 @@ local function binapk(luapath, apkpath)
     if #errbuffer == 0 then
         this.update("正在签名...");
         os.remove(apkpath)
-        local signed = pcall(function()
+        local signed, signErr = pcall(function()
             luajava.bindClass("com.mini.luaxplus.PackSigner").sign(activity, tmp, apkpath)
         end)
         if not signed then
-            Signer.sign(tmp, apkpath)
+            pcall(function()
+                luajava.bindClass("com.mini.luaxplus.LogCore")
+                    .luaError("打包签名失败 " .. tostring(apkpath), tostring(signErr))
+            end)
+            return "打包签名失败：" .. tostring(signErr)
         end
         os.remove(tmp)
         local installOk, installErr = pcall(function()
@@ -442,7 +445,11 @@ end
 --luabindir=activity.getLuaExtDir("bin")
 --print(activity.getLuaExtPath("bin","a"))
 local function safe_binapk(luapath, apkpath)
-    local ok, result = pcall(binapk, luapath, apkpath)
+    local ok, result = xpcall(function()
+        return binapk(luapath, apkpath)
+    end, function(err)
+        return debug.traceback(tostring(err), 2)
+    end)
     if ok then
         return result
     end
