@@ -18,6 +18,7 @@ activity.setTheme(autotheme())
 
 local theme = require "luaxplus.theme"
 local icons = require "luaxplus.icons"
+local lint = require "luaxplus.lint"
 local C = theme.colors
 local PAPER = C.paper
 local PANEL = C.panel
@@ -517,9 +518,159 @@ local function doSave()
   return true
 end
 
+-- ===== 保存前智能审计 =====
+local auditDialogShowing = false
+
+local function patternEscape(value)
+  return (tostring(value or ""):gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"))
+end
+
+local function projectRootForEditor()
+  local root = nil
+  pcall(function()
+    root = activity.getLuaExtDir("project")
+  end)
+  if not root or root == "" then
+    local parent = File(filePath).getParentFile()
+    return parent and parent.getAbsolutePath() or filePath
+  end
+  root = tostring(root):gsub("\\", "/"):gsub("/+$", "")
+  local normalized = tostring(filePath):gsub("\\", "/")
+  local relative = normalized:match("^" .. patternEscape(root) .. "/([^/]+)")
+  if relative then
+    return root .. "/" .. relative
+  end
+  local parent = File(filePath).getParentFile()
+  return parent and parent.getAbsolutePath() or filePath
+end
+
+local function auditCurrentFile()
+  if not tostring(filePath):lower():match("%.lua$") then
+    return nil
+  end
+  local ok, report = pcall(function()
+    return lint.audit(currentText(), {
+      file = filePath,
+      projectRoot = projectRootForEditor(),
+    })
+  end)
+  if not ok or type(report) ~= "table" then
+    return nil
+  end
+  return report
+end
+
+local function auditMessage(report)
+  local lines = {}
+  local total = #report.issues
+  local maxLines = 9
+  lines[#lines + 1] = "检测到 " .. total .. " 个问题："
+  for index, issue in ipairs(report.issues) do
+    if index > maxLines then
+      break
+    end
+    local label = "提示"
+    if issue.severity == "error" then
+      label = "错误"
+    elseif issue.severity == "warning" then
+      label = "警告"
+    end
+    lines[#lines + 1] = index .. ". 第 " .. tostring(issue.line or 0) .. " 行 · "
+      .. label .. "：" .. tostring(issue.message or "")
+  end
+  if total > maxLines then
+    lines[#lines + 1] = "还有 " .. (total - maxLines) .. " 条未展开。"
+  end
+  if report.fixable > 0 then
+    lines[#lines + 1] = "其中 " .. report.fixable .. " 处是已知模块引用，可一键补全。"
+  else
+    lines[#lines + 1] = "这些问题不会阻止保存，可以继续检查或仍然保存。"
+  end
+  return table.concat(lines, "\n")
+end
+
+local function saveWithAudit(commit)
+  if auditDialogShowing then
+    return false
+  end
+  local report = auditCurrentFile()
+  if not report or (not report.hasErrors and not report.hasWarnings) then
+    return commit()
+  end
+
+  auditDialogShowing = true
+  local builder = MaterialAlertDialogBuilder(activity)
+    .setTitle("保存前检查")
+    .setMessage(auditMessage(report))
+    .setNegativeButton("取消", function()
+      auditDialogShowing = false
+    end)
+    .setOnCancelListener(function()
+      auditDialogShowing = false
+    end)
+
+  if report.fixable > 0 then
+    builder.setPositiveButton("一键补全", function()
+      auditDialogShowing = false
+      local before = currentText()
+      local caret = editor.getSelectionEnd()
+      local ok, fixed, count = pcall(lint.applyFixes, before, report)
+      if not ok or not fixed or count == 0 then
+        toast("没有可自动补全的引用")
+        commit()
+        return
+      end
+      local changed = pcall(function()
+        editor.setText(fixed)
+      end)
+      if not changed then
+        toast("补全写入失败，请手动添加 require")
+        commit()
+        return
+      end
+      local target = math.max(0, math.min(#fixed, caret + (#fixed - #before)))
+      pcall(function()
+        editor.setSelectionRange(target, target)
+        editor.focusSelectionEnd()
+      end)
+      toast("已补全 " .. count .. " 处引用，正在保存")
+      commit()
+    end)
+    builder.setNeutralButton("仍然保存", function()
+      auditDialogShowing = false
+      commit()
+    end)
+  else
+    builder.setPositiveButton("仍然保存", function()
+      auditDialogShowing = false
+      commit()
+    end)
+  end
+
+  builder.show()
+  return false
+end
+
+local function showLintReport()
+  local report = auditCurrentFile()
+  if not report then
+    toast("代码检查目前只支持 Lua 文件")
+    return
+  end
+  if #report.issues == 0 then
+    toast("检查通过，没有发现问题")
+    return
+  end
+  MaterialAlertDialogBuilder(activity)
+    .setTitle("代码检查")
+    .setMessage(auditMessage(report))
+    .setPositiveButton("关闭", nil)
+    .show()
+end
+
 saveBtn.setOnClickListener(View.OnClickListener{
   onClick = function()
-    doSave()
+    saveWithAudit(doSave)
   end
 })
 
@@ -890,6 +1041,7 @@ local MENU_ITEMS = {
   { name = "字号加大", action = "bigger" },
   { name = "字号减小", action = "smaller" },
   { name = "切换明暗主题", action = "theme" },
+  { name = "代码检查", action = "lint" },
   { name = "另存为", action = "saveas" },
   { name = "文件信息", action = "info" }
 }
@@ -985,13 +1137,17 @@ local function menuActions(action)
         end
         local directory = File(filePath).getParentFile()
         local target = directory.getAbsolutePath() .. "/" .. name
-        if writeFile(target, currentText()) then
-          toast("已保存到 " .. name)
-        else
-          toast("保存失败")
-        end
+        saveWithAudit(function()
+          if writeFile(target, currentText()) then
+            toast("已保存到 " .. name)
+          else
+            toast("保存失败")
+          end
+        end)
       end)
       .show()
+  elseif action == "lint" then
+    showLintReport()
   elseif action == "info" then
     local file = File(filePath)
     local message = "路径：" .. filePath
@@ -1043,9 +1199,11 @@ local function tryExit()
     .setMessage("退出后这次修改会丢失，确定要退出吗？")
     .setPositiveButton("保存并退出", function()
       exitDialogShowing = false
-      if doSave() then
-        activity.finish()
-      end
+      saveWithAudit(function()
+        if doSave() then
+          activity.finish()
+        end
+      end)
     end)
     .setNeutralButton("直接退出", function()
       exitDialogShowing = false
