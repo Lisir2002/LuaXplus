@@ -44,7 +44,8 @@ function build(path)
     end
     local path=path..'c'
 
-    local st,str=pcall(string.dump,str,true)
+    -- 保留调试信息，成品包报错时才能显示文件名与行号
+    local st,str=pcall(string.dump,str,false)
     if st then
       f=io.open(path,'wb')
       f:write(str)
@@ -72,7 +73,8 @@ function build_aly(path2)
       return nil,st:gsub("%b[]",path2,1)
     end
 
-    local st,str=pcall(string.dump,str,true)
+    -- 保留调试信息，成品包报错时才能显示文件名与行号
+    local st,str=pcall(string.dump,str,false)
     if st then
       f=io.open(path,'wb')
       f:write(str)
