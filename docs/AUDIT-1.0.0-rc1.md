@@ -485,3 +485,24 @@
 - 侧栏现有“关于”“设置”两个入口：关于展示版本号、包名与项目说明，版本号从包信息读取；设置暂时留入口，待需求确认后接入具体开关。
 - 打开侧栏时按返回键先收起侧栏，不会直接退出应用。
 - 返回守卫的处理函数改为按页面实例保存，避免从编辑页回到首页后仍用编辑页的退出逻辑。
+
+## 三十五、LuaX-UI 自研组件库
+
+需求：在不改动原生 Lua 写法的前提下，补一套自有 UI 组件库，基础视觉对齐 iOS，并提供完整用例教程。
+
+设计边界：
+
+- 只新增 Lua 模块与一个自绘 Java 控件，不修改 `import`、`luajava`、`LuaActivity`、布局装载和打包器。
+- 组件返回普通 Android View，页面仍可 `addView`、`setContentView`，也可与原生控件混排。
+- 颜色、圆角、分割线、字号按 iOS 系统语义色和分组列表规范实现，不复用旧版纸感皮肤。
+- 主题支持浅色、深色与跟随系统，切换时重建当前页面。
+
+实现位置：
+
+- `app/src/main/assets/luaxplus/ui.lua`：主题、页面骨架、分组行、按钮、表单、分段控件、卡片、弹窗、标签栏等。
+- `app/src/main/java/com/mini/luaxplus/ui/IosSwitch.java`：51×31dp 胶囊开关，180ms 位移动画，失败回退系统 `Switch`。
+- `app/src/main/assets/luadoc/uikit.html`：内置教程，已从手册首页与侧栏接入。
+
+验证：`luac5.3 -p` 检查组件库与教程内 19 段示例全部通过；`:app:assembleRelease` 构建成功；APK 内确认包含 `assets/luaxplus/ui.lua`、`assets/luadoc/uikit.html` 与 `IosSwitch` 类，v1/v2/v3 签名校验通过。
+
+已知限制：组件库不做虚拟列表，超长列表继续使用原生 `RecyclerView` 或 `LuaAdapter`；旧成品不会自动获得组件库，需要重新打包。

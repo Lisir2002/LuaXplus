@@ -4,6 +4,7 @@
     { file: "contents.html", mark: "始", title: "手册首页" },
     { file: "start.html", mark: "启", title: "快速开始" },
     { file: "api.html", mark: "接", title: "常用接口" },
+    { file: "uikit.html", mark: "UI", title: "LuaX-UI 组件库" },
     { file: "pack.html", mark: "包", title: "打包与权限" },
     { file: "faq.html", mark: "问", title: "常见问题" },
     { file: "manual.html", mark: "典", title: "Lua 语言参考" },

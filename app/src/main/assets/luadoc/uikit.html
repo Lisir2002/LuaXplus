@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>LuaX-UI 组件库教程</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<div class="topbar">
+  <button class="home menu-btn" type="button" aria-label="打开目录">☰</button>
+  <span class="title">LuaX-UI 组件库</span>
+  <span class="sub">iOS 风格 · 纯增量</span>
+</div>
+
+<div class="wrap">
+  <h1 class="page">LuaX-UI：iOS 风格原生组件库</h1>
+  <p class="muted">一套可直接在 Lua 脚本里使用的 Android 原生组件。它只新增模块，不改变 <code class="inline">import</code>、<code class="inline">luajava</code>、<code class="inline">LuaActivity</code> 或原有的 View 写法。</p>
+
+  <div class="tocbox" id="auto-toc"></div>
+
+  <div class="note">
+    <strong>先记住三条规则</strong><br>
+    1. 组件库是可选的，原有代码一行都不用改；<br>
+    2. 所有组件最终都是普通 Android View，随时可以和原生 View 混用；<br>
+    3. 视觉参考 iOS 的系统分组、留白、圆角、细分割线和系统色，不是把 UIKit 搬过来。
+  </div>
+
+  <h2>一、加载与最小示例</h2>
+  <p>在 Activity 脚本里加载模块，然后创建一个页面。下面的代码可以直接运行：</p>
+<pre>local ui = require "luaxplus.ui"
+
+local page = ui.page{
+  title = "设置",
+  subtitle = "账户与偏好",
+  back = false,
+  largeTitle = true,
+}
+
+page:add(ui.group("账户", {
+  ui.row{ title = "个人资料", subtitle = "头像、昵称与签名", onClick = function()
+    ui.alert{ title = "提示", message = "这里可以打开资料页" }
+  end },
+  ui.row{ title = "通知", toggle = true, onToggle = function(value)
+    print("通知开关:", value)
+  end },
+}))
+
+page:add(ui.button{
+  text = "退出登录",
+  style = "destructive",
+  onClick = function()
+    ui.alert{
+      title = "退出登录",
+      message = "退出后需要重新登录。",
+      actions = {
+        { title = "取消", style = "cancel" },
+        { title = "退出", style = "destructive", onClick = function()
+          print("已退出")
+        end },
+      },
+    }
+  end,
+})
+
+page:show()</pre>
+
+  <div class="tip">
+    <code class="inline">ui.page</code> 会隐藏系统 ActionBar，并按 iOS 的大标题布局排好导航栏、内容滚动区和安全区。页面内容默认是浅灰分组背景，组件卡片是白色圆角块。
+  </div>
+
+  <h2>二、不影响原生写法</h2>
+  <p>LuaX-UI 没有接管 <code class="inline">activity.setContentView</code>，也没有改写全局类。你仍然可以：</p>
+<pre>-- 原生写法完全保留
+local tv = TextView(activity)
+tv.setText("原生 TextView")
+tv.setTextSize(16)
+
+local page = ui.page{ title = "混用示例" }
+page:add(tv)                       -- 直接把原生 View 放进页面
+page:add(ui.button{ text = "继续" })
+
+-- 需要完全自己控制时，仍然可以
+-- activity.setContentView(root)</pre>
+
+  <p>也可以拿到页面容器自己安排：</p>
+<pre>page.content.addView(tv)
+page.root.setBackgroundColor(0xFFFFFFFF)
+page.nav.setVisibility(View.GONE)</pre>
+
+  <h2>三、页面骨架 page</h2>
+  <p><code class="inline">ui.page(options)</code> 返回一个页面对象，常用字段如下：</p>
+
+  <table>
+    <thead><tr><th>字段</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>title</td><td>导航栏标题；开启大标题时同时作为大标题。</td></tr>
+      <tr><td>subtitle</td><td>大标题下方的一行灰色说明。</td></tr>
+      <tr><td>back</td><td>是否显示左上角返回按钮；默认调用 <code class="inline">activity.finish()</code>。</td></tr>
+      <tr><td>onBack</td><td>自定义返回逻辑；设置后不再自动 finish。</td></tr>
+      <tr><td>right</td><td>右上角文字按钮，可写字符串或 <code class="inline">{title, onClick}</code>。</td></tr>
+      <tr><td>largeTitle</td><td>默认 true；设为 false 只保留 44dp 小标题栏。</td></tr>
+      <tr><td>background / navBackground</td><td>覆盖页面背景色 / 导航栏底色。</td></tr>
+    </tbody>
+  </table>
+
+  <p>页面对象的方法：</p>
+<pre>page:add(view, topMargin)        -- 追加一个 View，可带顶部间距
+page:addGroup(header, rows, footer)
+page:setTitle("新标题")
+page:show()                      -- 真正调用 activity.setContentView(root)</pre>
+
+  <h2>四、主题与明暗模式</h2>
+  <p>默认跟随系统深浅色。需要强制某一套时：</p>
+<pre>ui.setAppearance("light")   -- 浅色
+ui.setAppearance("dark")    -- 深色
+ui.setAppearance("auto")    -- 跟随系统
+
+local colors = ui.palette()
+print(colors.blue, colors.bg, colors.label)</pre>
+
+  <p>只换强调色（按钮、链接、选中态）可以这样：</p>
+<pre>ui.setAccent(0xFF5856D6)    -- iOS 紫色</pre>
+
+  <div class="note">
+    主题在组件创建时读取。已经创建的页面不会自动换色；切换主题后重新创建页面即可。系统状态栏和导航栏颜色会随 <code class="inline">ui.page</code> 一起设置。
+  </div>
+
+  <h2>五、分组列表 group 与 row</h2>
+  <p>iOS 设置页的核心结构：浅灰背景 + 白色圆角分组 + 行内细分割线。</p>
+<pre>page:add(ui.group("通用", {
+  ui.row{ title = "关于本机", value = "1.0.0", chevron = true, onClick = showAbout },
+  ui.row{ title = "语言", value = "简体中文", onClick = chooseLanguage },
+  ui.row{ title = "深色模式", toggle = true, onToggle = function(on)
+    ui.setAppearance(on and "dark" or "light")
+  end },
+}, "更改语言后部分界面需要重新进入"))
+
+page:add(ui.group("存储", {
+  ui.row{ title = "清理缓存", value = "128 MB", onClick = clearCache },
+  ui.row{ title = "删除账户", destructive = true, onClick = confirmDelete },
+}))</pre>
+
+  <p><code class="inline">ui.row</code> 支持的字段：</p>
+  <table>
+    <thead><tr><th>字段</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>title / subtitle</td><td>主标题与第二行灰色说明。</td></tr>
+      <tr><td>value</td><td>右侧灰色值文本，例如版本号、容量。</td></tr>
+      <tr><td>icon</td><td>左侧图标；可传一个字符，或直接传 ImageView/View。</td></tr>
+      <tr><td>iconBg</td><td>字符图标的底色，默认系统蓝。</td></tr>
+      <tr><td>chevron</td><td>是否显示右侧箭头；默认在有点击事件时显示。</td></tr>
+      <tr><td>toggle / onToggle</td><td>显示 iOS 风格开关；回调收到当前布尔值。</td></tr>
+      <tr><td>selected</td><td>显示蓝色对勾，用于选择类列表。</td></tr>
+      <tr><td>accessory</td><td>自定义右侧附件 View，优先级最高。</td></tr>
+      <tr><td>destructive</td><td>标题使用系统红，用于删除类操作。</td></tr>
+      <tr><td>disabled</td><td>整行降低透明度并禁用。</td></tr>
+      <tr><td>onClick</td><td>行点击回调。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>六、按钮 button</h2>
+<pre>page:add(ui.button{ text = "保存", onClick = save })                 -- 蓝色填充
+page:add(ui.button{ text = "稍后再说", style = "gray" })              -- 灰色
+page:add(ui.button{ text = "了解更多", style = "plain" })             -- 纯文字
+page:add(ui.button{ text = "删除", style = "destructive" })           -- 红色
+page:add(ui.button{ text = "已禁用", enabled = false })</pre>
+
+  <p>样式：<code class="inline">filled</code>（默认）、<code class="inline">tinted</code>、<code class="inline">gray</code>、<code class="inline">plain</code>、<code class="inline">destructive</code>。按钮自带按压涟漪，圆角 12dp，高度随内容。</p>
+
+  <h2>七、输入组件</h2>
+  <h3>分组内单行输入 fieldRow</h3>
+<pre>local nameField = ui.fieldRow{
+  label = "名称",
+  value = "我的应用",
+  placeholder = "请输入名称",
+  onChange = function(text)
+    print("当前输入:", text)
+  end,
+}
+page:add(ui.group("基本信息", {
+  nameField,
+  ui.row{ title = "包名", value = "com.example.app" },
+}))
+
+-- 取值
+local value = nameField.input.getText().toString()</pre>
+
+  <div class="tip">
+    <code class="inline">fieldRow</code> 返回的是 <code class="inline">{view=行视图, input=EditText}</code>。放进 group 时直接传这个表即可，组件会自动取 <code class="inline">view</code>。
+  </div>
+
+  <h3>独立表单 field / textArea</h3>
+<pre>local email = ui.field{
+  label = "邮箱",
+  hint = "name@example.com",
+  email = true,
+  footer = "用于接收通知，不会公开。",
+}
+
+local note = ui.textArea{
+  label = "备注",
+  hint = "写点什么…",
+  lines = 5,
+}
+
+page:add(email.view)
+page:add(note.view)</pre>
+
+  <h3>搜索框 searchBar</h3>
+<pre>page:add(ui.searchBar{
+  hint = "搜索项目",
+  onChange = function(keyword)
+    print("搜索:", keyword)
+  end,
+})</pre>
+
+  <h2>八、分段选择 segmented</h2>
+<pre>local segment = ui.segmented{
+  items = { "全部", "进行中", "已完成" },
+  selected = 1,
+  onChange = function(index, value)
+    print("选中:", index, value)
+  end,
+}
+
+page:add(segment.view)
+
+-- 代码里切换
+segment.setSelected(3)
+print(segment.getSelected())</pre>
+
+  <h2>九、卡片 card</h2>
+<pre>page:add(ui.card({
+  title = "本月统计",
+  subtitle = "比上月增长 12%",
+}, function(box)
+  local value = TextView(activity)
+  value.setText("1,284")
+  value.setTextSize(34)
+  value.setTextColor(ui.palette().label)
+  box.addView(value)
+end))</pre>
+
+  <h2>十、弹窗 alert 与操作表 actionSheet</h2>
+  <h3>alert</h3>
+<pre>ui.alert{
+  title = "删除项目",
+  message = "删除后无法恢复，确定继续吗？",
+  actions = {
+    { title = "取消", style = "cancel" },
+    { title = "删除", style = "destructive", onClick = function()
+      deleteProject()
+    end },
+  },
+}</pre>
+
+  <p>单个按钮、两个按钮会横向排列；三个及以上自动纵向排列。回调返回 <code class="inline">false</code> 可以阻止弹窗自动关闭。</p>
+
+  <h3>actionSheet</h3>
+<pre>ui.actionSheet{
+  title = "选择操作",
+  message = "对当前文件执行以下操作",
+  actions = {
+    { title = "重命名", onClick = rename },
+    { title = "复制", onClick = copy },
+    { title = "删除", style = "destructive", onClick = remove },
+  },
+}</pre>
+
+  <h2>十一、底部标签栏 tabBar</h2>
+<pre>local tabs = ui.tabBar{
+  items = {
+    { icon = "⌂", title = "首页" },
+    { icon = "☰", title = "项目" },
+    { icon = "⚙", title = "设置" },
+  },
+  selected = 1,
+  onChange = function(index, item)
+    print("切换到:", item.title)
+  end,
+}
+
+page.root.addView(tabs.view, LinearLayout.LayoutParams(-1, -2))
+tabs.setSelected(2)</pre>
+
+  <div class="note">
+    <code class="inline">ui.page</code> 的内容区在滚动容器里，底部栏要加到 <code class="inline">page.root</code> 上，才能固定在底部不随内容滚动。
+  </div>
+
+  <h2>十二、空态、加载、头像与徽标</h2>
+<pre>page:add(ui.empty{
+  icon = "○",
+  title = "还没有项目",
+  message = "新建一个工程开始写应用。",
+  action = { title = "新建项目", onClick = createProject },
+})
+
+page:add(ui.loading{ text = "正在读取…" })
+
+page:add(ui.avatar("张三", 0xFF007AFF, 44))
+page:add(ui.badge("NEW", 0xFFFF3B30))
+page:add(ui.divider(16))</pre>
+
+  <h2>十三、完整示例：一个设置页</h2>
+  <p>下面的脚本可以单独运行，包含大标题、分组、开关、输入、分段选择、弹窗和底部按钮：</p>
+<pre>local ui = require "luaxplus.ui"
+
+local page = ui.page{
+  title = "设置",
+  subtitle = "账户、通知与外观",
+  back = false,
+}
+
+local nameField = ui.fieldRow{
+  label = "昵称",
+  value = "Lua 开发者",
+  placeholder = "请输入昵称",
+}
+
+page:add(ui.group("账户", {
+  ui.row{ title = "头像", value = "未设置", onClick = function()
+    ui.alert{ title = "头像", message = "这里可以接入相册或相机。" }
+  end },
+  nameField,
+}, "昵称会显示在个人主页。"))
+
+page:add(ui.group("通知", {
+  ui.row{ title = "允许通知", toggle = true },
+  ui.row{ title = "声音", toggle = false },
+  ui.row{ title = "震动", toggle = true },
+}))
+
+local appearance = ui.segmented{
+  items = { "跟随系统", "浅色", "深色" },
+  selected = 1,
+  onChange = function(index)
+    if index == 1 then
+      ui.setAppearance("auto")
+    elseif index == 2 then
+      ui.setAppearance("light")
+    else
+      ui.setAppearance("dark")
+    end
+    ui.alert{ title = "已切换", message = "重新进入页面后全部组件会使用新配色。" }
+  end,
+}
+page:add(appearance.view)
+
+page:add(ui.button{
+  text = "保存设置",
+  onClick = function()
+    ui.alert{
+      title = "已保存",
+      message = "昵称：" .. tostring(nameField.input.getText().toString()),
+    }
+  end,
+})
+
+page:show()</pre>
+
+  <h2>十四、完整示例：列表页 + 底部标签栏</h2>
+<pre>local ui = require "luaxplus.ui"
+
+local page = ui.page{
+  title = "项目",
+  subtitle = "共 3 个",
+  back = false,
+}
+
+local items = {
+  { name = "记账本", desc = "本地记账，支持导出 CSV" },
+  { name = "天气", desc = "按城市查询未来七天" },
+  { name = "待办", desc = "支持分组与提醒" },
+}
+
+for index = 1, #items do
+  local item = items[index]
+  page:add(ui.card({
+    title = item.name,
+    subtitle = item.desc,
+  }, function(box)
+    box.addView(ui.button{
+      text = "打开",
+      style = "tinted",
+      onClick = function()
+        ui.alert{ title = item.name, message = "这里打开项目：" .. item.name }
+      end,
+    })
+  end), 12)
+end
+
+local tabs = ui.tabBar{
+  items = {
+    { icon = "⌂", title = "首页" },
+    { icon = "☰", title = "项目" },
+    { icon = "⚙", title = "设置" },
+  },
+  selected = 2,
+}
+page.root.addView(tabs.view, LinearLayout.LayoutParams(-1, -2))
+
+page:show()</pre>
+
+  <h2>十五、和原生代码混用的建议</h2>
+  <table>
+    <thead><tr><th>场景</th><th>推荐做法</th></tr></thead>
+    <tbody>
+      <tr><td>普通设置页、表单、弹窗</td><td>直接用 LuaX-UI，保持视觉统一。</td></tr>
+      <tr><td>需要自定义绘制、复杂动画</td><td>在 Kotlin/Java 里写自定义 View，再用 <code class="inline">page:add(view)</code> 放进来。</td></tr>
+      <tr><td>超长数据列表</td><td>继续使用原生 RecyclerView 或 <code class="inline">LuaAdapter</code>，不要把所有行都塞进 ScrollView。</td></tr>
+      <tr><td>已有页面逐步迁移</td><td>保留原布局，只把按钮、分组、弹窗替换成组件；不需要一次性重写。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>十六、打包与发布</h2>
+  <p>组件库放在 <code class="inline">assets/luaxplus/ui.lua</code>，属于打包器保留的运行时目录，所有成品包会自动带上，不需要在工程里复制文件，也不需要改打包脚本。</p>
+  <p>iOS 风格开关是一个很小的原生 View（<code class="inline">com.mini.luaxplus.ui.IosSwitch</code>），已经随模板 APK 一起打包；Lua 侧通过 <code class="inline">luajava</code> 反射创建，不依赖额外权限。</p>
+
+  <div class="tip">
+    成品包使用时同样写 <code class="inline">local ui = require "luaxplus.ui"</code>。如果某个工程不想用组件库，不 require 即可，原有代码和包体积都不受影响。
+  </div>
+
+  <h2>十七、限制与常见问题</h2>
+  <ul>
+    <li><strong>这是 iOS 风格的 Android 组件，不是 UIKit。</strong> 系统字体、阴影和动画与真机 iOS 仍有差异。</li>
+    <li><strong>主题切换不会实时重绘已有控件。</strong> 切换后重建页面即可。</li>
+    <li><strong>不要在一个 ScrollView 里嵌套长列表。</strong> 数据量大时用原生 RecyclerView / LuaAdapter。</li>
+    <li><strong>组件只封装常用能力。</strong> 需要新组件时，可以继续在 <code class="inline">assets/luaxplus/ui.lua</code> 里追加，不影响已有调用。</li>
+    <li><strong>原生写法永远可用。</strong> 组件库只是可选的语法糖，不是新的运行时。</li>
+  </ul>
+
+  <footer>
+    Mini-LuaXPLUS 内置手册 · LuaX-UI 教程 · 版本 1.0.0-rc1
+  </footer>
+</div>
+
+<script src="doc.js"></script>
+</body>
+</html>

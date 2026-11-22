@@ -5,7 +5,7 @@
 - 应用名称：Mini-LuaXPLUS
 - 应用包名：`com.mini.luaxplus`
 - 运行平台：Android 5.0（API 21）及以上，目标版本 Android 12（API 31）
-- 当前版本：`1.0.0-rc1`
+- 当前版本：`1.0.0-rc2`
 
 ## 技术架构
 
@@ -38,6 +38,16 @@ keystore/                 正式签名密钥库（不入库）
 app/proguard-rules.pro    R8 规则
 docs/                     审计与规范文档
 ```
+
+## LuaX-UI 组件库
+
+内置一套 iOS 风格的原生界面组件，放在 `app/src/main/assets/luaxplus/ui.lua`，通过 `require "luaxplus.ui"` 使用。
+
+- 纯增量：不修改 `import`、`luajava`、`LuaActivity`，不接管 `setContentView`，原生 View 可继续混用。
+- 组件范围：页面骨架、分组列表、按钮、表单、搜索栏、分段控件、卡片、弹窗、操作菜单、底部标签栏、空态与加载态。
+- 自绘开关：`app/src/main/java/com/mini/luaxplus/ui/IosSwitch.java`，失败时自动回退系统 `Switch`。
+- 打包携带：`assets/luaxplus/` 在打包白名单内，新打包的成品会自动带上组件库；已安装的旧成品需重新打包。
+- 教程：应用内“手册 → LuaX-UI 组件库”，含字段表、明暗主题与可直接运行的完整页面示例。
 
 ## 版本号规范
 
