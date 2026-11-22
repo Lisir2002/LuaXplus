@@ -85,12 +85,10 @@ local fileExists = File(filePath).exists()
 local savedText = readFile(filePath)
 local darkMode = false
 
--- 语法高亮按文件扩展名识别，菜单里可以手动覆盖
+-- 语法高亮只按文件扩展名自动识别，不提供手动切换
 local languageId = EditorLanguage.detect(filePath)
 local languageName = EditorLanguage.displayName(languageId)
 local languageText
-local applyLanguage
-local showLanguageMenu
 local refreshStatus
 
 activity.setTitle(fileName)
@@ -392,13 +390,6 @@ languageText.setTextSize(11)
 languageText.setTextColor(TEXT_MUTED)
 languageText.setPadding(dp(7), 0, dp(7), 0)
 languageText.setText(languageName)
-languageText.setOnClickListener(View.OnClickListener{
-  onClick = function()
-    if showLanguageMenu then
-      showLanguageMenu()
-    end
-  end
-})
 statusBar.addView(languageText, LinearLayout.LayoutParams(-2, -2))
 
 local dirtyText = TextView(activity)
@@ -408,70 +399,19 @@ statusBar.addView(dirtyText, LinearLayout.LayoutParams(-2, -2))
 
 root.addView(statusBar, LinearLayout.LayoutParams(-1, -2))
 
--- 高亮切换只影响当前编辑器，不改变文件内容或原生编辑逻辑
-applyLanguage = function(id)
-  id = tostring(id or "lua")
-  languageId = id
-  languageName = EditorLanguage.displayName(id)
+-- 高亮只按当前文件后缀自动识别，不提供手动切换
+local function applyAutoLanguage()
+  languageId = EditorLanguage.detect(filePath)
+  languageName = EditorLanguage.displayName(languageId)
   pcall(function()
-    EditorLanguage.applyById(editor, id)
+    EditorLanguage.applyById(editor, languageId)
   end)
   if languageText then
     languageText.setText(languageName)
   end
 end
 
-local LANGUAGE_ITEMS = {
-  { id = "lua", name = "Lua / Aide Lua" },
-  { id = "java", name = "Java" },
-  { id = "kotlin", name = "Kotlin" },
-  { id = "javascript", name = "JavaScript" },
-  { id = "typescript", name = "TypeScript" },
-  { id = "python", name = "Python" },
-  { id = "c", name = "C" },
-  { id = "cpp", name = "C++" },
-  { id = "csharp", name = "C#" },
-  { id = "go", name = "Go" },
-  { id = "rust", name = "Rust" },
-  { id = "swift", name = "Swift" },
-  { id = "php", name = "PHP" },
-  { id = "ruby", name = "Ruby" },
-  { id = "shell", name = "Shell" },
-  { id = "html", name = "HTML / XML" },
-  { id = "css", name = "CSS / SCSS" },
-  { id = "json", name = "JSON" },
-  { id = "yaml", name = "YAML" },
-  { id = "sql", name = "SQL" },
-  { id = "markdown", name = "Markdown" },
-  { id = "groovy", name = "Groovy / Gradle" },
-  { id = "dart", name = "Dart" },
-  { id = "plain", name = "纯文本" }
-}
-
-showLanguageMenu = function()
-  local names = {}
-  local current = 1
-  for index = 1, #LANGUAGE_ITEMS do
-    local item = LANGUAGE_ITEMS[index]
-    names[#names + 1] = item.name .. (item.id == languageId and "  ✓" or "")
-    if item.id == languageId then
-      current = index
-    end
-  end
-  MaterialAlertDialogBuilder(activity)
-    .setTitle("语法高亮")
-    .setItems(names, function(_, which)
-      local item = LANGUAGE_ITEMS[which + 1]
-      if item then
-        applyLanguage(item.id)
-        toast("已切换为 " .. item.name)
-      end
-    end)
-    .setNegativeButton("取消", nil)
-    .show()
-end
-
-applyLanguage(languageId)
+applyAutoLanguage()
 
 -- ===== 保存与状态 =====
 local function currentText()
@@ -914,7 +854,6 @@ local MENU_ITEMS = {
   { name = "查找替换", action = "find" },
   { name = "撤销", action = "undo" },
   { name = "重做", action = "redo" },
-  { name = "语法高亮", action = "language" },
   { name = "格式化代码", action = "format" },
   { name = "复制当前行", action = "duplicate" },
   { name = "注释 / 取消注释", action = "comment" },
@@ -960,8 +899,6 @@ local function menuActions(action)
       editor.redo()
     end)
     refreshStatus()
-  elseif action == "language" then
-    showLanguageMenu()
   elseif action == "format" then
     if languageId ~= "lua" then
       toast("格式化目前只支持 Lua，当前是 " .. languageName)

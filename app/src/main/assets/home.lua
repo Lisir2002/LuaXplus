@@ -10,6 +10,7 @@ import "com.google.android.material.dialog.MaterialAlertDialogBuilder"
 import "loadbitmap"
 import "autotheme"
 import "androidx.drawerlayout.widget.DrawerLayout"
+import "com.androlua.LuaFileObserver"
 
 -- 首页：应用（项目）列表
 -- 数据来源：外部目录 project 下的工程文件夹，每个文件夹带 init.lua 描述信息
@@ -258,7 +259,7 @@ local function removeProject(info)
         file.delete()
       end
       drop(info.path)
-      toast("已删除「" .. info.appname .. "」")
+      toast("已删除「" .. info.appname .. "」，外部目录已同步移除")
       refresh()
     end)
     .show()
@@ -585,22 +586,21 @@ pcall(function()
 end)
 
 local function showAbout()
-  local versionName = appVersion
-  MaterialAlertDialogBuilder(activity)
-    .setTitle("关于 Mini-LuaXPLUS")
-    .setMessage("版本：" .. versionName
-      .. "\n包名：" .. tostring(activity.getPackageName())
-      .. "\n\n基于 AndroLuaX 改造的 Lua 移动开发环境：应用列表、工程管理、独立编辑器、权限注入与打包签名。")
-    .setPositiveButton("知道了", nil)
-    .show()
+  local ok, err = pcall(function()
+    activity.newActivity("about")
+  end)
+  if not ok then
+    toast("关于页启动失败：" .. tostring(err))
+  end
 end
 
 local function showSettings()
-  MaterialAlertDialogBuilder(activity)
-    .setTitle("设置")
-    .setMessage("设置项还没接入，这里先留入口。需要哪些开关或偏好，告诉我我按清单补上。")
-    .setPositiveButton("知道了", nil)
-    .show()
+  local ok, err = pcall(function()
+    activity.newActivity("settings")
+  end)
+  if not ok then
+    toast("设置页启动失败：" .. tostring(err))
+  end
 end
 
 sidePanel = LinearLayout(activity)
@@ -733,7 +733,7 @@ sideEntry("关", 0xff0b6f6a, 0xffdff3f0, "关于", "版本信息与开发说明"
 sideEntry("设", 0xff7a6a56, 0xfff0e4d4, "设置", "偏好与行为配置", showSettings)
 
 local sideFooter = TextView(activity)
-sideFooter.setText(appVersion ~= "" and appVersion or "1.0.0-rc6")
+sideFooter.setText(appVersion ~= "" and appVersion or "1.0.0-rc9")
 sideFooter.setTextSize(10.5)
 sideFooter.setTextColor(MUTED)
 sideFooter.setPadding(dp(12), dp(20), 0, 0)
@@ -775,5 +775,88 @@ pcall(function()
     end
   }))
 end)
+
+-- 左右滑动：向右打开侧栏，向左关闭侧栏
+pcall(function()
+  drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
+end)
+
+local swipeTracking = false
+local swipeStartX = 0
+local swipeStartY = 0
+
+local function attachSwipe(view)
+  view.setOnTouchListener(View.OnTouchListener{
+    onTouch = function(v, event)
+      local action = event.getAction()
+      if action == 0 then
+        swipeTracking = true
+        swipeStartX = event.getX()
+        swipeStartY = event.getY()
+      elseif action == 2 and swipeTracking then
+        local dx = event.getX() - swipeStartX
+        local dy = event.getY() - swipeStartY
+        if math.abs(dx) > dp(48) and math.abs(dx) > math.abs(dy) * 1.35 then
+          swipeTracking = false
+          if dx > 0 then
+            drawerLayout.openDrawer(sidePanel)
+          else
+            drawerLayout.closeDrawer(sidePanel)
+          end
+        end
+      elseif action == 1 or action == 3 then
+        swipeTracking = false
+      end
+      return false
+    end
+  })
+end
+
+attachSwipe(root)
+attachSwipe(scroll)
+attachSwipe(list)
+attachSwipe(sidePanel)
+
+-- 外部目录被文件管理器或其它应用删除时，项目列表即时刷新
+local projectObserver
+local observerPending = false
+
+local function scheduleProjectRefresh()
+  if observerPending then
+    return
+  end
+  observerPending = true
+  activity.runOnUiThread(luajava.new(luajava.bindClass("java.lang.Runnable"), {
+    run = function()
+      observerPending = false
+      pcall(refresh)
+    end
+  }))
+end
+
+pcall(function()
+  projectObserver = LuaFileObserver(projectRoot, 0x00000fff)
+  projectObserver.setOnEventListener(luajava.new(
+    luajava.bindClass("com.androlua.LuaFileObserver$OnEventListener"),
+    {
+      onEvent = function(event, path)
+        scheduleProjectRefresh()
+      end
+    }
+  ))
+  projectObserver.startWatching()
+end)
+
+function onResume()
+  pcall(refresh)
+end
+
+function onDestroy()
+  pcall(function()
+    if projectObserver then
+      projectObserver.stopWatching()
+    end
+  end)
+end
 
 refresh()
