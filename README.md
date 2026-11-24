@@ -119,8 +119,8 @@ Java 能力放在 `app/src/main/java/com/mini/luaxplus/java/`，由四层组成�
 
 编译器插件：
 
-- 首次使用前，从首页侧边栏「插件市场」下载并安装「Java 编译器」；插件包约 28 MB，包含 ECJ 3.26.0、D8 3.3.20 和 `android.jar`。
-- 插件默认安装到 `LuaXPlus/plugin/compiler`，下载后校验 SHA-256，再通过 `DexClassLoader` 加载；外部存储不可写时退回应用私有目录。
+- 插件包约 29 MB，从 GitHub `main` 分支下载，包含 ECJ 3.26.0、D8 3.3.20、`android.jar` 和许可证说明。
+- 插件默认安装到应用内部存储 `files/compiler-plugin`，下载后校验 SHA-256，再通过 `DexClassLoader` 加载；不依赖外部存储，也不需要存储权限。
 - 未安装插件时，Java 编译入口会提示去插件市场；安装后编译、预览和打包仍可正常使用。
 
 当前首版边界：支持程序化 View、Activity 宿主、双向调用和动态 DEX；暂不支持 XML 布局、`R.java`、Android 资源编译和第三方 Java 依赖。手机内编译需要 Android 8.0 及以上系统，并已安装编译器插件。

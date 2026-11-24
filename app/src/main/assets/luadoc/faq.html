@@ -70,8 +70,8 @@
   <p>ECJ 与 D8 已从主程序安装包移出，改为按需下载的编译器插件。第一次预览或打包 Java 工程前需要先安装。</p>
   <ol>
     <li>打开首页侧边栏「插件市场」，在「Java 编译器」卡片点「下载并安装」。</li>
-    <li>插件包约 28 MB，下载后会校验 SHA-256；网络中断时重试即可，不会影响已有工程。</li>
-    <li>安装完成后回到 Java 工程重新预览；如果仍提示未安装，检查 <code class="inline">LuaXPlus/plugin/compiler</code> 是否存在 <code class="inline">compiler.dex</code> 与 <code class="inline">android.jar</code>，或存储权限是否被系统限制。</li>
+    <li>插件包约 29 MB，从 GitHub 下载后会校验 SHA-256；网络中断时重试即可，不会影响已有工程。</li>
+    <li>安装完成后回到 Java 工程重新预览；如果仍提示未安装，检查应用内部存储的 <code class="inline">files/compiler-plugin</code> 是否存在 <code class="inline">compiler.dex</code> 与 <code class="inline">android.jar</code>，或重新下载安装。</li>
   </ol>
 
   <h2>改了脚本但运行结果没变</h2>

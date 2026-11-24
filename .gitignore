@@ -17,7 +17,9 @@ local.properties
 *.keystore
 
 # 编译产物与安装包（仅保留在本地）
-/dist/
+/dist/*
+# 插件市场公开下载包必须提交，使用 GitHub main 分支直链
+!/dist/compiler-plugin-1.2.zip
 *.apk
 *.aab
 

@@ -25,6 +25,7 @@
 
 - 只使用官方构件，不修改编译器算法。
 - `android.jar` 受 Android SDK 许可约束，必须由构建机自行安装，不提交到仓库。
-- `compiler.dex` 与 `dist/*.zip` 属于本地构建产物，不提交到仓库。
+- `compiler.dex` 不提交到仓库。
+- 插件市场公开下载包 `dist/compiler-plugin-1.2.zip` 是例外，必须提交到仓库供 GitHub 直链下载；其他 `dist/*` 构建产物不提交。
 - 发布前重新计算 ZIP 的 SHA-256，并同步更新 `app/src/main/assets/pluginmarket.lua` 中的下载地址、哈希和大小。
 - 版本号和许可证说明必须与包内 `version.txt`、`resources/NOTICE.txt` 保持一致。

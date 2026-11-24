@@ -42,10 +42,10 @@ local WASH = C.accentWash
 local SUCCESS = C.success
 local DANGER = C.danger
 
--- 插件包与整包校验值；安装前必须匹配，避免下载到不完整或被替换的文件。
-local COMPILER_URL = "https://aka.doubaocdn.com/s/OIT0ZJQtze"
-local COMPILER_SHA256 = "e807066aef6c970a405f3c5bd4ead5fa97c51acd7202b0cd97987be9596c9c06"
-local COMPILER_SIZE_TEXT = "约 28 MB"
+-- 插件包托管在 GitHub main 分支，下载后仍按整包 SHA-256 校验。
+local COMPILER_URL = "https://raw.githubusercontent.com/Lisir2002/LuaXplus/main/dist/compiler-plugin-1.2.zip"
+local COMPILER_SHA256 = "25b2a5d979ff1e054ef5c63ab635465eecb444a24913c37b100ce50c0615941a"
+local COMPILER_SIZE_TEXT = "约 29 MB"
 
 local function dp(n)
   return math.floor(n * activity.getResources().getDisplayMetrics().density + 0.5)
@@ -287,7 +287,7 @@ local lines = {
   "下载完成后会核对 SHA-256，并校验编译器 DEX 与 android.jar 的完整性。",
   "插件只加载 ECJ 与 D8 编译类，不会改动你的工程文件。",
   "开源许可：ECJ 采用 EPL-2.0，D8 采用 BSD-3-Clause；完整许可见插件 resources/licenses。",
-  "卸载或删除 LuaXPlus/plugin/compiler 后，Java 编译入口会提示重新安装。",
+  "插件安装在应用内部存储，不申请存储权限；清理应用数据或卸载应用后会提示重新安装。",
 }
 for _, text in ipairs(lines) do
   local line = label(text, 12, MUTED)

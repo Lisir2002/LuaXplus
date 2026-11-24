@@ -1,7 +1,6 @@
 package com.mini.luaxplus;
 
 import android.content.Context;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -22,14 +21,15 @@ import java.util.zip.ZipFile;
 /**
  * Java 编译器插件：ECJ 与 D8 不再随主程序打包，而是按需下载后从这里加载。
  *
- * 插件目录放在 LuaXPlus/plugin/compiler，只有外部存储不可写时才退回应用私有目录。
- * 插件包固定包含 compiler.dex、android.jar 和 version.txt，安装前校验整包 SHA-256，
- * 运行时通过 DexClassLoader 提供 ECJ/D8 类，避免把约 34 MB 的编译链塞进 APK。
+ * 插件目录固定放在应用内部存储 files/compiler-plugin，不依赖外部存储或存储权限，
+ * 卸载应用时随应用数据一起清理。插件包固定包含 compiler.dex、android.jar 和
+ * version.txt，安装前校验整包 SHA-256，运行时通过 DexClassLoader 提供 ECJ/D8 类，
+ * 避免把约 34 MB 的编译链塞进 APK。
  */
 public final class CompilerPlugin {
 
     private static final String TAG = "CompilerPlugin";
-    private static final String EXTERNAL_DIR = "LuaXPlus/plugin/compiler";
+    private static final String INTERNAL_DIR = "compiler-plugin";
     private static final String DEX_NAME = "compiler.dex";
     private static final String ANDROID_JAR_NAME = "android.jar";
     private static final String VERSION_NAME = "version.txt";
@@ -47,16 +47,9 @@ public final class CompilerPlugin {
     private CompilerPlugin() {
     }
 
-    /** 插件目录；优先外部存储，便于用户通过文件管理器查看或手动替换。 */
+    /** 插件目录固定使用应用内部存储，避免外部存储被清理或文件管理器误删。 */
     public static File root(Context context) {
-        File externalRoot = Environment.getExternalStorageDirectory();
-        File external = externalRoot == null
-                ? null
-                : new File(externalRoot, EXTERNAL_DIR);
-        if (external != null && ensureDirectory(external) && external.canWrite()) {
-            return external;
-        }
-        File internal = new File(context.getFilesDir(), "compiler-plugin");
+        File internal = new File(context.getFilesDir(), INTERNAL_DIR);
         ensureDirectory(internal);
         return internal;
     }
@@ -269,13 +262,6 @@ public final class CompilerPlugin {
                 throw new IOException("插件包缺少 ECJ 提示资源");
             }
             compilerLoader = null;
-            // 部分系统会限制从可写外部存储直接加载 DEX；再留一份应用私有副本，
-            // 编译时优先加载私有副本，插件仍可在 LuaXPlus/plugin/compiler 查看。
-            try {
-                prepareLoadDex(context, true);
-            } catch (IOException shadowError) {
-                Log.w(TAG, "无法准备私有 DEX 副本，编译时将重试", shadowError);
-            }
             return true;
         } catch (Throwable error) {
             lastError = error.getMessage() == null ? error.toString() : error.getMessage();
@@ -315,44 +301,13 @@ public final class CompilerPlugin {
         return compilerLoader;
     }
 
-    /**
-     * 返回用于 DexClassLoader 的 DEX 路径。外部插件存在时，复制到应用私有目录，
-     * 避免 Android 对外部可写 DEX 的限制；私有目录不可用时仍回退外部路径。
-     */
+    /** 插件 DEX 固定在应用内部存储，直接交给 DexClassLoader 加载。 */
     private static File prepareLoadDex(Context context) throws IOException {
-        return prepareLoadDex(context, false);
-    }
-
-    private static File prepareLoadDex(Context context, boolean forceCopy) throws IOException {
-        File external = dexFile(context);
-        File internal = new File(context.getFilesDir(), "compiler-plugin/compiler.dex");
-        if (isSameFile(external, internal)) {
-            return external;
+        File dex = dexFile(context);
+        if (!dex.isFile() || dex.length() < MIN_DEX_BYTES) {
+            throw new IOException("Java 编译器插件 DEX 不完整");
         }
-        if (!ensureDirectory(internal.getParentFile())) {
-            return external;
-        }
-        boolean needsCopy = forceCopy || !internal.isFile() || internal.length() != external.length();
-        if (needsCopy) {
-            try (InputStream input = new FileInputStream(external);
-                 OutputStream output = new FileOutputStream(internal)) {
-                byte[] buffer = new byte[32 * 1024];
-                int read;
-                while ((read = input.read(buffer)) != -1) {
-                    output.write(buffer, 0, read);
-                }
-                output.flush();
-            }
-        }
-        return internal;
-    }
-
-    private static boolean isSameFile(File left, File right) {
-        try {
-            return left.getCanonicalPath().equals(right.getCanonicalPath());
-        } catch (IOException ignored) {
-            return left.getAbsolutePath().equals(right.getAbsolutePath());
-        }
+        return dex;
     }
 
     private static boolean ensureDirectory(File directory) {
