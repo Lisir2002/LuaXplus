@@ -63,6 +63,42 @@ end
 projectDir = tostring(projectDir or "")
 projectDir = projectDir:gsub("/init%.lua$", "")
 
+local function readPropertiesFile(path)
+  local file = io.open(path, "r")
+  if not file then
+    return nil
+  end
+  local result = {}
+  for raw in file:lines() do
+    local line = raw:gsub("\r", "")
+    if line:match("%S") and not line:match("^%s*#") then
+      local key, value = line:match("^([^=]+)=(.*)$")
+      if key then
+        key = key:match("^%s*(.-)%s*$")
+        value = value:match("^%s*(.-)%s*$")
+        if key and key ~= "" then
+          result[key] = value or ""
+        end
+      end
+    end
+  end
+  file:close()
+  return result
+end
+
+local isJavaProject = File(projectDir .. "/project.properties").isFile()
+
+if isJavaProject then
+  for _, name in ipairs({ "init.lua", "main.lua" }) do
+    local stale = File(projectDir .. "/" .. name)
+    if stale.isFile() then
+      pcall(function()
+        stale.delete()
+      end)
+    end
+  end
+end
+
 local function dp(n)
   return math.floor(n * activity.getResources().getDisplayMetrics().density + 0.5)
 end
@@ -83,7 +119,66 @@ local function toast(text)
 end
 
 -- 运行前先编译校验，语法错误也能落快照，而不是只弹一个错误页
+local function javaClassName(filePath)
+  local base = File(filePath).getName():gsub("%.java$", "")
+  local handle = io.open(filePath, "r")
+  if not handle then
+    return base
+  end
+  local source = handle:read("*a")
+  handle:close()
+  local packageName = source and source:match("package%s+([%w_%.]+)%s*;")
+  if packageName and packageName ~= "" then
+    return packageName .. "." .. base
+  end
+  return base
+end
+
+local function runJavaFile(filePath)
+  local java = require "luaxplus.java"
+  local className = javaClassName(filePath)
+  local outputDir = projectDir .. "/.build/java"
+  toast("正在编译 " .. className .. " …")
+  java.compileAsync(projectDir, outputDir, function(result)
+    if not result.success then
+      MaterialAlertDialogBuilder(activity)
+        .setTitle("Java 编译失败")
+        .setMessage(tostring(result.message))
+        .setPositiveButton("知道了", nil)
+        .show()
+      return
+    end
+    toast("编译成功，正在打开 Java 页面")
+    java.run(className, result.dexPath)
+  end)
+end
+
+local function firstJavaFile(dir)
+  local children = File(dir).listFiles()
+  if not children then
+    return nil
+  end
+  for index = 0, #children - 1 do
+    local child = children[index]
+    if child.isDirectory() then
+      if child.getName() ~= ".build" then
+        local found = firstJavaFile(child.getAbsolutePath())
+        if found then
+          return found
+        end
+      end
+    elseif child.isFile() and child.getName():match("%.java$") then
+      return child.getAbsolutePath()
+    end
+  end
+  return nil
+end
+
 local function runScript(filePath)
+  if filePath:match("%.java$") then
+    runJavaFile(filePath)
+    return
+  end
   local ok, err = loadfile(filePath)
   if not ok then
     pcall(function()
@@ -98,18 +193,102 @@ local function runScript(filePath)
   end)
 end
 
-local info = { path = projectDir }
-pcall(function()
-  local chunk = loadfile(projectDir .. "/init.lua", "bt", info)
-  if chunk then
-    chunk()
+local info
+if isJavaProject then
+  local props = readPropertiesFile(projectDir .. "/project.properties") or {}
+  info = {
+    path = projectDir,
+    type = "java",
+    javaProject = true,
+    appname = props.name or "Java 工程",
+    appver = props.version or "1.0",
+    appcode = props.code or "1",
+    appsdk = props.sdk or "21",
+    packagename = props["package"] or "",
+    theme = props.theme or "Theme_Material_Light",
+    developer = props.developer or "",
+    description = props.description or "",
+    debugmode = true,
+    inject_log = props.inject_log ~= "false",
+    glyph = props.glyph,
+    screen = props.screen,
+    argument = props.argument,
+    lua = props.lua,
+    official = props.official ~= "false",
+  }
+else
+  info = { path = projectDir }
+  pcall(function()
+    local chunk = loadfile(projectDir .. "/init.lua", "bt", info)
+    if chunk then
+      chunk()
+    end
+  end)
+  local logProps = readPropertiesFile(projectDir .. "/log.properties") or {}
+  if logProps.inject_log ~= nil then
+    info.inject_log = logProps.inject_log ~= "false"
   end
-end)
+end
 info.path = projectDir
+if info.inject_log == nil then
+  info.inject_log = true
+end
+
+local function safeLogPackage(value)
+  return tostring(value or ""):gsub("[^%w%._]", "_")
+end
+
+local function ensureProjectLogDir(pkg)
+  local segment = safeLogPackage(pkg)
+  if segment == "" then
+    return
+  end
+  local dir = File(activity.getLuaExtDir() .. "/APP_Logs/" .. segment)
+  if not dir.isDirectory() then
+    local ok = dir.mkdirs()
+    if not ok then
+      toast("日志目录创建失败：" .. segment)
+    end
+  end
+end
+
+pcall(function()
+  ensureProjectLogDir(info.packagename)
+end)
 
 local function writeInfo()
   local function str(value)
     return string.format("%q", tostring(value or ""))
+  end
+  if isJavaProject then
+    local lines = {
+      "type=java",
+      "name=" .. tostring(info.appname or "Java 工程"),
+      "version=" .. tostring(info.appver or "1.0"),
+      "code=" .. tostring(info.appcode or "1"),
+      "sdk=" .. tostring(info.appsdk or "21"),
+      "package=" .. tostring(info.packagename or ""),
+      "screen=" .. tostring(info.screen or ""),
+      "argument=" .. tostring(info.argument or ""),
+      "lua=" .. tostring(info.lua or ""),
+      "theme=" .. tostring(info.theme or "Theme_Material_Light"),
+      "developer=" .. tostring(info.developer or ""),
+      "description=" .. tostring(info.description or ""),
+      "inject_log=" .. (info.inject_log and "true" or "false"),
+      "official=" .. (info.official and "true" or "false"),
+    }
+    if info.glyph and info.glyph ~= "" then
+      table.insert(lines, "glyph=" .. tostring(info.glyph))
+    end
+    local file = io.open(projectDir .. "/project.properties", "w")
+    if not file then
+      toast("写入失败，请检查存储权限")
+      return false
+    end
+    file:write(table.concat(lines, "\n") .. "\n")
+    file:close()
+    ensureProjectLogDir(info.packagename)
+    return true
   end
   if info.debugmode == nil then
     info.debugmode = true
@@ -145,6 +324,18 @@ local function writeInfo()
     return false
   end
   file:write(table.concat(lines, "\n") .. "\n")
+  file:close()
+  ensureProjectLogDir(info.packagename)
+  return true
+end
+
+local function writeLogFlag()
+  local file = io.open(projectDir .. "/log.properties", "w")
+  if not file then
+    toast("写入失败，请检查存储权限")
+    return false
+  end
+  file:write("inject_log=" .. (info.inject_log and "true" or "false") .. "\n")
   file:close()
   return true
 end
@@ -1152,36 +1343,54 @@ local function buildPermissionPage()
 end
 
 -- ===== 日志页 =====
-local function readHead(path, count)
-  local file = io.open(path, "r")
-  if not file then
-    return ""
+local function logTime(item)
+  local ok, text = pcall(function()
+    return os.date("%m-%d %H:%M", math.floor(item.lastModified() / 1000))
+  end)
+  return ok and text or "未知时间"
+end
+
+local function logSize(item)
+  local size = tonumber(item.length()) or 0
+  if size >= 1024 * 1024 then
+    return string.format("%.1f MB", size / 1024 / 1024)
   end
-  local lines = {}
-  for _ = 1, (count or 6) do
-    local line = file:read("*l")
-    if not line then
-      break
-    end
-    table.insert(lines, line)
+  if size >= 1024 then
+    return string.format("%.1f KB", size / 1024)
   end
-  file:close()
-  return table.concat(lines, "\n")
+  return tostring(size) .. " B"
 end
 
 local function collectLogs()
+  local pkg = tostring(info.packagename or "")
+  if pkg == "" then
+    return {}
+  end
+  -- 这里只展示当前工程打包产物的日志，不混入主程序自身日志。
+  local safePkg = safeLogPackage(pkg)
   local dirs = {
-    activity.getLuaExtDir() .. "/logs",
-    activity.getLuaExtDir() .. "/products/" .. (info.packagename or "") .. "/logs",
+    activity.getLuaExtDir() .. "/APP_Logs/" .. safePkg,
+    -- 兼容旧版本成品使用的 products/<包名>/logs
+    activity.getLuaExtDir() .. "/products/" .. safePkg .. "/logs",
   }
+  pcall(function()
+    local root = Environment.getExternalStorageDirectory().getAbsolutePath()
+    table.insert(dirs, root .. "/Android/data/" .. pkg .. "/files/logs")
+    table.insert(dirs, root .. "/Download/Mini-LuaXPLUS/" .. pkg .. "/logs")
+  end)
   local list = {}
+  local seen = {}
   for _, dir in ipairs(dirs) do
     local files = File(dir).listFiles()
     if files then
       for i = 0, #files - 1 do
         local item = files[i]
         if item.isFile() then
-          table.insert(list, item)
+          local path = item.getAbsolutePath()
+          if not seen[path] then
+            seen[path] = true
+            table.insert(list, item)
+          end
         end
       end
     end
@@ -1192,41 +1401,180 @@ local function collectLogs()
   return list
 end
 
+local function showLogFile(item)
+  local ok, text = pcall(function()
+    local file = io.open(item.getAbsolutePath(), "r")
+    if not file then
+      return nil
+    end
+    local body = file:read("*a")
+    file:close()
+    return body
+  end)
+  if not ok or not text then
+    toast("日志文件打不开：" .. item.getName())
+    return
+  end
+  if #text > 120000 then
+    text = text:sub(1, 120000) .. "\n…（内容过长已截断）"
+  end
+  local content = TextView(activity)
+  content.setText(text)
+  content.setTextSize(11.5)
+  content.setTextColor(INK)
+  content.setTypeface(Typeface.MONOSPACE)
+  content.setTextIsSelectable(true)
+  content.setPadding(dp(14), dp(10), dp(14), dp(10))
+  content.setBackgroundColor(CARD)
+  local scroll = ScrollView(activity)
+  scroll.setBackgroundColor(CARD)
+  scroll.addView(content, LinearLayout.LayoutParams(-1, -2))
+  MaterialAlertDialogBuilder(activity)
+    .setTitle(item.getName())
+    .setView(scroll)
+    .setPositiveButton("关闭", nil)
+    .show()
+end
+
 local function buildLogPage()
   local scroll, box = makeScroll()
   pages[4] = scroll
 
-  local card = LinearLayout(activity)
-  card.setOrientation(LinearLayout.VERTICAL)
-  card.setGravity(Gravity.CENTER)
-  card.setPadding(dp(20), dp(46), dp(20), dp(46))
-  card.setBackground(rounded(CARD, LINE, 14))
-  box.addView(card, LinearLayout.LayoutParams(-1, -2))
+  local note = TextView(activity)
+  note.setText("开启后，成品会注入主程序的完整日志与崩溃捕获；这里只显示当前成品包名下的日志。")
+  note.setTextSize(12.5)
+  note.setTextColor(MUTED)
+  note.setBackground(rounded(INFO_BG, INFO_LINE, 10))
+  note.setPadding(dp(12), dp(10), dp(12), dp(10))
+  box.addView(note, LinearLayout.LayoutParams(-1, -2))
 
-  local symbol = icons.chip("log", {
-    size = 52,
-    iconSize = 24,
-    background = PAPER_SOFT,
-    color = WARM_INK,
-    radius = 14,
-  })
-  card.addView(symbol, LinearLayout.LayoutParams(dp(52), dp(52)))
+  local card = LinearLayout(activity)
+  card.setOrientation(LinearLayout.HORIZONTAL)
+  card.setGravity(Gravity.CENTER_VERTICAL)
+  card.setPadding(dp(12), dp(10), dp(12), dp(10))
+  card.setBackground(rounded(CARD, LINE, 12))
+  local cardParams = LinearLayout.LayoutParams(-1, -2)
+  cardParams.topMargin = dp(12)
+  box.addView(card, cardParams)
+
+  local textBox = LinearLayout(activity)
+  textBox.setOrientation(LinearLayout.VERTICAL)
+  card.addView(textBox, LinearLayout.LayoutParams(0, -2, 1))
 
   local title = TextView(activity)
-  title.setText("日志页占位")
-  title.setTextSize(15)
+  title.setText("打包时注入日志系统")
+  title.setTextSize(14)
   title.setTextColor(INK)
-  title.setGravity(Gravity.CENTER)
-  title.setPadding(0, dp(14), 0, dp(6))
-  card.addView(title)
+  textBox.addView(title)
 
   local hint = TextView(activity)
-  hint.setText("这里先留空，日志的展示方式与内容待确认后接入。")
-  hint.setTextSize(12.5)
+  hint.setText("成品里保留崩溃捕获、启动轨迹和日志文件")
+  hint.setTextSize(11.5)
   hint.setTextColor(MUTED)
-  hint.setGravity(Gravity.CENTER)
-  card.addView(hint, LinearLayout.LayoutParams(-1, -2))
+  hint.setPadding(0, dp(4), 0, 0)
+  textBox.addView(hint)
 
+  local switch = MaterialSwitch(activity)
+  switch.setChecked(info.inject_log ~= false)
+  card.addView(switch)
+  switch.setOnCheckedChangeListener(CompoundButton.OnCheckedChangeListener{
+    onCheckedChanged = function(button, state)
+      if info.inject_log == state then
+        return
+      end
+      info.inject_log = state
+      local saved
+      if isJavaProject then
+        saved = writeInfo()
+      else
+        saved = writeLogFlag()
+      end
+      if saved then
+        toast(state and "已开启成品日志注入" or "已关闭成品日志注入")
+      else
+        toast("日志开关保存失败")
+      end
+    end
+  })
+
+  local header = LinearLayout(activity)
+  header.setOrientation(LinearLayout.HORIZONTAL)
+  header.setGravity(Gravity.CENTER_VERTICAL)
+  local headerParams = LinearLayout.LayoutParams(-1, -2)
+  headerParams.topMargin = dp(18)
+  box.addView(header, headerParams)
+
+  local listTitle = TextView(activity)
+  listTitle.setText("成品日志")
+  listTitle.setTextSize(13)
+  listTitle.setTypeface(Typeface.DEFAULT_BOLD)
+  listTitle.setTextColor(INFO_TEXT)
+  header.addView(listTitle, LinearLayout.LayoutParams(0, -2, 1))
+
+  local refresh = TextView(activity)
+  refresh.setText("刷新")
+  refresh.setTextSize(12)
+  refresh.setTextColor(ACCENT_DEEP)
+  refresh.setPadding(dp(10), dp(6), dp(4), dp(6))
+  header.addView(refresh)
+
+  local listBox = LinearLayout(activity)
+  listBox.setOrientation(LinearLayout.VERTICAL)
+  box.addView(listBox, LinearLayout.LayoutParams(-1, -2))
+
+  local function refreshList()
+    listBox.removeAllViews()
+    local logs = collectLogs()
+    if #logs == 0 then
+      local empty = TextView(activity)
+      empty.setText("暂无成品日志。确认包名正确，并打包安装后在成品里运行一次。")
+      empty.setTextSize(12)
+      empty.setTextColor(MUTED)
+      empty.setPadding(dp(2), dp(10), dp(2), dp(10))
+      listBox.addView(empty, LinearLayout.LayoutParams(-1, -2))
+      return
+    end
+    for i = 1, math.min(#logs, 12) do
+      local item = logs[i]
+      local row = LinearLayout(activity)
+      row.setOrientation(LinearLayout.HORIZONTAL)
+      row.setGravity(Gravity.CENTER_VERTICAL)
+      row.setPadding(dp(12), dp(9), dp(12), dp(9))
+      row.setBackground(rounded(CARD, LINE, 10))
+      local rowParams = LinearLayout.LayoutParams(-1, -2)
+      rowParams.topMargin = dp(6)
+      listBox.addView(row, rowParams)
+
+      local name = TextView(activity)
+      name.setText(item.getName())
+      name.setTextSize(12)
+      name.setTextColor(INK)
+      name.setSingleLine(true)
+      name.setEllipsize(TextUtils.TruncateAt.MIDDLE)
+      row.addView(name, LinearLayout.LayoutParams(0, -2, 1))
+
+      local meta = TextView(activity)
+      meta.setText(logTime(item) .. "  " .. logSize(item))
+      meta.setTextSize(11)
+      meta.setTextColor(MUTED)
+      meta.setPadding(dp(8), 0, 0, 0)
+      row.addView(meta)
+
+      row.setOnClickListener(View.OnClickListener{
+        onClick = function()
+          showLogFile(item)
+        end
+      })
+    end
+  end
+
+  refreshList()
+  refresh.setOnClickListener(View.OnClickListener{
+    onClick = function()
+      refreshList()
+      toast("日志列表已刷新")
+    end
+  })
   return scroll
 end
 
@@ -1335,7 +1683,17 @@ local function barButton(text, primary, handler, iconName)
   })
 end
 
-barButton("运行", false, function()
+barButton("预览", false, function()
+  if isJavaProject then
+    local ok, err = pcall(function()
+      luajava.bindClass("com.mini.luaxplus.java.JavaProjectEntry")
+        .open(activity, projectDir)
+    end)
+    if not ok then
+      toast("Java 工程入口启动失败：" .. tostring(err))
+    end
+    return
+  end
   local entry = projectDir .. "/main.lua"
   if not File(entry).exists() then
     toast("缺少 main.lua")
@@ -1359,6 +1717,15 @@ barButton("打包", true, function()
 end, "package")
 
 barButton("编辑器", false, function()
+  if isJavaProject then
+    local file = firstJavaFile(projectDir)
+    if file then
+      activity.newActivity("editor", {file})
+    else
+      toast("工程里还没有 .java 文件")
+    end
+    return
+  end
   pcall(function()
     activity.newActivity("editor", {projectDir .. "/main.lua"})
   end)

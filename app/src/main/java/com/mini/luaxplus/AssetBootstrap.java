@@ -42,6 +42,9 @@ public final class AssetBootstrap {
         long[] bytes = new long[1];
         boolean ok;
         try {
+            // 资源目录只作为内置示例的铺设源，版本更新时先清掉旧文件，
+            // 避免已删除的 init.lua、main.lua 继续被复制到示例目录。
+            deleteTree(new File(target, "examples"));
             copyDir(context.getAssets(), "", target, files, bytes);
             // 打包组件按无扩展名加载，需把 mao.dex、sign.dex 另存为 mao、sign
             copyDex(context.getAssets(), "mao.dex", new File(target, "mao"), bytes);
@@ -123,6 +126,22 @@ public final class AssetBootstrap {
         } finally {
             closeQuietly(inputStream);
             closeQuietly(outputStream);
+        }
+    }
+
+    /** 递归删除内置资源的旧缓存，不跟随目录外的符号链接。 */
+    private static void deleteTree(File file) {
+        if (file == null || !file.exists()) {
+            return;
+        }
+        File[] children = file.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                deleteTree(child);
+            }
+        }
+        if (!file.delete()) {
+            LogCore.w(TAG, "删除旧资源失败: " + file.getAbsolutePath());
         }
     }
 

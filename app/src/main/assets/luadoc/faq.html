@@ -23,7 +23,7 @@
   <h2>先看日志，不要猜</h2>
   <ul>
     <li>主程序日志：<code class="inline">/storage/emulated/0/LuaXPlus/logs</code></li>
-    <li>成品日志：<code class="inline">/storage/emulated/0/LuaXPlus/products/包名/logs</code></li>
+    <li>成品日志：<code class="inline">/storage/emulated/0/LuaXPlus/APP_Logs/包名</code></li>
     <li>按修改时间排序，最新的 <code class="inline">luaerror_*</code> 或 <code class="inline">crash_*</code> 就是现场。</li>
   </ul>
 
@@ -66,6 +66,14 @@
   <h2>权限开关是灰的</h2>
   <p>说明安装包清单里没有声明对应权限。当前版本打包会继承完整权限清单；如果仍为灰色，检查是不是用了旧版本打的包。</p>
 
+  <h2>Java 编译提示未安装编译器</h2>
+  <p>ECJ 与 D8 已从主程序安装包移出，改为按需下载的编译器插件。第一次预览或打包 Java 工程前需要先安装。</p>
+  <ol>
+    <li>打开首页侧边栏「插件市场」，在「Java 编译器」卡片点「下载并安装」。</li>
+    <li>插件包约 28 MB，下载后会校验 SHA-256；网络中断时重试即可，不会影响已有工程。</li>
+    <li>安装完成后回到 Java 工程重新预览；如果仍提示未安装，检查 <code class="inline">LuaXPlus/plugin/compiler</code> 是否存在 <code class="inline">compiler.dex</code> 与 <code class="inline">android.jar</code>，或存储权限是否被系统限制。</li>
+  </ol>
+
   <h2>改了脚本但运行结果没变</h2>
   <ul>
     <li>主程序在版本变化或重装后才重新铺设运行时脚本，工程脚本本身每次都重新读取。</li>
@@ -85,7 +93,7 @@
 
   <h2>成品打开白屏或直接退出</h2>
   <ol>
-    <li>先看 <code class="inline">products/包名/logs</code> 是否生成日志；没有日志说明启动阶段就出问题。</li>
+    <li>先看 <code class="inline">APP_Logs/包名</code> 是否生成日志；没有日志说明启动阶段就出问题。</li>
     <li>有 <code class="inline">luaerror</code> 时按堆栈定位脚本；有 <code class="inline">crash</code> 时看是否为 Java 层异常。</li>
     <li>确认成品已获得存储权限，否则部分依赖外部目录的脚本会失败。</li>
   </ol>
@@ -93,7 +101,7 @@
   <h2>怎么彻底重置</h2>
   <ul>
     <li>系统设置里清除应用数据：会清空私有目录脚本，下次启动重新铺设。</li>
-    <li>删除外部目录 <code class="inline">LuaXPlus/logs</code> 只清日志，不影响工程。</li>
+    <li>删除 <code class="inline">LuaXPlus/logs</code> 只清主程序日志；成品日志按 <code class="inline">LuaXPlus/APP_Logs/包名</code> 单独清理，不影响工程。</li>
     <li>成品包各自独立，卸载成品只影响它自己的目录。</li>
   </ul>
 

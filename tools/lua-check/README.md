@@ -1,10 +1,11 @@
 # Lua 检查门禁
 
-`run.sh` 是构建和 CI 共用的入口，包含三项检查：
+`run.sh` 是构建和 CI 共用的入口，包含四项检查：
 
-1. **语法检查**：对 `app/src/main/assets` 和 `app/src/main/resources` 下的所有 `.lua` 文件执行 `loadfile`，只编译不执行。
-2. **JavaAPI 契约测试**：用严格 mock 运行 `javaapi/main.lua`，覆盖页面加载、类搜索、类加载失败、详情构建、成员搜索、长按复制、弹窗关闭和重开。
-3. **打包预检回归**：用临时工程验证 `packcheck` 能发现缺失入口、Lua 语法错误、布局语法错误，并正确跳过隐藏文件与子目录合法文件。
+1. **原生库版本检查**：`libluajava.so` 必须包含 `Lua 5.5.1`，且 JAR 内不能残留旧 `com.luajava` 字节码。
+2. **语法检查**：对 `app/src/main/assets` 和 `app/src/main/resources` 下的所有 `.lua` 文件执行 `loadfile`，只编译不执行。
+3. **JavaAPI 契约测试**：用严格 mock 运行 `javaapi/main.lua`，覆盖页面加载、类搜索、类加载失败、详情构建、成员搜索、长按复制、弹窗关闭和重开。
+4. **打包预检回归**：用临时工程验证 `packcheck` 能发现缺失入口、Lua 语法错误、布局语法错误，并正确跳过隐藏文件与子目录合法文件。
 
 ## 为什么需要严格 mock
 
@@ -20,6 +21,12 @@ Invalid method call. Invalid Parameters.
 
 ```bash
 bash tools/lua-check/run.sh
+```
+
+只检查原生库版本：
+
+```bash
+bash tools/lua-check/check_native.sh
 ```
 
 Gradle 任务：

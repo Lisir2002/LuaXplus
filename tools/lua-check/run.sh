@@ -5,6 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 LUA_BIN="${LUA_BIN:-}"
+if [ -z "$LUA_BIN" ] && [ -x "$ROOT_DIR/native/lua/lua" ]; then
+  # 优先使用项目自带的 Lua 5.5，避免系统 Lua 5.3 漏掉 loop 变量等 5.5 约束。
+  LUA_BIN="$ROOT_DIR/native/lua/lua"
+fi
 if [ -z "$LUA_BIN" ]; then
   for candidate in lua5.5 lua5.4 lua5.3 lua; do
     if command -v "$candidate" >/dev/null 2>&1; then
@@ -24,6 +28,7 @@ if [ -z "${LUA_INIT:-}" ] && [ -f "$ROOT_DIR/app/src/main/resources/lua/lua55_co
 fi
 
 echo "[lua-check] Lua: $($LUA_BIN -v 2>&1 | head -1)"
+bash tools/lua-check/check_native.sh
 "$LUA_BIN" tools/lua-check/check_syntax.lua
 "$LUA_BIN" tools/lua-smoke/run.lua
 "$LUA_BIN" tools/lua-smoke/packcheck_test.lua

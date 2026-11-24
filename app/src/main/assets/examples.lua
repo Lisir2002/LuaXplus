@@ -11,7 +11,7 @@ import "loadbitmap"
 import "autotheme"
 
 -- 官方示例列表：工程落在 LuaXPlus/examples，首次打开时从内置资产铺设。
--- 示例工程和普通工程一样，可以进入详情、编辑文件、运行和打包。
+-- 点击卡片统一进入工程管理页；Java 工程在工程页点“预览”时才编译并打开页面。
 
 activity.setTheme(autotheme())
 activity.setTitle("官方示例")
@@ -129,6 +129,29 @@ local function readMarker()
   return value
 end
 
+local function readProperties(path)
+  local file = io.open(path, "r")
+  if not file then
+    return nil
+  end
+  local result = {}
+  for raw in file:lines() do
+    local line = raw:gsub("\r", "")
+    if line:match("%S") and not line:match("^%s*#") then
+      local key, value = line:match("^([^=]+)=(.*)$")
+      if key then
+        key = key:match("^%s*(.-)%s*$")
+        value = value:match("^%s*(.-)%s*$")
+        if key and key ~= "" then
+          result[key] = value or ""
+        end
+      end
+    end
+  end
+  file:close()
+  return result
+end
+
 local function writeMarker()
   local file = io.open(examplesRoot .. "/.bundle", "w")
   if file then
@@ -144,7 +167,10 @@ local function hasExample()
   end
   for index = 0, #children - 1 do
     local child = children[index]
-    if child.isDirectory() and File(child.getAbsolutePath() .. "/init.lua").isFile() then
+    if child.isDirectory() and (
+        File(child.getAbsolutePath() .. "/init.lua").isFile()
+        or File(child.getAbsolutePath() .. "/project.properties").isFile()
+    ) then
       return true
     end
   end
@@ -185,12 +211,40 @@ local function ensureExamples(force)
     return false
   end
   File(examplesRoot).mkdirs()
+  local oldChildren = File(examplesRoot).listFiles()
+  if oldChildren then
+    for index = 0, #oldChildren - 1 do
+      local child = oldChildren[index]
+      if child.getName() ~= ".bundle" then
+        removeTree(child.getAbsolutePath())
+      end
+    end
+  end
   copyTree(sourceRoot, examplesRoot, true)
   writeMarker()
   return true
 end
 
 local function readInfo(dir)
+  local properties = readProperties(dir .. "/project.properties")
+  if properties and (properties.type == "java" or properties.screen) then
+    local info = {
+      path = dir,
+      type = "java",
+      javaProject = true,
+      appname = properties.name or "Java 工程",
+      appver = properties.version or "1.0",
+      packagename = properties["package"] or "",
+      description = properties.description or "",
+      glyph = properties.glyph,
+      screen = properties.screen,
+      argument = properties.argument,
+      lua = properties.lua,
+      official = properties.official ~= "false",
+    }
+    return info
+  end
+
   local info = {}
   local ok = pcall(function()
     local chunk = loadfile(dir .. "/init.lua", "bt", info)
@@ -303,8 +357,12 @@ theme.apply(activity, { background = PAPER, root = root, dark = false })
 activity.setContentView(root)
 
 -- ===== 卡片 =====
-local function openProject(info)
+local function openProjectPage(info)
   activity.newActivity("projectpage", {info.path})
+end
+
+local function openProject(info)
+  openProjectPage(info)
 end
 
 local function restoreOne(info)
@@ -350,7 +408,7 @@ local function buildIcon(info)
   end
 
   local glyph = TextView(activity)
-  glyph.setText("UI")
+  glyph.setText(info.glyph or "UI")
   glyph.setTextSize(15)
   glyph.setTypeface(Typeface.DEFAULT_BOLD)
   glyph.setTextColor(C.onAccent)
@@ -387,7 +445,7 @@ local function buildCard(info)
   nameRow.addView(name)
 
   local badge = TextView(activity)
-  badge.setText("官方")
+  badge.setText(info.javaProject and "Java" or "官方")
   badge.setTextSize(10)
   badge.setTextColor(ACCENT_DEEP)
   badge.setGravity(Gravity.CENTER)

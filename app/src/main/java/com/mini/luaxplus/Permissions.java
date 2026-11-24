@@ -20,6 +20,7 @@ public final class Permissions {
     private static final int REQUEST_CODE = 3100;
     private static final String PREFS_NAME = "mini_luaxplus_permissions";
     private static final String KEY_FIRST_LAUNCH = "first_launch_storage_requested";
+    private static final String KEY_ALL_FILES_VERSION = "all_files_request_version";
 
     private Permissions() {
     }
@@ -80,7 +81,13 @@ public final class Permissions {
             return;
         }
         if (Build.VERSION.SDK_INT >= 30) {
-            if (!allFiles()) {
+            if (allFiles()) {
+                return;
+            }
+            String version = appVersion(activity);
+            SharedPreferences preferences = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            if (!version.equals(preferences.getString(KEY_ALL_FILES_VERSION, ""))) {
+                preferences.edit().putString(KEY_ALL_FILES_VERSION, version).apply();
                 openAllFilesSettings(activity);
             }
             return;
@@ -90,6 +97,15 @@ public final class Permissions {
             if (!missing.isEmpty()) {
                 request(activity, missing);
             }
+        }
+    }
+
+    private static String appVersion(Context context) {
+        try {
+            return context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0).versionName;
+        } catch (Throwable throwable) {
+            return "unknown";
         }
     }
 
@@ -109,7 +125,15 @@ public final class Permissions {
 
     /** 是否已获得所有文件访问权限 */
     public static boolean allFiles() {
-        return Build.VERSION.SDK_INT < 30 || Environment.isExternalStorageManager();
+        if (Build.VERSION.SDK_INT < 30) {
+            return true;
+        }
+        try {
+            return Environment.isExternalStorageManager();
+        } catch (Throwable throwable) {
+            // 部分 ROM 在 Application 早期尚未准备好包信息
+            return false;
+        }
     }
 
     /** 申请所有文件访问权限；低版本走存储写入权限 */

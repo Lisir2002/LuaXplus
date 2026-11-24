@@ -3115,9 +3115,40 @@ Java_com_luajava_LuaState__1setUpValue(JNIEnv *env, jobject jobj, jlong cptr,
     return (*env)->NewStringUTF(env, name);
 }
 
-static int writer(lua_State *L, const void *b, size_t size, void *B) {
+typedef struct {
+    unsigned char *data;
+    size_t size;
+    size_t capacity;
+} DumpBuffer;
+
+static int dump_writer(lua_State *L, const void *p, size_t size, void *ud) {
+    DumpBuffer *out = (DumpBuffer *) ud;
     (void) L;
-    luaL_addlstring((luaL_Buffer *) B, (const char *) b, size);
+    if (size == 0) {
+        return 0;
+    }
+    if (out->size > SIZE_MAX - size) {
+        return 1;
+    }
+    size_t needed = out->size + size;
+    if (needed > out->capacity) {
+        size_t capacity = out->capacity == 0 ? 64 : out->capacity;
+        while (capacity < needed) {
+            if (capacity > SIZE_MAX / 2) {
+                capacity = needed;
+                break;
+            }
+            capacity *= 2;
+        }
+        unsigned char *data = (unsigned char *) realloc(out->data, capacity);
+        if (data == NULL) {
+            return 1;
+        }
+        out->data = data;
+        out->capacity = capacity;
+    }
+    memcpy(out->data + out->size, p, size);
+    out->size = needed;
     return 0;
 }
 
@@ -3126,23 +3157,29 @@ JNIEXPORT jbyteArray JNICALL
 Java_com_luajava_LuaState__1dump(JNIEnv *env, jobject jobj, jlong cptr,
                                  jint funcindex) {
     lua_State *L = getStateFromCPtr(env, cptr);
-    luaL_Buffer b;
+    DumpBuffer out = {NULL, 0, 0};
     luaL_checktype(L, funcindex, LUA_TFUNCTION);
-    //lua_settop(L, 1);
-    luaL_buffinit(L, &b);
-    if (lua_dump(L, writer, &b, 0) != 0)
+    if (lua_dump(L, dump_writer, &out, 0) != 0) {
+        free(out.data);
         luaL_error(L, "unable to dump given function");
+        return NULL;
+    }
 
-    //lua_pushlstring(L, (&b)->b, (&b)->n);
-    luaL_pushresult(&b);
-
-    size_t size = 0;
-    const char *str = lua_tolstring(L, -1, &size);
-    lua_pop(L, 1);
-    jbyteArray arr = (*env)->NewByteArray(env, size);
-    jbyte *data = (*env)->GetByteArrayElements(env, arr, 0);
-    memcpy(data, str, size);
-    (*env)->ReleaseByteArrayElements(env, arr, data, 0);
+    jbyteArray arr = (*env)->NewByteArray(env, (jsize) out.size);
+    if (arr == NULL) {
+        free(out.data);
+        return NULL;
+    }
+    if (out.size > 0) {
+        jbyte *data = (*env)->GetByteArrayElements(env, arr, NULL);
+        if (data == NULL) {
+            free(out.data);
+            return arr;
+        }
+        memcpy(data, out.data, out.size);
+        (*env)->ReleaseByteArrayElements(env, arr, data, 0);
+    }
+    free(out.data);
     return arr;
 }
 

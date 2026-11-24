@@ -21,6 +21,9 @@ public final class RuntimeWatcher {
 
     private static final String TAG = "Watcher";
     private static boolean installed;
+    private static boolean crashHandlerInstalled;
+    private static Thread.UncaughtExceptionHandler ownHandler;
+    private static Context appContext;
     /** 已记录过的错误页文本，按页面实例隔离，避免重复快照 */
     private static final Map<Object, String> SEEN_ERROR = new WeakHashMap<>();
     /** 错误页内容会分批写入，先缓存再统一落盘，避免只截到标题 */
@@ -37,27 +40,69 @@ public final class RuntimeWatcher {
             return;
         }
         installed = true;
+        setContext(context);
+        BootTrace.mark("RuntimeWatcher.install begin");
         installCrashHandler();
+        BootTrace.mark("RuntimeWatcher.install handler ready");
         installLifecycle(context);
+        BootTrace.mark("RuntimeWatcher.install lifecycle ready");
         LogCore.i(TAG, "运行监控已启用");
     }
 
-    /** 记录 Java 层未捕获异常，再交回系统原有处理流程 */
-    private static void installCrashHandler() {
+    /** Application 或 ContentProvider 最早阶段没有完整初始化，先交入上下文供崩溃快照使用 */
+    public static void setContext(Context context) {
+        if (context == null) {
+            return;
+        }
+        Context applicationContext = context.getApplicationContext();
+        appContext = applicationContext == null ? context : applicationContext;
+    }
+
+    /** 记录 Java 层未捕获异常，再交回系统原有处理流程；可在 Application 之前调用 */
+    public static void installCrashHandler() {
+        installCrashHandler(false);
+    }
+
+    /** 父类初始化可能替换默认处理器，启动完成后强制重新接管并保留当前处理器 */
+    public static void refreshCrashHandler() {
+        BootTrace.mark("RuntimeWatcher.refreshCrashHandler begin");
+        installCrashHandler(true);
+        BootTrace.mark("RuntimeWatcher.refreshCrashHandler done");
+    }
+
+    private static void installCrashHandler(boolean force) {
+        if (crashHandlerInstalled && !force) {
+            return;
+        }
+        crashHandlerInstalled = true;
         final Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
-        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+        if (previous == ownHandler) {
+            return;
+        }
+        Thread.UncaughtExceptionHandler handler = new Thread.UncaughtExceptionHandler() {
             @Override
             public void uncaughtException(Thread thread, Throwable throwable) {
+                try {
+                    BootTrace.crash(throwable, thread);
+                } catch (Throwable ignored) {
+                }
                 try {
                     LogCore.crash(throwable, thread);
                 } catch (Throwable ignored) {
                     // 崩溃记录失败不能再抛异常，避免掩盖原始崩溃
                 }
+                try {
+                    LogInjection.recordCrash(appContext, throwable);
+                } catch (Throwable ignored) {
+                    // 崩溃报告只做辅助，不能影响系统原有处理
+                }
                 if (previous != null) {
                     previous.uncaughtException(thread, throwable);
                 }
             }
-        });
+        };
+        ownHandler = handler;
+        Thread.setDefaultUncaughtExceptionHandler(handler);
     }
 
     /** 记录页面生命周期与跳转来源 */
@@ -70,16 +115,22 @@ public final class RuntimeWatcher {
                 new Application.ActivityLifecycleCallbacks() {
                     @Override
                     public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
+                        RuntimeWatcher.refreshCrashHandler();
+                        BootTrace.mark("Activity created " + activity.getClass().getName());
                         LogCore.i(TAG, "创建 " + name(activity) + describe(getIntent(activity)));
                     }
 
                     @Override
                     public void onActivityStarted(Activity activity) {
+                        RuntimeWatcher.refreshCrashHandler();
+                        BootTrace.mark("Activity started " + activity.getClass().getName());
                         LogCore.d(TAG, "显示 " + name(activity));
                     }
 
                     @Override
                     public void onActivityResumed(Activity activity) {
+                        RuntimeWatcher.refreshCrashHandler();
+                        BootTrace.mark("Activity resumed " + activity.getClass().getName());
                         LogCore.d(TAG, "前台 " + name(activity));
                         scheduleCapture(activity);
                     }

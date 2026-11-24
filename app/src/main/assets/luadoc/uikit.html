@@ -916,7 +916,84 @@ page:add(ui.pagination({
     这些组件都是普通 View 的封装，可以继续 <code>addView</code>、设置 LayoutParams 或放进原生布局；需要更复杂的数据列表时，仍然优先使用 RecyclerView。
   </div>
 
-  <h2>二十三、原子组件：把每一类拆到最小</h2>
+  <h2>二十三、筛选、日历与地区选择</h2>
+  <p>这一组是面向真实页面搭建的业务组件：筛选条负责把分区条件收成一句话，日历处理单日期和日期范围，地区选择把省 / 市 / 区县收成一行。三者都沿用同一套令牌和底部面板，不引入新的视觉体系。</p>
+  <table>
+    <thead><tr><th>组件</th><th>返回</th><th>用途与核心字段</th></tr></thead>
+    <tbody>
+      <tr><td><code>filter</code></td><td>普通 View</td><td>筛选条，点击打开分区面板；<code>sections / value / onChange / showReset</code>。</td></tr>
+      <tr><td><code>filterSheet</code></td><td><code>{ dialog, getValues }</code></td><td>直接打开筛选面板；适合放在自定义按钮或工具栏里。</td></tr>
+      <tr><td><code>calendar</code></td><td><code>{ view, getDate, setDate, refresh }</code></td><td>单日期或日期范围；<code>range / value / startDate / endDate / minDate / maxDate / marked / weekStart</code>。</td></tr>
+      <tr><td><code>regionPicker</code></td><td><code>{ view, open, getValue, setValue }</code></td><td>省 / 市 / 区县选择行；<code>value / data / allowEmpty / onChange</code>。</td></tr>
+    </tbody>
+  </table>
+
+  <h3>筛选条与分区面板</h3>
+<pre>local filter = ui.filter({
+  label = "筛选",
+  sections = {
+    { key = "type", title = "类型", options = { "全部", "图片", "文档" } },
+    {
+      key = "tag",
+      title = "标签",
+      multiple = true,
+      options = { "工作", "生活", "收藏" },
+    },
+  },
+  value = { tag = { "工作" } },
+  onChange = function(values, summary)
+    print(summary, values.type, values.tag)
+  end,
+})
+page:add(filter, 14)
+
+-- 直接打开面板（不经过筛选条）
+ui.filterSheet({
+  title = "更多筛选",
+  sections = { ... },
+  onChange = function(values) print(values) end,
+})</pre>
+  <p><code>sections[].options</code> 可以是字符串，也可以是 <code>{ title, value, subtitle }</code>；<code>multiple = true</code> 时值是数组，否则是单个值。点击“重置”会清空当前条件，摘要回到“全部”。</p>
+
+  <h3>日历与日期范围</h3>
+<pre>local calendar = ui.calendar({
+  range = true,
+  startDate = "2026-11-01",
+  endDate = "2026-11-20",
+  minDate = "2026-01-01",
+  maxDate = "2027-12-31",
+  marked = { "2026-11-11", "2026-11-23" },
+  onChange = function(value)
+    print(value.startDate, value.endDate)
+  end,
+})
+page:add(calendar.view, 14)
+
+print(calendar.getDate())  -- 单日期返回字符串；范围返回 { startDate, endDate }
+calendar.setDate("2026-12-01")</pre>
+  <p>默认周一作为一周起点，传 <code>weekStart = 0</code> 可改为周日。范围模式下第一次点击设起点，第二次点击设终点；若第二次早于起点，会自动交换。</p>
+
+  <h3>地区选择</h3>
+<pre>local region = ui.regionPicker({
+  title = "收货地区",
+  value = { province = "广东省", city = "深圳市", district = "南山区" },
+  onChange = function(value)
+    print(value.text, value.provinceCode, value.cityCode, value.districtCode)
+  end,
+})
+page:add(ui.group("地区", { region.view }, "省 / 市 / 区县三级选择"))
+
+-- 使用自己的地区数据
+local custom = ui.regionPicker({
+  data = {
+    { name = "某省", code = "990000", children = {
+      { name = "某市", code = "990100", children = { { name = "某区", code = "990101" } } },
+    } },
+  },
+})</pre>
+  <p>内置数据在 <code>assets/lua/luaxplus/regions.lua</code>，按行政区划编码组织；直辖市和港澳会先进入同名市级节点，再选区县。省直辖县级市没有区县层，选到市级即可确认。<code>allowEmpty = false</code> 会要求至少选到市级；有区县的城市还必须选到区县。</p>
+
+  <h2>二十四、原子组件：把每一类拆到最小</h2>
   <p>原子组件的视觉值全部收口到令牌：<code>spacing.labelX/labelY</code>、<code>spacing.helperX/helperTop</code>、<code>spacing.checkboxX/checkboxY/checkboxGap</code>、<code>spacing.tabTop/tabBottom/tabGap</code>、<code>spacing.kvX/kvY</code>、<code>spacing.motionY</code>，透明底色使用 <code>color.transparent</code>。</p>
   <p>复合组件解决“一个完整场景”，原子组件解决“一个最小视觉单元”。新增的原子层覆盖布局、排版、图标、表单、选择、反馈、导航、数据和动效，复杂页面可以按需组合，不必被现成组件的参数限制。</p>
   <table>
@@ -1001,7 +1078,7 @@ ui.scaleIn(view, { duration = "220ms" })</pre>
     原子组件不会替代复合组件。需要一整行、整张卡片或完整表单时继续用 <code>row</code>、<code>card</code>、<code>field</code>；需要局部微调时再用原子层拆开组合。
   </div>
 
-  <h2>二十四、限制与常见问题</h2>
+  <h2>二十五、限制与常见问题</h2>
   <ul>
     <li><strong>这是 iOS 风格的 Android 组件，不是 UIKit。</strong> 系统字体、阴影和动画与真机 iOS 仍有差异。</li>
     <li><strong>主题切换不会实时重绘已有控件。</strong> 切换后重建页面即可。</li>

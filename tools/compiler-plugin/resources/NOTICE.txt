@@ -1,0 +1,19 @@
+Java 编译器插件第三方组件说明
+
+ECJ 3.26.0
+  来源：Eclipse JDT（org.eclipse.jdt:ecj:3.26.0）
+  许可：Eclipse Public License 2.0
+  全文：licenses/ECLIPSE-PUBLIC-LICENSE-2.0.txt
+
+D8 / R8 3.3.20
+  来源：Google R8（com.android.tools:r8:3.3.20）
+  许可：3-Clause BSD License
+  全文：licenses/R8-D8-LICENSE.txt
+
+android.jar
+  来源：Android SDK Platform 34
+  许可：Android SDK License Agreement
+  说明：仅用于编译 classpath，不随本插件再分发。
+
+本插件只把上述官方 Java 构件转换为 Android DEX，并整理运行时资源；
+未修改编译器算法。完整说明见项目根目录 THIRD-PARTY-NOTICES.md。

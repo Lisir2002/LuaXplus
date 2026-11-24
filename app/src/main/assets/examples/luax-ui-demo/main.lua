@@ -30,6 +30,11 @@ local function toast(text)
   Toast.makeText(activity, text, Toast.LENGTH_SHORT).show()
 end
 
+-- JavaHostActivity 通过 LuaBridge 回调到这里。
+function onJavaPageEvent(value)
+  toast("Java → Lua：" .. tostring(value))
+end
+
 local function heading(title, note)
   local box = LinearLayout(activity)
   box.setOrientation(LinearLayout.VERTICAL)
@@ -934,6 +939,48 @@ end
 local function buildAdvanced()
   page:add(heading("进阶", "chips、勾选、滑杆、步进、进度、骨架屏、横幅、数据卡、悬浮按钮和动画"))
 
+  local JavaRuntime = luajava.bindClass("com.mini.luaxplus.java.JavaRuntime")
+  page:add(ui.card({
+    title = "Java 页面",
+    subtitle = "用 Java 创建界面，并从 Lua 挂载同一个 LuaState",
+  }, function(box)
+    box.addView(ui.button({
+      text = "打开 Java 示例",
+      style = "filled",
+      onClick = function()
+        local ok, token = pcall(function()
+          return JavaRuntime.attachLuaState(activity.getLuaState())
+        end)
+        if not ok then
+          ui.toast("LuaState 不可用：" .. tostring(token))
+          return
+        end
+        JavaRuntime.start(activity, "com.mini.luaxplus.java.demo.HelloScreen", token)
+      end,
+    }))
+  end), 0)
+
+  page:add(ui.card({
+    title = "手机内编译 Java",
+    subtitle = "ECJ 编译源码，D8 生成 DEX，再由宿主加载",
+  }, function(box)
+    box.addView(ui.button({
+      text = "编译并打开动态页面",
+      style = "tinted",
+      onClick = function()
+        local java = require "luaxplus.java"
+        ui.toast("正在编译 Java 示例…")
+        java.compileAndRunAsync("java-demo", "com.example.demo.DynamicHello", function(result)
+          if result.success then
+            ui.toast("Java 编译成功")
+          else
+            showInfo("Java 编译失败", result.message)
+          end
+        end)
+      end,
+    }))
+  end), 10)
+
   local chipLabel = TextView(activity)
   chipLabel.setTextSize(13)
   chipLabel.setTextColor(palette().secondary)
@@ -1250,6 +1297,54 @@ local function buildAdvanced()
     box.addView(alphaRow)
     applyAlpha(0.72)
   end), 14)
+
+  page:add(heading("业务组件", "筛选、日历和地区选择：都是可直接放进页面或表单的普通 View"))
+
+  local filter = ui.filter({
+    label = "筛选",
+    sections = {
+      { key = "type", title = "类型", options = { "全部", "图片", "文档", "音频" } },
+      {
+        key = "tag",
+        title = "标签",
+        multiple = true,
+        options = { "工作", "生活", "收藏", "待整理" },
+      },
+    },
+    value = { tag = { "工作" } },
+    onChange = function(values, summary)
+      showInfo("筛选", summary)
+    end,
+  })
+  page:add(filter, 14)
+
+  local calendar = ui.calendar({
+    range = true,
+    startDate = "2026-11-01",
+    endDate = "2026-11-20",
+    marked = { "2026-11-11", "2026-11-23" },
+    onChange = function(value)
+      showInfo("日期范围", (value.startDate or "未选") .. " → " .. (value.endDate or "未选"))
+    end,
+  })
+  local calendarHint = ui.text({
+    text = "日期范围：点击起点，再点终点；切换月份不会丢失选择。",
+    type = "footnote",
+    color = palette().secondary,
+  })
+  calendarHint.setPadding(dp(4), dp(4), dp(4), 0)
+  page:add(calendarHint, 0)
+  page:add(calendar.view, 14)
+
+  local region = ui.regionPicker({
+    title = "收货地区",
+    subtitle = "省 / 市 / 区县三级",
+    value = { province = "广东省", city = "深圳市", district = "南山区" },
+    onChange = function(value)
+      showInfo("地区", value.text)
+    end,
+  })
+  page:add(ui.group("地区选择", { region.view }, "内置省市区数据；也可以传入 data 使用自己的地区表。"), 14)
 
   page:add(ui.spacer(8))
 end

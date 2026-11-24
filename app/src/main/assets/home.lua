@@ -488,6 +488,24 @@ search.addTextChangedListener{
   end
 }
 
+local function safeLogPackage(value)
+  return tostring(value or ""):gsub("[^%w%._]", "_")
+end
+
+local function ensureProjectLogDir(pkg)
+  local segment = safeLogPackage(pkg)
+  if segment == "" or segment == "unknown" then
+    return
+  end
+  local dir = File(activity.getLuaExtDir() .. "/APP_Logs/" .. segment)
+  if not dir.isDirectory() then
+    local ok = dir.mkdirs()
+    if not ok then
+      toast("日志目录创建失败：" .. segment)
+    end
+  end
+end
+
 local function createProject(name, pkg)
   local safe = name:gsub("[/\\%s]", "_")
   local dir = projectRoot .. "/" .. safe
@@ -501,6 +519,7 @@ local function createProject(name, pkg)
     description = "",
     user_permission = { "INTERNET", "WRITE_EXTERNAL_STORAGE" },
   }
+  ensureProjectLogDir(pkg)
 
   local entry = io.open(dir .. "/main.lua", "w")
   entry:write('require "import"\n')
@@ -794,6 +813,14 @@ sideEntry("code", INFO_INK, INFO_WASH, "Java 浏览器", "浏览类、方法、�
   end)
   if not ok then
     Toast.makeText(activity, "Java 浏览器启动失败：" .. tostring(err), Toast.LENGTH_SHORT).show()
+  end
+end)
+sideEntry("package", INFO_INK, INFO_WASH, "插件市场", "按需下载 Java 编译器与扩展", function()
+  local ok, err = pcall(function()
+    activity.newActivity("pluginmarket")
+  end)
+  if not ok then
+    Toast.makeText(activity, "插件市场启动失败：" .. tostring(err), Toast.LENGTH_SHORT).show()
   end
 end)
 sideEntry("info", ACCENT_DEEP, ACCENT_WASH, "关于", "版本信息与开发说明", showAbout)

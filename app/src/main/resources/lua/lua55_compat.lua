@@ -5,7 +5,12 @@ local _G = _G
 
 if not _G.loadstring then
   function _G.loadstring(chunk, chunkname, mode, env)
-    return load(chunk, chunkname, mode or "bt", env)
+    -- Lua 5.5 的 load 显式收到 nil env 时，代码块会得到空 _ENV；
+    -- 旧 loadstring 不传 env 时应当继承全局环境。
+    if env ~= nil then
+      return load(chunk, chunkname, mode or "bt", env)
+    end
+    return load(chunk, chunkname, mode or "bt")
   end
 end
 

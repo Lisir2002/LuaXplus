@@ -11,6 +11,9 @@ set(COMPAT "${ROOT}/compat")
 
 file(GLOB LUA_SRC "${LUA_INC}/l*.c")
 
+add_library(crashguard SHARED "${ROOT}/crashguard/crashguard.c")
+target_link_libraries(crashguard log)
+
 add_library(luajava SHARED ${LUA_SRC}
   "${ROOT}/luajava/luajava.c"
   "${COMPAT}/lua55_abi_bridge.c")

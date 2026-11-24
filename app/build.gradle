@@ -83,7 +83,7 @@ android {
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             // noinspection ChromeOsAbiSupport
-            ndk { abiFilters 'arm64-v8a' }
+            ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64' }
         }
         debug {
             // 调试包同样使用正式签名，保证安装覆盖与线上包一致
@@ -93,7 +93,7 @@ android {
             minifyEnabled false
             shrinkResources false
             // noinspection ChromeOsAbiSupport
-            ndk { abiFilters 'arm64-v8a' }
+            ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64' }
         }
     }
 
@@ -467,6 +467,9 @@ tasks.register('luaCheck', Exec) {
     inputs.files(fileTree(rootProject.projectDir) {
         include 'app/src/main/assets/**/*.lua'
         include 'app/src/main/resources/**/*.lua'
+        include 'androlua/src/main/jniLibs/**/libluajava.so'
+        include 'app/src/main/jniLibs/**/libluajava.so'
+        include 'androlua/libs/AndroLua+5.0.18_AndroidX.jar'
         include 'tools/lua-check/**'
         include 'tools/lua-smoke/**'
     })

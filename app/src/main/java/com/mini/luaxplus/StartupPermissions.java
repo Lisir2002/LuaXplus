@@ -16,6 +16,10 @@ public final class StartupPermissions {
             return;
         }
         if (Permissions.firstLaunchDone(activity)) {
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                // Android 11+ 每个版本最多引导一次所有文件访问，更新后不会继续沿用旧授权状态
+                Permissions.requestStorage(activity);
+            }
             return;
         }
         Permissions.markFirstLaunchDone(activity);

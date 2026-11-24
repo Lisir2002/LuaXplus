@@ -4,8 +4,8 @@
 
 - 应用名称：Mini-LuaXPLUS
 - 应用包名：`com.mini.luaxplus`
-- 运行平台：Android 5.0（API 21）及以上，目标版本 Android 12（API 31）；当前只发布 arm64-v8a 真机包
-- 当前版本：`1.0.0-rc41`
+- 运行平台：Android 5.0（API 21）及以上，目标版本 Android 12（API 31）；同一个安装包内置 arm64-v8a、armeabi-v7a、x86、x86_64
+- 当前版本：`1.0.1-rc11`
 
 ## 技术架构
 
@@ -31,7 +31,7 @@ app/                     编辑器应用模块
   src/main/assets/       Lua 脚本、类库索引、帮助文档、插件与工程模板
   src/main/java/         扩展 Java 类
   src/main/res/          主题、颜色、图标
-  src/main/jniLibs/      LuaJava 原生库（arm64-v8a 发布；armeabi-v7a 仅保留源码兼容）
+  src/main/jniLibs/      LuaJava 原生库（arm64-v8a、armeabi-v7a、x86、x86_64 同包发布）
 .github/workflows/         Lua 门禁与 arm64 正式包构建
 androlua/                 运行时封装模块（jar + 原生库 + 少量桥接类）
 version.properties        版本号唯一来源
@@ -50,6 +50,8 @@ docs/                     审计与规范文档
 - 组件范围：页面骨架、分组列表、按钮、表单、搜索栏、分段控件、卡片、弹窗、操作菜单、底部标签栏、空态与加载态。
 - 进阶组件：chip、checkRow、slider、stepper、progress、skeleton、banner、stat、fab、toast。
 - 选择与数据：switch、switchRow、radioGroup、rating、select、keyValue、table、timeline、accordion、avatarGroup、pagination。
+- 业务组件：filter / filterSheet 支持分区单选、多选和重置；calendar 支持单日期、日期范围、最小/最大日期与标记日期；regionPicker 内置省/市/区县三级数据，可注入自定义 data。
+- 地区数据：`app/src/main/assets/lua/luaxplus/regions.lua`，按行政区划编码组织；直辖市与港澳按“省级→同名市级→区县”兼容。
 - 原子组件：text、label、helper、icon、surface、stack/vstack/hstack、grid、center、input、checkMark、checkbox、radioMark、statusDot、tabItem、cell、kvRow、fadeIn/slideIn/scaleIn。
 - 设计令牌：`ui.tokens` 统一颜色、间距、圆角、字体、控件尺寸、动效和透明度；支持 `ui.defineTheme` 自定义主题、`ui.useTheme` 切换、`ui.cssVars` 导出 CSS 变量。
 - 数值无级调节：尺寸、字号、圆角、透明度和动效都同时接受令牌档位与数值字符串，例如 `textSize="15px"`、`radius="14px"`、`withAlpha(..., "35%")`；`ui.dp`、`ui.number`、`ui.metric` 可直接复用解析器。
@@ -98,6 +100,38 @@ docs/                     审计与规范文档
 - 示例工程和普通工程一样，可以进入属性页、目录页编辑文件、运行和打包。
 - 官方示例合并为一个工程，第一个页签「快速」用几十行演示 `ui.show` 与 `ui.form`，其余页签覆盖控件、表单、弹窗、进阶组件与动画。
 
+
+## 手机内 Java 页面与编译
+
+Java 能力放在 `app/src/main/java/com/mini/luaxplus/java/`，由四层组成：
+
+- `JavaHostActivity`：AndroidManifest 中预注册的宿主，负责页面栈、生命周期、资源和返回键。
+- `JavaScreen` / `JavaHost`：Java 页面接口；页面返回根 View，不直接继承 Activity。
+- `JavaProjectCompiler`：手机内执行 `.java → ECJ → .class → D8 → classes.dex`，编译在后台线程完成；ECJ、D8 与 `android.jar` 由侧边栏「插件市场」按需下载，不随主 APK 内置。
+- `LuaBridge`：Java 页面通过它同步调用 Lua 或 `post` 回主线程；Lua 侧由 `JavaRuntime.attachLuaState` 交出同一份 LuaState。
+
+运行方式：
+
+1. Java 工程根目录放 `project.properties`，写 `type=java`、`screen`（页面类名），可选 `argument`、`lua`；
+2. 官方示例卡片进入工程管理页，底部点“预览”时由 `JavaProjectEntry` 自动编译并打开 Java 页面；
+3. 工程页点“预览”也走同一个 Java 入口，不再要求 `main.lua`；
+4. Lua 侧仍可 `require "luaxplus.java"` 调用编译模块。
+
+编译器插件：
+
+- 首次使用前，从首页侧边栏「插件市场」下载并安装「Java 编译器」；插件包约 28 MB，包含 ECJ 3.26.0、D8 3.3.20 和 `android.jar`。
+- 插件默认安装到 `LuaXPlus/plugin/compiler`，下载后校验 SHA-256，再通过 `DexClassLoader` 加载；外部存储不可写时退回应用私有目录。
+- 未安装插件时，Java 编译入口会提示去插件市场；安装后编译、预览和打包仍可正常使用。
+
+当前首版边界：支持程序化 View、Activity 宿主、双向调用和动态 DEX；暂不支持 XML 布局、`R.java`、Android 资源编译和第三方 Java 依赖。手机内编译需要 Android 8.0 及以上系统，并已安装编译器插件。
+
+官方示例新增三个独立工程：
+
+- `java-pure-demo`：纯 Java 页面，只有 Java 源码和 `project.properties`，不挂 LuaState，也没有 Lua 文件。
+- `java-widget-demo`：纯 Java 控件页，同样不包含 Lua。
+- `java-bridge-demo`：Java 入口创建 LuaState 加载 `bridge.lua`，验证 Lua 调 Java、Java 回调 Lua。
+
+纯 Java 工程的打包同样先安装编译器插件；插件就绪后，打包时会调用同一套 ECJ + D8 链路生成页面 DEX。
 
 ## Java API 浏览器
 
@@ -166,13 +200,13 @@ keyPassword=****
 ```
 
 - 本地需要 JDK 17 与 Android SDK Platform 34。
-- 构建前自动执行 `:app:luaCheck`：Lua 5.5 语法检查 + JavaAPI 严格契约测试，不需要模拟器。
+- 构建前自动执行 `:app:luaCheck`：Lua 5.5 语法检查、`libluajava.so` 版本检查、JavaAPI 严格契约测试，不需要模拟器。
 - 单独运行：`./gradlew :app:luaCheck`；详细说明见 `tools/lua-check/README.md`。
 
 正式 APK 只通过 GitHub Actions 构建：
 
 - 工作流：`.github/workflows/release.yml`，支持手动触发或推送 `v*` 标签。
-- 只打 `arm64-v8a`，构建后检查 APK 不含 32 位/x86 库，并核对内置 `libluajava.so` 为 Lua 5.5.1。
+- 四架构打进同一 APK，构建后检查 `native-code` 包含 `arm64-v8a`、`armeabi-v7a`、`x86`、`x86_64`，并核对四个 ABI 的 `libluajava.so` 均为 Lua 5.5.1。
 - 签名使用 Secrets：`MINI_LUAXPLUS_KEYSTORE_BASE64`、`MINI_LUAXPLUS_KEYSTORE_PASSWORD`、`MINI_LUAXPLUS_KEY_ALIAS`、`MINI_LUAXPLUS_KEY_PASSWORD`。
 - 推送标签时自动生成 Release；手动触发只上传 APK Artifact。
 
@@ -217,7 +251,7 @@ keyPassword=****
 
 启动流程：`Welcome` 先初始化日志与运行监控，再把 assets 内的脚本铺设到应用私有目录，最后进入 `Main`。铺设带版本标记 `.luaxplus_bootstrap`，版本变化或入口脚本缺失时自动重铺，避免出现“找不到 main.lua”。
 
-日志统一写入外部存储的 `LuaXPlus/logs`，未获得存储授权时先写应用私有目录 `files/logs`，授权后自动切回外部目录。
+主程序日志写入外部存储的 `LuaXPlus/logs`；每个子应用成品写入 `LuaXPlus/APP_Logs/<包名>/`，该目录在工程创建时同步预建，未获得存储授权时先写应用私有目录，授权后自动切回外部目录。
 
 | 文件 | 用途 |
 | --- | --- |
@@ -253,3 +287,11 @@ log.e("demo", "出错了", err)
 本项目在 AndroLuaX（MIT）基础上二次开发，技术底座来自 AndroLua / AndroLua+（作者 nirenr，基于 LuaJava）。相关版权与许可声明保留在 `LICENSE`。
 
 本项目代码采用 MIT 许可，见 [LICENSE](LICENSE)。
+
+编译器插件按需分发第三方组件，分别适用其上游许可证：
+
+- ECJ 3.26.0：Eclipse Public License 2.0，全文见 `licenses/eclipse-public-license-2.0.txt`
+- D8 / R8 3.3.20：3-Clause BSD License，全文见 `licenses/r8-d8-license.txt`
+- Android SDK `android.jar`：Android SDK License Agreement，仅作为编译 classpath，不从本仓库分发
+
+完整说明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。

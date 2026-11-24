@@ -22,6 +22,13 @@
 -keep class android.app.** { *; }
 -keep class android.content.** { *; }
 
+# ---- 手机内 Java 编译链 ----
+# ECJ 与 D8 的入口和内部实现需要完整保留，避免反射路径被裁剪
+-keep class com.android.tools.r8.** { *; }
+-keep class org.eclipse.jdt.** { *; }
+# ECJ 启动时探测 javax.lang.model.SourceVersion，Android 没有该包，需保留兼容类
+-keep class javax.lang.model.** { *; }
+
 # ---- 本应用自有类 ----
 -keep class com.mini.luaxplus.** { *; }
 

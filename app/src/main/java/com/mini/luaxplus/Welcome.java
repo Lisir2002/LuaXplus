@@ -14,6 +14,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.androlua.Main;
+import com.mini.luaxplus.java.JavaPackagedEntry;
 
 /**
  * 品牌启动页：初始化日志与运行监控，铺设运行时脚本后进入编辑器主界面，
@@ -27,6 +28,7 @@ public class Welcome extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        BootTrace.mark("Welcome.onCreate enter");
         super.onCreate(savedInstanceState);
         LogCore.init(this);
         RuntimeWatcher.install(this);
@@ -37,7 +39,14 @@ public class Welcome extends Activity {
         LogCore.i("Welcome", "启动页创建 version=" + readVersionName()
                 + " 日志目录=" + LogCore.dir());
         setContentView(createSplashView());
-        prepareAndStartEditor();
+        BootTrace.mark("Welcome.splash ready");
+        LogInjection.showPendingCrash(this, new Runnable() {
+            @Override
+            public void run() {
+                prepareAndStartEditor();
+            }
+        });
+        BootTrace.mark("Welcome.onCreate complete");
     }
 
     private void prepareAndStartEditor() {
@@ -45,7 +54,20 @@ public class Welcome extends Activity {
         new Thread(new Runnable() {
             @Override
             public void run() {
+                if (JavaPackagedEntry.isJavaPackage(Welcome.this)) {
+                    BootTrace.mark("Welcome java package detected");
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            BootTrace.mark("Welcome start java package");
+                            JavaPackagedEntry.start(Welcome.this);
+                        }
+                    });
+                    return;
+                }
+                BootTrace.mark("Welcome asset bootstrap begin");
                 boolean ready = AssetBootstrap.ensure(Welcome.this);
+                BootTrace.mark("Welcome asset bootstrap done ready=" + ready);
                 long cost = SystemClock.elapsedRealtime() - startedAt;
                 LogCore.i("Welcome", "脚本准备结果=" + ready + " 耗时=" + cost + "ms");
                 long remain = SPLASH_DELAY_MS - cost;
@@ -55,6 +77,7 @@ public class Welcome extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
+                        BootTrace.mark("Welcome startEditor");
                         startEditor();
                     }
                 });

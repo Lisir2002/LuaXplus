@@ -3379,6 +3379,1016 @@ function M.select(spec)
   return row
 end
 
+-- ===== 业务组件：筛选 / 日历 / 地区选择 =====
+-- 三个组件都只产出普通 View 或带 view 字段的包装表，便于继续 addView，也便于读取状态。
+
+local function optionLabel(option)
+  if type(option) == "table" then
+    return tostring(option.title or option.text or option.label or option.value or "")
+  end
+  return tostring(option or "")
+end
+
+local function optionValue(option, index)
+  if type(option) == "table" then
+    if option.value ~= nil then
+      return option.value
+    end
+    return option.title or option.text or option.label or index
+  end
+  return option
+end
+
+local function filterSections(spec)
+  local sections = spec.sections or {}
+  if #sections == 0 then
+    sections = {
+      { key = "value", title = spec.title or "筛选", options = spec.options or {} },
+    }
+  end
+  for index = 1, #sections do
+    local section = sections[index]
+    if type(section) ~= "table" then
+      section = { title = tostring(section), options = {} }
+      sections[index] = section
+    end
+    section.key = tostring(section.key or ("section" .. index))
+    section.options = section.options or {}
+  end
+  return sections
+end
+
+local function copyArray(values)
+  local out = {}
+  for index = 1, #(values or {}) do
+    out[index] = values[index]
+  end
+  return out
+end
+
+local function copyFilterState(state)
+  local out = {}
+  for key, value in pairs(state or {}) do
+    out[key] = type(value) == "table" and copyArray(value) or value
+  end
+  return out
+end
+
+local function normalizeFilterState(spec, sections)
+  spec = spec or {}
+  local source = spec.value or spec.selected or {}
+  if type(source) ~= "table" then
+    source = {}
+  end
+  local state = {}
+  for index = 1, #sections do
+    local section = sections[index]
+    local raw = source[section.key]
+    if raw == nil then
+      raw = section.value
+    end
+    if raw == nil then
+      raw = section.selected
+    end
+    if section.multiple then
+      if type(raw) == "table" then
+        state[section.key] = copyArray(raw)
+      else
+        state[section.key] = raw ~= nil and { raw } or {}
+      end
+    else
+      if type(raw) == "table" then
+        raw = raw[1]
+      end
+      state[section.key] = raw
+    end
+  end
+  return state
+end
+
+local function clearFilterState(sections)
+  local state = {}
+  for index = 1, #sections do
+    local section = sections[index]
+    state[section.key] = section.multiple and {} or nil
+  end
+  return state
+end
+
+local function labelForValue(section, value)
+  for index = 1, #section.options do
+    local option = section.options[index]
+    local optionVal = optionValue(option, index)
+    if tostring(optionVal) == tostring(value) or optionLabel(option) == tostring(value) then
+      return optionLabel(option)
+    end
+  end
+  return value ~= nil and tostring(value) or nil
+end
+
+local function filterSummary(spec, sections, state)
+  local labels = {}
+  for index = 1, #sections do
+    local section = sections[index]
+    local value = state[section.key]
+    if section.multiple then
+      for n = 1, #(value or {}) do
+        local label = labelForValue(section, value[n])
+        if label and label ~= "" then
+          labels[#labels + 1] = label
+        end
+      end
+    elseif value ~= nil then
+      local label = labelForValue(section, value)
+      if label and label ~= "" then
+        labels[#labels + 1] = label
+      end
+    end
+  end
+  if #labels == 0 then
+    return spec.emptyText or "全部"
+  end
+  return table.concat(labels, " · ")
+end
+
+local function isOptionSelected(section, state, value)
+  local current = state[section.key]
+  if section.multiple then
+    for index = 1, #(current or {}) do
+      if tostring(current[index]) == tostring(value) then
+        return true
+      end
+    end
+    return false
+  end
+  return current ~= nil and tostring(current) == tostring(value)
+end
+
+local function toggleFilterOption(section, state, value)
+  if section.multiple then
+    local current = state[section.key]
+    if type(current) ~= "table" then
+      current = {}
+      state[section.key] = current
+    end
+    local found = 0
+    for index = #current, 1, -1 do
+      if tostring(current[index]) == tostring(value) then
+        found = index
+        break
+      end
+    end
+    if found > 0 then
+      table.remove(current, found)
+    else
+      current[#current + 1] = value
+    end
+  else
+    state[section.key] = value
+  end
+end
+
+local function showFilterSheet(spec, sections, state, onApply)
+  local palette = colors()
+  local current = activity
+  local dialog = Dialog(current)
+  dialog.requestWindowFeature(1)
+  dialog.setCanceledOnTouchOutside(true)
+
+  local root = LinearLayout(current)
+  root.setOrientation(LinearLayout.VERTICAL)
+  root.setPadding(dp(space(8)), dp(space(8)), dp(space(8)), dp(space(24)))
+
+  local panel = LinearLayout(current)
+  panel.setOrientation(LinearLayout.VERTICAL)
+  panel.setBackground(roundRect(palette.surface, R.sheet))
+  panel.setClipToOutline(true)
+
+  local head = LinearLayout(current)
+  head.setOrientation(LinearLayout.HORIZONTAL)
+  head.setGravity(Gravity.CENTER_VERTICAL)
+  head.setPadding(dp(space(16)), dp(space(12)), dp(space(8)), dp(space(10)))
+  local title = textView(spec.title or "筛选", TY.headline.size, palette.label, true)
+  head.addView(title, LinearLayout.LayoutParams(0, -2, 1))
+  local close = icons.view("close", { size = 18, color = palette.secondary })
+  close.setPadding(dp(space(8)), dp(space(8)), dp(space(8)), dp(space(8)))
+  close.setOnClickListener(View.OnClickListener{ onClick = function() dialog.dismiss() end })
+  head.addView(close, LinearLayout.LayoutParams(dp(34), dp(34)))
+  panel.addView(head, LinearLayout.LayoutParams(-1, -2))
+
+  local scroll = ScrollView(current)
+  scroll.setFillViewport(true)
+  local body = LinearLayout(current)
+  body.setOrientation(LinearLayout.VERTICAL)
+  body.setPadding(dp(space(16)), 0, dp(space(16)), dp(space(4)))
+  scroll.addView(body, LinearLayout.LayoutParams(-1, -2))
+  local screenHeight = current.getResources().getDisplayMetrics().heightPixels
+  local scrollParams = LinearLayout.LayoutParams(-1, math.floor(screenHeight * 0.5))
+  panel.addView(scroll, scrollParams)
+
+  local markViews = {}
+  local function paintMarks()
+    for index = 1, #markViews do
+      local mark = markViews[index]
+      mark.setVisibility(isOptionSelected(mark.section, state, mark.value) and View.VISIBLE or View.INVISIBLE)
+    end
+  end
+
+  for sectionIndex = 1, #sections do
+    local section = sections[sectionIndex]
+    local sectionTitle = textView(section.title or ("分组" .. sectionIndex), TY.footnote.size, palette.secondary, true)
+    sectionTitle.setPadding(dp(space(2)), dp(space(10)), 0, dp(space(4)))
+    body.addView(sectionTitle, LinearLayout.LayoutParams(-1, -2))
+    for optionIndex = 1, #section.options do
+      local option = section.options[optionIndex]
+      local value = optionValue(option, optionIndex)
+      local check = icons.view("check", { size = 16, color = palette.accent })
+      check.setPadding(0, 0, 0, 0)
+      local row = M.row({
+        title = optionLabel(option),
+        subtitle = type(option) == "table" and option.subtitle or nil,
+        accessory = check,
+        chevron = false,
+        onClick = function()
+          toggleFilterOption(section, state, value)
+          paintMarks()
+          if spec.onPreview then
+            spec.onPreview(copyFilterState(state))
+          end
+        end,
+      })
+      body.addView(row, LinearLayout.LayoutParams(-1, -2))
+      markViews[#markViews + 1] = { mark = check, section = section, value = value }
+    end
+  end
+  paintMarks()
+
+  local line = View(current)
+  line.setBackgroundColor(palette.separator)
+  panel.addView(line, LinearLayout.LayoutParams(-1, hairline()))
+
+  local footer = LinearLayout(current)
+  footer.setOrientation(LinearLayout.HORIZONTAL)
+  footer.setGravity(Gravity.CENTER_VERTICAL)
+  footer.setPadding(dp(space(8)), dp(space(6)), dp(space(8)), dp(space(6)))
+  local reset = textView(spec.resetText or "重置", TY.callout.size, palette.accent, false)
+  reset.setGravity(Gravity.CENTER)
+  reset.setPadding(dp(space(12)), 0, dp(space(12)), 0)
+  reset.setOnClickListener(View.OnClickListener{
+    onClick = function()
+      state = clearFilterState(sections)
+      paintMarks()
+    end,
+  })
+  footer.addView(reset, LinearLayout.LayoutParams(-2, dp(44)))
+  local confirm = M.button({
+    text = spec.confirmText or "确定",
+    style = "filled",
+    height = 40,
+    onClick = function()
+      local values = copyFilterState(state)
+      if onApply then
+        onApply(values)
+      end
+      dialog.dismiss()
+    end,
+  })
+  local confirmParams = LinearLayout.LayoutParams(0, dp(44), 1)
+  confirmParams.leftMargin = dp(space(8))
+  footer.addView(confirm, confirmParams)
+  panel.addView(footer, LinearLayout.LayoutParams(-1, -2))
+
+  root.addView(panel, LinearLayout.LayoutParams(-1, -2))
+  dialog.setContentView(root)
+  local window = dialog.getWindow()
+  if window then
+    window.setBackgroundDrawable(ColorDrawable(0x00000000))
+    window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+    window.setDimAmount(alphaValue(OP.overlay))
+    window.setGravity(Gravity.BOTTOM)
+    window.setLayout(-1, -2)
+  end
+  dialog.show()
+  return { dialog = dialog, getValues = function() return copyFilterState(state) end }
+end
+
+-- 筛选条：点击后从底部弹出分区选项；支持单选、多选和重置。
+function M.filter(spec)
+  spec = spec or {}
+  local sections = filterSections(spec)
+  local state = normalizeFilterState(spec, sections)
+  local palette = colors()
+
+  local bar = LinearLayout(activity)
+  bar.setOrientation(LinearLayout.HORIZONTAL)
+  bar.setGravity(Gravity.CENTER_VERTICAL)
+  bar.setMinimumHeight(dp(56))
+  bar.setPadding(dp(space(16)), dp(space(8)), dp(space(12)), dp(space(8)))
+  bar.setBackground(ripple(palette.surface, R.card, palette.press))
+
+  local textBox = LinearLayout(activity)
+  textBox.setOrientation(LinearLayout.VERTICAL)
+  bar.addView(textBox, LinearLayout.LayoutParams(0, -2, 1))
+  local head = textView(spec.label or spec.title or "筛选", TY.footnote.size, palette.secondary, true)
+  textBox.addView(head)
+  local summary = textView(filterSummary(spec, sections, state), TY.callout.size, palette.label, false)
+  summary.setSingleLine(true)
+  summary.setEllipsize(TextUtils.TruncateAt.END)
+  summary.setPadding(0, dp(space(3)), 0, 0)
+  textBox.addView(summary)
+
+  local function refresh()
+    summary.setText(filterSummary(spec, sections, state))
+  end
+
+  local reset
+  if spec.showReset ~= false then
+    reset = textView(spec.resetText or "重置", TY.callout.size, palette.accent, false)
+    reset.setPadding(dp(space(10)), dp(space(8)), dp(space(10)), dp(space(8)))
+    reset.setOnClickListener(View.OnClickListener{
+      onClick = function()
+        state = clearFilterState(sections)
+        refresh()
+        if spec.onChange then
+          spec.onChange(copyFilterState(state), filterSummary(spec, sections, state))
+        end
+      end,
+    })
+    if spec.disabled then
+      reset.setEnabled(false)
+      reset.setAlpha(alphaValue(OP.disabled))
+    end
+    bar.addView(reset, LinearLayout.LayoutParams(-2, -2))
+  end
+
+  local chevron = icons.view("chevron-right", { size = 16, color = palette.tertiary })
+  local chevronParams = LinearLayout.LayoutParams(dp(16), dp(16))
+  chevronParams.leftMargin = dp(space(4))
+  bar.addView(chevron, chevronParams)
+
+  bar.setOnClickListener(View.OnClickListener{
+    onClick = function()
+      if spec.disabled then
+        return
+      end
+      showFilterSheet(spec, sections, state, function(values)
+        state = values
+        refresh()
+        if spec.onChange then
+          spec.onChange(copyFilterState(state), filterSummary(spec, sections, state))
+        end
+      end)
+    end,
+  })
+  if spec.disabled then
+    bar.setAlpha(alphaValue(OP.disabled))
+    bar.setEnabled(false)
+  end
+  return bar
+end
+
+-- 直接打开筛选面板；不传筛选条时也可以独立使用。
+function M.filterSheet(spec)
+  spec = spec or {}
+  local sections = filterSections(spec)
+  local state = normalizeFilterState(spec, sections)
+  return showFilterSheet(spec, sections, state, function(values)
+    if spec.onChange then
+      spec.onChange(values, filterSummary(spec, sections, values))
+    end
+  end)
+end
+
+local function pad2(value)
+  return string.format("%02d", value)
+end
+
+local function dateKey(year, month, day)
+  return string.format("%04d-%02d-%02d", year, month, day)
+end
+
+local function parseDate(value)
+  if type(value) == "table" then
+    local year = tonumber(value.year or value.y)
+    local month = tonumber(value.month or value.m)
+    local day = tonumber(value.day or value.d)
+    if year and month and day then
+      return year, month, day
+    end
+    return nil
+  end
+  if value ~= nil then
+    local year, month, day = tostring(value):match("^(%d%d%d%d)[%-/](%d%d)[%-/](%d%d)")
+    if year then
+      return tonumber(year), tonumber(month), tonumber(day)
+    end
+  end
+  return nil
+end
+
+local function daysInMonth(year, month)
+  if month == 2 then
+    local leap = (year % 4 == 0 and year % 100 ~= 0) or year % 400 == 0
+    return leap and 29 or 28
+  end
+  if month == 4 or month == 6 or month == 9 or month == 11 then
+    return 30
+  end
+  return 31
+end
+
+local function weekdayOf(year, month, day)
+  local time = os.time({ year = year, month = month, day = day, hour = 12, min = 0, sec = 0 })
+  local info = os.date("*t", time)
+  return tonumber(info.wday) - 1
+end
+
+-- 日历：单日期与日期范围两种模式，可选最小/最大日期和标记日期。
+function M.calendar(spec)
+  spec = spec or {}
+  local palette = colors()
+  local rangeMode = spec.range == true
+  local selectedYear, selectedMonth, selectedDay = parseDate(spec.value or spec.selected or spec.date)
+  local startYear, startMonth, startDay = parseDate(spec.startDate)
+  local endYear, endMonth, endDay = parseDate(spec.endDate)
+  local todayYear, todayMonth, todayDay = parseDate(os.date("%Y-%m-%d"))
+  local cursorYear, cursorMonth = todayYear, todayMonth
+  if selectedYear then
+    cursorYear, cursorMonth = selectedYear, selectedMonth
+  elseif startYear then
+    cursorYear, cursorMonth = startYear, startMonth
+  end
+  if type(spec.month) == "string" then
+    local year, month = spec.month:match("^(%d%d%d%d)%-(%d%d)")
+    if year then
+      cursorYear, cursorMonth = tonumber(year), tonumber(month)
+    end
+  end
+
+  local card = LinearLayout(activity)
+  card.setOrientation(LinearLayout.VERTICAL)
+  card.setBackground(roundRect(palette.surface, R.card))
+  card.setClipToOutline(true)
+  card.setPadding(dp(space(12)), dp(space(10)), dp(space(12)), dp(space(12)))
+
+  local head = LinearLayout(activity)
+  head.setOrientation(LinearLayout.HORIZONTAL)
+  head.setGravity(Gravity.CENTER_VERTICAL)
+  card.addView(head, LinearLayout.LayoutParams(-1, -2))
+
+  local refresh
+  local function arrow(glyph, onClick)
+    local view = icons.view(glyph, { size = 17, color = palette.accent })
+    view.setPadding(dp(space(8)), dp(space(8)), dp(space(8)), dp(space(8)))
+    view.setOnClickListener(View.OnClickListener{ onClick = onClick })
+    return view
+  end
+
+  head.addView(arrow("chevron-left", function()
+    cursorMonth = cursorMonth - 1
+    if cursorMonth < 1 then
+      cursorMonth = 12
+      cursorYear = cursorYear - 1
+    end
+    refresh()
+  end), LinearLayout.LayoutParams(dp(34), dp(34)))
+
+  local title = textView("", TY.bodyLarge.size, palette.label, true)
+  title.setGravity(Gravity.CENTER)
+  head.addView(title, LinearLayout.LayoutParams(0, -2, 1))
+
+  head.addView(arrow("chevron-right", function()
+    cursorMonth = cursorMonth + 1
+    if cursorMonth > 12 then
+      cursorMonth = 1
+      cursorYear = cursorYear + 1
+    end
+    refresh()
+  end), LinearLayout.LayoutParams(dp(34), dp(34)))
+
+  local weekHeader = LinearLayout(activity)
+  weekHeader.setOrientation(LinearLayout.HORIZONTAL)
+  weekHeader.setPadding(0, dp(space(4)), 0, dp(space(2)))
+  card.addView(weekHeader, LinearLayout.LayoutParams(-1, -2))
+
+  local grid = LinearLayout(activity)
+  grid.setOrientation(LinearLayout.VERTICAL)
+  card.addView(grid, LinearLayout.LayoutParams(-1, -2))
+
+  local weekStart = spec.weekStart == 0 and 0 or 1
+  local weekLabels = weekStart == 1 and { "一", "二", "三", "四", "五", "六", "日" }
+    or { "日", "一", "二", "三", "四", "五", "六" }
+  for index = 1, 7 do
+    local label = textView(weekLabels[index], TY.footnote.size, palette.tertiary, false)
+    label.setGravity(Gravity.CENTER)
+    weekHeader.addView(label, LinearLayout.LayoutParams(0, dp(28), 1))
+  end
+
+  local markedSet = {}
+  for index = 1, #(spec.marked or {}) do
+    local y, m, d = parseDate(spec.marked[index])
+    if y then
+      markedSet[dateKey(y, m, d)] = true
+    end
+  end
+
+  local function isDisabled(y, m, d)
+    local key = dateKey(y, m, d)
+    if spec.minDate then
+      local minYear, minMonth, minDay = parseDate(spec.minDate)
+      if minYear and key < dateKey(minYear, minMonth, minDay) then
+        return true
+      end
+    end
+    if spec.maxDate then
+      local maxYear, maxMonth, maxDay = parseDate(spec.maxDate)
+      if maxYear and key > dateKey(maxYear, maxMonth, maxDay) then
+        return true
+      end
+    end
+    return false
+  end
+
+  local function notify()
+    if not spec.onChange then
+      return
+    end
+    if rangeMode then
+      spec.onChange({
+        startDate = startYear and dateKey(startYear, startMonth, startDay) or nil,
+        endDate = endYear and dateKey(endYear, endMonth, endDay) or nil,
+      })
+    else
+      spec.onChange(selectedYear and dateKey(selectedYear, selectedMonth, selectedDay) or nil)
+    end
+  end
+
+  local function choose(y, m, d)
+    if isDisabled(y, m, d) then
+      return
+    end
+    if rangeMode then
+      if startYear == nil or (startYear and endYear) then
+        startYear, startMonth, startDay = y, m, d
+        endYear, endMonth, endDay = nil, nil, nil
+      else
+        local startKey = dateKey(startYear, startMonth, startDay)
+        local key = dateKey(y, m, d)
+        if key < startKey then
+          endYear, endMonth, endDay = startYear, startMonth, startDay
+          startYear, startMonth, startDay = y, m, d
+        else
+          endYear, endMonth, endDay = y, m, d
+        end
+      end
+    else
+      selectedYear, selectedMonth, selectedDay = y, m, d
+    end
+    refresh()
+    if spec.onSelect then
+      spec.onSelect(rangeMode and {
+        startDate = startYear and dateKey(startYear, startMonth, startDay) or nil,
+        endDate = endYear and dateKey(endYear, endMonth, endDay) or nil,
+      } or dateKey(y, m, d))
+    end
+    notify()
+  end
+
+  refresh = function()
+    title.setText(string.format("%d年%d月", cursorYear, cursorMonth))
+    grid.removeAllViews()
+    local firstWeekday = weekdayOf(cursorYear, cursorMonth, 1)
+    local offset = (firstWeekday - weekStart + 7) % 7
+    local total = daysInMonth(cursorYear, cursorMonth)
+    local day = 1 - offset
+    for week = 1, 6 do
+      local row = LinearLayout(activity)
+      row.setOrientation(LinearLayout.HORIZONTAL)
+      for column = 1, 7 do
+        local cell = FrameLayout(activity)
+        row.addView(cell, LinearLayout.LayoutParams(0, dp(40), 1))
+        if day >= 1 and day <= total then
+          local y, m, d = cursorYear, cursorMonth, day
+          local key = dateKey(y, m, d)
+          local label = textView(tostring(day), TY.callout.size, palette.label, false)
+          label.setGravity(Gravity.CENTER)
+          label.setIncludeFontPadding(false)
+          local labelParams = FrameLayout.LayoutParams(dp(30), dp(30), Gravity.CENTER)
+          cell.addView(label, labelParams)
+          local isStart = rangeMode and startYear and key == dateKey(startYear, startMonth, startDay)
+          local isEnd = rangeMode and endYear and key == dateKey(endYear, endMonth, endDay)
+          local isSingle = not rangeMode and selectedYear and key == dateKey(selectedYear, selectedMonth, selectedDay)
+          local inRange = rangeMode and startYear and endYear and key > dateKey(startYear, startMonth, startDay)
+            and key < dateKey(endYear, endMonth, endDay)
+          if isDisabled(y, m, d) then
+            label.setTextColor(palette.tertiary)
+            label.setAlpha(alphaValue(OP.disabled))
+          elseif isStart or isEnd or isSingle then
+            label.setTextColor(palette.onAccent)
+            label.setTypeface(nil, Typeface.BOLD)
+            label.setBackground(roundRect(palette.accent, 15))
+          elseif inRange then
+            label.setTextColor(palette.accent)
+            label.setBackground(roundRect(palette.accentSoft, 15))
+          elseif key == dateKey(todayYear, todayMonth, todayDay) then
+            label.setTextColor(palette.accent)
+            label.setTypeface(nil, Typeface.BOLD)
+          end
+          if markedSet[key] then
+            local dot = View(activity)
+            dot.setBackground(roundRect(palette.accent, 4))
+            local dotParams = FrameLayout.LayoutParams(dp(4), dp(4), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL)
+            dotParams.bottomMargin = dp(2)
+            cell.addView(dot, dotParams)
+          end
+          if not isDisabled(y, m, d) then
+            cell.setOnClickListener(View.OnClickListener{
+              onClick = function() choose(y, m, d) end,
+            })
+          end
+        end
+        if day >= 1 and day <= total then
+          day = day + 1
+        end
+      end
+      grid.addView(row, LinearLayout.LayoutParams(-1, dp(40)))
+    end
+  end
+
+  local widget = {
+    view = card,
+    getDate = function()
+      if rangeMode then
+        return {
+          startDate = startYear and dateKey(startYear, startMonth, startDay) or nil,
+          endDate = endYear and dateKey(endYear, endMonth, endDay) or nil,
+        }
+      end
+      return selectedYear and dateKey(selectedYear, selectedMonth, selectedDay) or nil
+    end,
+    setDate = function(value)
+      if type(value) == "table" and (value.startDate or value.endDate) then
+        startYear, startMonth, startDay = parseDate(value.startDate)
+        endYear, endMonth, endDay = parseDate(value.endDate)
+      else
+        selectedYear, selectedMonth, selectedDay = parseDate(value)
+      end
+      if selectedYear then
+        cursorYear, cursorMonth = selectedYear, selectedMonth
+      elseif startYear then
+        cursorYear, cursorMonth = startYear, startMonth
+      end
+      refresh()
+    end,
+    refresh = refresh,
+  }
+  refresh()
+  return widget
+end
+
+local function findRegion(nodes, value)
+  if value == nil or value == "" then
+    return nil
+  end
+  if type(value) == "table" then
+    return value
+  end
+  for index = 1, #(nodes or {}) do
+    local node = nodes[index]
+    if tostring(node.code) == tostring(value) or node.name == tostring(value) then
+      return node
+    end
+  end
+  return nil
+end
+
+-- 地区选择：内置省 / 市 / 区县数据，也可以传入 data 覆盖；row 形式适合表单。
+function M.regionPicker(spec)
+  spec = spec or {}
+  local palette = colors()
+  local data = spec.data
+  if not data then
+    local ok, loaded = pcall(require, "luaxplus.regions")
+    if ok then
+      data = loaded
+    else
+      data = {}
+    end
+  end
+
+  local selected = {}
+  local function parseValue(value)
+    selected = {}
+    if type(value) == "table" then
+      selected.province = findRegion(data, value.province or value.provinceCode)
+      selected.city = selected.province and findRegion(selected.province.children, value.city or value.cityCode) or nil
+      selected.district = selected.city and findRegion(selected.city.children, value.district or value.districtCode) or nil
+    elseif type(value) == "string" and value ~= "" then
+      local parts = {}
+      for part in tostring(value):gmatch("[^/]+") do
+        local clean = part:match("^%s*(.-)%s*$")
+        if clean ~= "" then
+          parts[#parts + 1] = clean
+        end
+      end
+      selected.province = findRegion(data, parts[1])
+      selected.city = selected.province and findRegion(selected.province.children, parts[2]) or nil
+      selected.district = selected.city and findRegion(selected.city.children, parts[3]) or nil
+    end
+  end
+
+  local function snapshot()
+    local names = {}
+    if selected.province and selected.province.name then names[#names + 1] = selected.province.name end
+    if selected.city and selected.city.name then names[#names + 1] = selected.city.name end
+    if selected.district and selected.district.name then names[#names + 1] = selected.district.name end
+    return {
+      province = selected.province and selected.province.name or nil,
+      city = selected.city and selected.city.name or nil,
+      district = selected.district and selected.district.name or nil,
+      provinceCode = selected.province and selected.province.code or nil,
+      cityCode = selected.city and selected.city.code or nil,
+      districtCode = selected.district and selected.district.code or nil,
+      text = #names > 0 and table.concat(names, " / ") or "",
+    }
+  end
+
+  local row = LinearLayout(activity)
+  row.setOrientation(LinearLayout.HORIZONTAL)
+  row.setGravity(Gravity.CENTER_VERTICAL)
+  row.setMinimumHeight(dp(space(K.rowHeight)))
+  row.setPadding(dp(space(16)), dp(space(7)), dp(space(12)), dp(space(7)))
+  row.setBackground(ripple(0x00000000, 0, palette.press))
+
+  local textBox = LinearLayout(activity)
+  textBox.setOrientation(LinearLayout.VERTICAL)
+  row.addView(textBox, LinearLayout.LayoutParams(0, -2, 1))
+  local label = textView(spec.title or "地区", spec.titleSize or TY.body.size, palette.label, false)
+  textBox.addView(label)
+  if spec.subtitle then
+    local subtitle = textView(spec.subtitle, TY.footnote.size, palette.secondary, false)
+    subtitle.setPadding(0, dp(space(2)), 0, 0)
+    textBox.addView(subtitle)
+  end
+  local valueView = textView("", TY.callout.size, palette.tertiary, false)
+  valueView.setSingleLine(true)
+  valueView.setEllipsize(TextUtils.TruncateAt.END)
+  valueView.setPadding(dp(space(8)), 0, dp(space(4)), 0)
+  row.addView(valueView)
+
+  local function refreshRow()
+    local value = snapshot()
+    valueView.setText(value.text ~= "" and value.text or (spec.placeholder or "请选择"))
+    valueView.setTextColor(value.text ~= "" and palette.label or palette.tertiary)
+  end
+
+  local open
+
+  local function renderList(listBox, level, onLevel)
+    listBox.removeAllViews()
+    local nodes
+    if level == 1 then
+      nodes = data
+    elseif level == 2 then
+      nodes = selected.province and selected.province.children or {}
+    else
+      nodes = selected.city and selected.city.children or {}
+    end
+    if spec.allowEmpty ~= false and level >= 2 then
+      local current = level == 2 and selected.city == nil or (level == 3 and selected.district == nil)
+      listBox.addView(M.row({
+        title = spec.emptyText or "不限",
+        selected = current,
+        chevron = false,
+        onClick = function()
+          if level == 2 then
+            selected.city = nil
+            selected.district = nil
+          else
+            selected.district = nil
+          end
+          onLevel(level)
+        end,
+      }), LinearLayout.LayoutParams(-1, -2))
+    end
+    if #nodes == 0 then
+      local empty = textView(spec.emptyListText or "暂无可选项", TY.callout.size, palette.secondary, false)
+      empty.setPadding(dp(space(16)), dp(space(18)), dp(space(16)), dp(space(18)))
+      listBox.addView(empty)
+      return
+    end
+    for index = 1, #nodes do
+      local node = nodes[index]
+      local active
+      if level == 1 then
+        active = selected.province
+      elseif level == 2 then
+        active = selected.city
+      else
+        active = selected.district
+      end
+      listBox.addView(M.row({
+        title = node.name,
+        selected = active == node,
+        chevron = false,
+        onClick = function()
+          if level == 1 then
+            selected.province = node
+            selected.city = nil
+            selected.district = nil
+            onLevel(2)
+          elseif level == 2 then
+            selected.city = node
+            selected.district = nil
+            onLevel(node.children and #node.children > 0 and 3 or 2)
+          else
+            selected.district = node
+            onLevel(3)
+          end
+        end,
+      }), LinearLayout.LayoutParams(-1, -2))
+    end
+  end
+
+  open = function()
+    local current = activity
+    local dialog = Dialog(current)
+    dialog.requestWindowFeature(1)
+    dialog.setCanceledOnTouchOutside(true)
+
+    local root = LinearLayout(current)
+    root.setOrientation(LinearLayout.VERTICAL)
+    root.setPadding(dp(space(8)), dp(space(8)), dp(space(8)), dp(space(24)))
+    local panel = LinearLayout(current)
+    panel.setOrientation(LinearLayout.VERTICAL)
+    panel.setBackground(roundRect(palette.surface, R.sheet))
+    panel.setClipToOutline(true)
+
+    local head = LinearLayout(current)
+    head.setOrientation(LinearLayout.HORIZONTAL)
+    head.setGravity(Gravity.CENTER_VERTICAL)
+    head.setPadding(dp(space(16)), dp(space(12)), dp(space(8)), dp(space(8)))
+    local title = textView(spec.pickerTitle or spec.title or "选择地区", TY.headline.size, palette.label, true)
+    head.addView(title, LinearLayout.LayoutParams(0, -2, 1))
+    local close = icons.view("close", { size = 18, color = palette.secondary })
+    close.setPadding(dp(space(8)), dp(space(8)), dp(space(8)), dp(space(8)))
+    close.setOnClickListener(View.OnClickListener{ onClick = function() dialog.dismiss() end })
+    head.addView(close, LinearLayout.LayoutParams(dp(34), dp(34)))
+    panel.addView(head, LinearLayout.LayoutParams(-1, -2))
+
+    local tabs = LinearLayout(current)
+    tabs.setOrientation(LinearLayout.HORIZONTAL)
+    tabs.setPadding(dp(space(16)), 0, dp(space(16)), dp(space(8)))
+    local tabViews = {}
+    local level = 1
+    if selected.province then
+      level = 2
+    end
+    if selected.city and selected.city.children and #selected.city.children > 0 then
+      level = 3
+    end
+    local listBox = LinearLayout(current)
+    listBox.setOrientation(LinearLayout.VERTICAL)
+    local scroll = ScrollView(current)
+    scroll.addView(listBox, LinearLayout.LayoutParams(-1, -2))
+    local screenHeight = current.getResources().getDisplayMetrics().heightPixels
+    panel.addView(scroll, LinearLayout.LayoutParams(-1, math.floor(screenHeight * 0.45)))
+
+    local confirm
+    local refreshTabs
+
+    local function go(nextLevel)
+      if nextLevel == 2 and not selected.province then return end
+      if nextLevel == 3 and not (selected.city and selected.city.children and #selected.city.children > 0) then
+        return
+      end
+      level = nextLevel
+      renderList(listBox, level, go)
+      refreshTabs()
+    end
+
+    refreshTabs = function()
+      for index = 1, 3 do
+        local tab = tabViews[index]
+        local active = index == level
+        tab.setBackground(active and roundRect(palette.accentSoft, R.check) or nil)
+        tab.setTextColor(active and palette.accent or palette.secondary)
+      end
+      tabViews[1].setText(selected.province and selected.province.name or "省份")
+      tabViews[2].setText(selected.city and selected.city.name or "城市")
+      tabViews[3].setText(selected.district and selected.district.name or "区县")
+      tabViews[2].setAlpha(selected.province and 1 or alphaValue(OP.disabled))
+      local hasDistrict = selected.city and selected.city.children and #selected.city.children > 0
+      tabViews[3].setAlpha(hasDistrict and 1 or alphaValue(OP.disabled))
+      if confirm then
+        local ready = selected.province ~= nil
+        if spec.allowEmpty == false then
+          ready = ready and selected.city ~= nil
+          if selected.city and selected.city.children and #selected.city.children > 0 then
+            ready = selected.district ~= nil
+          end
+        end
+        confirm.setEnabled(ready)
+        confirm.setAlpha(ready and 1 or alphaValue(OP.disabled))
+      end
+    end
+
+    for index = 1, 3 do
+      local tab = textView("", TY.callout.size, palette.secondary, false)
+      tab.setGravity(Gravity.CENTER)
+      tab.setPadding(dp(space(4)), dp(space(7)), dp(space(4)), dp(space(7)))
+      tab.setOnClickListener(View.OnClickListener{
+        onClick = function()
+          if index == 1 then
+            go(1)
+          elseif index == 2 then
+            go(2)
+          elseif index == 3 then
+            go(3)
+          end
+        end,
+      })
+      tabViews[index] = tab
+      tabs.addView(tab, LinearLayout.LayoutParams(0, -2, 1))
+    end
+    panel.addView(tabs, LinearLayout.LayoutParams(-1, -2))
+
+    local line = View(current)
+    line.setBackgroundColor(palette.separator)
+    panel.addView(line, LinearLayout.LayoutParams(-1, hairline()))
+
+    local footer = LinearLayout(current)
+    footer.setOrientation(LinearLayout.HORIZONTAL)
+    footer.setGravity(Gravity.CENTER_VERTICAL)
+    footer.setPadding(dp(space(8)), dp(space(6)), dp(space(8)), dp(space(6)))
+    local cancel = M.button({
+      text = spec.cancelText or "取消",
+      style = "plain",
+      height = 40,
+      onClick = function() dialog.dismiss() end,
+    })
+    footer.addView(cancel, LinearLayout.LayoutParams(0, dp(44), 1))
+    confirm = M.button({
+      text = spec.confirmText or "确定",
+      style = "filled",
+      height = 40,
+      onClick = function()
+        refreshRow()
+        local value = snapshot()
+        if spec.onChange then
+          spec.onChange(value)
+        end
+        dialog.dismiss()
+      end,
+    })
+    local confirmParams = LinearLayout.LayoutParams(0, dp(44), 1)
+    confirmParams.leftMargin = dp(space(8))
+    footer.addView(confirm, confirmParams)
+    panel.addView(footer, LinearLayout.LayoutParams(-1, -2))
+
+    root.addView(panel, LinearLayout.LayoutParams(-1, -2))
+    dialog.setContentView(root)
+    local window = dialog.getWindow()
+    if window then
+      window.setBackgroundDrawable(ColorDrawable(0x00000000))
+      window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+      window.setDimAmount(alphaValue(OP.overlay))
+      window.setGravity(Gravity.BOTTOM)
+      window.setLayout(-1, -2)
+    end
+    dialog.show()
+    renderList(listBox, level, go)
+    refreshTabs()
+    return dialog
+  end
+
+  if not spec.readonly then
+    row.setOnClickListener(View.OnClickListener{ onClick = function()
+      if not spec.disabled then open() end
+    end })
+  end
+  local chevron = icons.view("chevron-right", { size = 16, color = palette.tertiary })
+  local chevronParams = LinearLayout.LayoutParams(dp(16), dp(16))
+  chevronParams.leftMargin = dp(space(4))
+  row.addView(chevron, chevronParams)
+
+  parseValue(spec.value or spec.selected)
+  refreshRow()
+  if spec.disabled or spec.readonly then
+    row.setAlpha(alphaValue(OP.disabled))
+  end
+  return {
+    view = row,
+    open = open,
+    getValue = snapshot,
+    setValue = function(value)
+      parseValue(value)
+      refreshRow()
+    end,
+  }
+end
+
+
 -- 键值说明列表；value 可以是字符串，也可以直接放一个 View。
 function M.keyValue(spec)
   spec = spec or {}

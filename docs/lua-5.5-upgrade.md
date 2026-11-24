@@ -314,3 +314,224 @@ LuaX-UI：
 - 本地单元测试：`./gradlew :app:testDebugUnitTest --no-daemon`
 - 云端全量打包：`.github/workflows/release.yml` 已就绪，待仓库远端与签名 Secrets 配置后执行。
 
+
+
+---
+
+## 10. rc41 启动闪退定位与 rc42 修复（2026-11-23）
+
+### 10.1 根因
+
+`libluajava.so` 与 `AndroLua+5.0.18_AndroidX.jar` 不是同一条代码线。新原生代码按 `LuaJavaAPI(long, Object, ...)` 查找 Java 方法，但 JAR 里的桥接方法全部是 `long cptr + int 栈索引`，例如：
+
+- 原生期望 `javaGc(Object)`，JAR 实际是 `javaGc(long, int)`。
+- 原生期望 `callMethod(long, Object, String)`，JAR 实际是 `callMethod(long, int, String)`。
+
+`LuaState.openLibs()` 进入 `luaopen_luajava` 时，`GetStaticMethodID` 找不到 `javaGc` 返回空，`checkError` 触发 Lua panic，随后 `abort()`。这类原生 abort 不会进入 Java `UncaughtExceptionHandler`，所以表现为“直接闪退、没有 LuaXPlus 快照”。
+
+主机用同一份 JNI + Lua 5.5.1 复现，稳定输出：
+
+```text
+PANIC: unprotected error in call to Lua API (static Lcom/luajava/LuaJavaAPI;.javaGc(Ljava/lang/Object;)V)
+```
+
+### 10.2 修复
+
+- 从与 `native/luajava/luajava.c` 同源的上游取出完整的 `com.luajava` Java 源码，编译进 `androlua` 模块。
+- 从 `AndroLua+5.0.18_AndroidX.jar` 移除整套旧 `com.luajava` 字节码，避免新旧两套 `LuaState` 同时存在。
+- 修正 Lua 5.5 的注册表伪索引：`LUA_REGISTRYINDEX` 由 `-LUAI_MAXSTACK-1000` 改为 `-(Integer.MAX_VALUE/2+1000)`，并重新编译引用该常量的类，修复 LuaObject 引用注册时的原生崩溃。
+- 补齐旧版 `LuaState` 的 `LtoString`、`getJavaObject`、`removeJavaObject` 兼容入口，保证 JAR 内 `com.androlua` 层仍可调用。
+- 主机验证：`newLuaState` → `openLibs` → 类绑定 → 方法调用 → `LuaObject` 字段读取全部通过，退出码 0。
+- 新增 `MiniApplication`，在 Application 阶段初始化 `LogCore`、`RuntimeWatcher`。
+- 新增 `libcrashguard.so`：接管 `SIGABRT`、`SIGSEGV`、`SIGBUS`、`SIGILL`、`SIGFPE`，先写 `native_crash_*.log`，再交还系统默认处理。
+
+### 10.3 rc42 产物
+
+- 版本：`1.0.0-rc42` / versionCode `1000042`。
+- 仅 `arm64-v8a`，共 21 个 `.so`（18 个项目库 + Compose 2 个 + 崩溃守卫 1 个）。
+- `libluajava.so` 仍为 Lua 5.5.1。
+- v1/v2/v3 签名通过，证书 SHA-256 与 rc41 一致。
+
+## 11. rc43：崩溃快照与四架构同包
+
+### 11.1 崩溃无日志的两个断点
+
+rc42 已经有 LogCore 和原生信号守卫，但真机仍然看不到新日志，审计后确认不是单点：
+
+- `LuaApplication.onCreate()` 内部会调用 `CrashHandler.init(Context)`，而该方法会直接 `Thread.setDefaultUncaughtExceptionHandler(CrashHandler)`。`MiniApplication` 在 `attachBaseContext` 安装的处理器会被父类覆盖，Java 崩溃回到旧链路，只尝试写 `/sdcard/androlua/crash`，没有权限时就完全静默。
+- 崩溃可能发生在 `Application.onCreate` 之前，尤其是 `LuaApplication` 初始化、静态类加载和 ContentProvider 创建阶段。只在 Welcome 或 onCreate 里初始化日志，覆盖不了这些阶段。
+
+rc43 对应做了两件事：
+
+- 新增 `CrashBootstrapProvider`，在 `Application.onCreate` 之前初始化 BootTrace、Java 异常捕获和原生信号守卫。Provider 只依赖 Android 基础 API，不读取 Lua、不初始化界面。
+- 父类 `onCreate` 执行完成后调用 `RuntimeWatcher.refreshCrashHandler()`，强制重新接管默认异常处理器，并把父类 CrashHandler 作为上一级处理器保留，形成“BootTrace → LogCore → 旧 CrashHandler → 系统”的顺序。
+
+### 11.2 启动轨迹落盘位置
+
+BootTrace 会在所有可写目录同时追加 `boot_trace.log`，崩溃时额外生成 `crash_yyyyMMdd_HHmmss_SSS.log`：
+
+- `Android/data/com.mini.luaxplus/files/boot_trace.log`，应用外部私有目录，卸载前一直保留。
+- 应用内部 `files/boot_trace.log`，外部目录不可写时的兜底。
+- `/storage/emulated/0/LuaXPlus/logs` 与 `/sdcard/androlua/crash`，仅在已授权存储时写入。
+
+每次写入都执行 `flush` 与 `FileDescriptor.sync()`，避免进程被 `abort()` 终止时缓冲区丢失。原生信号日志由 `libcrashguard.so` 写入同样的目录，文件名为 `native_crash_<时间>_<pid>_<信号>.log`。
+
+### 11.3 四架构同包
+
+rc43 不再使用 ABI split，四个 ABI 的库全部进入同一个 APK：
+
+- `arm64-v8a`：19 个项目库，`libluajava.so` 使用 Lua 5.5.1。
+- `armeabi-v7a`：恢复旧版 32 位适配，补齐 `libcrashguard.so`，Lua 文件定位退回 32 位 `fseek/ftell`。
+- `x86`：补齐 32 位模拟器库，同样退回 32 位文件定位。
+- `x86_64`：补齐 64 位模拟器库，JNI 与 arm64 使用同一份 4.4.2 桥接实现。
+
+打包结果：`native-code: 'arm64-v8a' 'armeabi-v7a' 'x86' 'x86_64'`，每个 ABI 21 个 `.so`，不生成 split APK。
+
+### 11.4 rc43 产物
+
+- 版本：`1.0.0-rc43` / versionCode `1000043`。
+- 文件：`Mini-LuaXPLUS-1.0.0-rc43.apk`。
+- 大小：15,190,423 字节。
+- SHA-256：`bdd0d43647eb0a6b593ebf9f7e41655c04fc5d10cdf0c9873bc5edb78541a7dc`。
+- 签名证书 SHA-256 与 rc42 一致，可直接覆盖安装。
+- 主机侧已验证 `libcrashguard.so` 能接管 SIGABRT 并落盘完整信号日志。
+
+## 12. rc49 → 1.0.1-rc1：日志初始化闪退修复
+
+精确堆栈显示，rc49 的崩溃发生在 `MiniApplication.attachBaseContext` 内的 `LogCore.init`，并非 Lua 或原生守卫：`LogCore.write` 调用 `Environment.isExternalStorageManager()` 时，部分 ROM 在 Application.attach 早期尚未准备好包信息，抛出 `NullPointerException`。
+
+处理方式：
+
+- `LogCore.switchExternalIfPossible` 捕获该调用的全部异常，异常时直接跳过外部切换。
+- `LogCore.init` 在 `getApplicationContext()` 返回空时回退到传入的基础上下文，保证内部目录可用。
+- `LogCore.prepareExternal` 将目录探测的异常范围扩大到 `Throwable`，外部目录不可写时保持内部目录。
+- `Permissions.allFiles` 同样捕获系统异常，权限查询不阻断启动。
+- Android 11 及以上按版本引导一次所有文件访问，启动后授权成功即自动切换到 `/storage/emulated/0/LuaXPlus/logs`。
+
+版本从 `1.0.0-rc49` 升到 `1.0.1-rc1`，versionCode `1000101`。四个 ABI 继续同包，不 split。
+
+### rc1 实测结果与 rc2 诊断
+
+rc1 在 vivo V2324A / Android 16 上已不再出现 LogCore 空指针，日志成功写入 `/storage/emulated/0/LuaXPlus/logs`，说明外部存储授权与目录切换已生效。
+
+新的停止点在 `Main.onCreate` 的父类初始化阶段：`Activity created` 已写入，但 `Main.onCreate after super` 未出现，入口脚本的第一条日志也未出现。这说明崩溃发生在 Lua 运行环境初始化或入口脚本加载早期，而不是界面绘制阶段。
+
+rc2 在 `Main` 的 `getLuaPath`、`initMain`、`doFile`、`runFunc` 前后增加轨迹，并捕获 Throwable 写快照；原生守卫改为先写最小崩溃文件，再尝试 `_Unwind_Backtrace`，避免回溯本身异常导致无文件可查。
+
+### rc2 实测结果与 rc3 根因
+
+rc2 日志仍停在 `Activity created com.androlua.Main`，且没有出现 `Main.getLuaPath enter`。继续反汇编父类 `LuaActivity.onCreate` 后发现一段旧代码：
+
+```java
+LuaApplication app = (LuaApplication) getApplication();
+if (app.getClass() != LuaApplication.class) {
+    while (true) {
+        if (app.getClass() == LuaApplication.class) {
+            break;
+        }
+    }
+}
+```
+
+它要求应用类精确等于 `LuaApplication`。本项目为了启动日志与崩溃守卫，使用 `MiniApplication extends LuaApplication`，精确类判断永远不成立，主线程因此进入忙等，表现为停在 `Activity created` 后无任何日志、随后被系统或用户终止。
+
+rc3 通过字节码补丁移除这段死循环。补丁只删除 `onCreate` 中的类判断与忙等，不改变字段、方法签名和其他逻辑。构建后的 DEX 已核对：`getApplication` 之后直接进入 `getLocalDir`，不存在类判断分支。
+
+### rc3 实测结果与 rc4
+
+rc3 已突破首页入口，应用不再卡在 `Activity created`。随后在打包工程“啤酒”时出现新的原生 `SIGSEGV`，并且 Lua 快照记录了“打包配置读取失败”。
+
+该 Lua 错误来自 `bin.lua` 中 `pcall(loadfile(...))` 的判断写反：`pcall` 成功时返回 true，原逻辑却把成功当成失败，弹出错误框并继续打包。rc4 改为成功时执行配置块，失败时提示并直接返回。
+
+原生崩溃文件已能产出，但只有裸地址。rc4 在信号处理里加入 `dladdr`，崩溃文件会写明 `libxxx.so+偏移 符号`，下一次可直接定位到具体原生函数。
+
+### rc4 原生栈定位与 rc5 修复
+
+rc4 崩溃文件已经符号化，调用栈落在：
+
+- `libluajava.so+0x1d1e8 lua_dump`
+- `Java_com_luajava_LuaState__1dump`
+- `libluajava.so+0x1f8bc luaL_addlstring`
+- `libc.so` 内存操作
+
+根因是 Lua 5.5 修改了 `luaL_Buffer` 的栈约定：`luaL_buffinit` 会压入一个 lightuserdata 占位值。旧桥接先 `luaL_buffinit`，再调用 `lua_dump(L, writer, &b, 0)`，此时栈顶已经不是待 dump 的函数，`lua_dump` 取到占位值，writer 又把占位值当成缓冲盒，最终在 `luaL_addlstring` 内越界崩溃。
+
+rc5 把 dump 的输出改为独立 C 动态缓冲区，writer 直接向 `malloc/realloc` 的缓冲区追加，不再创建 `luaL_Buffer`，也不再向 Lua 栈压占位值。`lua_dump` 始终 dump 栈顶函数，序列化完成后再复制到 Java `byte[]`。
+
+### rc5 实测结果与 rc6
+
+rc5 没有再产生原生 SIGSEGV，说明 `lua_dump` 的独立缓冲区修复有效。打包继续进入修改清单阶段，出现两个 Lua 层错误：
+
+1. `bin.lua:394 attempt to call a nil value (global 'tointeger')`。旧运行环境提供全局 `tointeger`，Lua 5.5 运行时没有该全局；rc6 在打包函数作用域内提供本地实现，用 `tonumber` 与 `math.floor` 转换。
+2. `bin.lua:33 attempt to index a nil value (upvalue 'error_dlg')`。rc4 移除配置误报后，成功路径不再提前创建错误框，失败回调仍直接使用它；rc6 改为需要时按需创建。
+
+这两处都不涉及原生层。
+
+### rc6 成品安装冲突与 rc7
+
+rc6 已成功产出 `啤酒_1.0.apk`（包名 `com.mini.pijiu`，版本名 1.0），但安装时提示“软件包与现有软件包存在冲突”。
+
+检查成品清单发现版本号被写成 1，而打包器自身版本号是 1000106。`bin.lua` 在写完整清单后，用 `string.gsub` 对二进制 XML 做四字节替换：
+
+```lua
+s = string.gsub(s, touint32(code), touint32(tointeger(appcode) or 1), 1)
+```
+
+`touint32(1)` 会匹配二进制 XML 中大量值为 1 的字段，既可能把版本号降级，也可能误改 `uses-feature` 的 `android:required` 等属性。安装器因此把成品判成降级包或结构异常包。
+
+rc7 删除这两处二进制替换。成品版本号继承打包器版本号，版本名仍通过字符串表替换；清单不再被字节级改写。若旧成品是同包名但不同签名，需要先卸载旧版，这是 Android 的签名约束，不是清单问题。
+
+### rc8 成品与主程序安装冲突
+
+rc7 重新打包后，成品版本号已恢复为 `1000107`，清单也能被 `aapt` 正常解析，但安装仍提示“软件包与现有软件包存在冲突”，且设备上没有同包名旧版。
+
+解码成品清单后确认，成品包名是 `com.mini.pijiu`，与主程序 `com.mini.luaxplus` 不同；真正的冲突来自 ContentProvider 标识：
+
+```xml
+<provider
+    android:name="com.mini.luaxplus.CrashBootstrapProvider"
+    android:authorities="com.mini.luaxplus.crashbootstrap" />
+```
+
+Android 要求已安装应用的 ContentProvider authority 全局唯一。成品沿用了主程序已经占用的 `com.mini.luaxplus.crashbootstrap`，安装器因此拒绝安装，表现就是“与现有软件包冲突”。
+
+rc8 在 `bin.lua` 的清单字符串替换表中补上：
+
+```lua
+[activity.getPackageName()..".crashbootstrap"] = packagename..".crashbootstrap"
+```
+
+成品重新打包后，authority 变为 `com.mini.pijiu.crashbootstrap`，不再与主程序冲突。
+
+### rc9 资源包名仍与主程序重名
+
+rc8 修掉 `crashbootstrap` 的 Provider 标识后，成品仍被 vivo 拒绝。继续解码成品发现，`resources.arsc` 的资源包名还是 `com.mini.luaxplus`：
+
+```
+Package 0 id=0x7f name=com.mini.luaxplus
+```
+
+也就是说，清单里的包名已经变成 `com.mini.pijiu`，但资源表仍把自己标成主程序。部分安装器会读资源表包名做同名判断，于是仍然报“软件包与现有软件包存在冲突”。
+
+rc9 新增 `ArscPackage`，在打包复制 `resources.arsc` 时定位 `RES_TABLE_PACKAGE_TYPE` 块，把 128 字符的包名改成成品包名。资源 ID 的 `0x7f` 命名空间不变，只改资源表身份。成品现在是清单包名、Provider 标识、动态权限、资源包名四层一致。
+
+### rc10 资源表不能压缩
+
+rc9 已把 `resources.arsc` 的资源包名改成成品包名，但修复测试包在 vivo 上提示“安装应用与当前系统有兼容性问题”。对比原包和修复包的 ZIP 结构发现：
+
+- 原包 `resources.arsc` 是 `Stored`，不压缩
+- 修复包重新打包时把 `resources.arsc` 变成了 `Defl:N`
+
+部分安装器要求资源表保持未压缩，压缩后会判定为不兼容包。rc10 的 `ArscPackage.writeStored` 在改写资源包名的同时，按 `STORED` 方式写入 `resources.arsc`，并设置正确的 size 和 CRC。
+
+### rc11 布局加载的 _ENV 空值
+
+rc10 安装后打开 Java API 页面，`javaapi/main.lua` 的 `import "classitem"` 触发 `.aly` 布局加载，报：
+
+```
+[string "javaapi/classitem.aly"]:2: attempt to index a nil value (upvalue '_ENV')
+```
+
+根因在 `lua55_compat.lua` 的 `loadstring` 兼容实现：它把第四个参数 `env` 无条件传给 `load`。旧 `loadstring` 调用通常只传 3 个参数，此时 `env` 是 `nil`，Lua 5.5 的 `load` 会给代码块一个空的 `_ENV`，布局里的 `LinearLayout` 等全局类无法解析。
+
+修复为：只有 `env` 非 nil 时才传第四个参数；否则调用 `load` 的三参数形式，使用全局环境。显式传 env 的工程 `init.lua` 加载路径保持不变。

@@ -32,6 +32,10 @@
     成品包与主程序共用同一套 Java 运行时，所以启动页、日志、崩溃监控、权限申请都不需要工程自己实现。
   </div>
 
+  <div class="note">
+    工程包含 <code class="inline">.java</code> 源码时，打包前会先在手机内编译 Java。ECJ 与 D8 不随主程序内置，请先在首页侧边栏「插件市场」安装「Java 编译器」；未安装时打包会停在 Java 编译步骤并给出提示。
+  </div>
+
   <h2>成品包里带了什么</h2>
   <table>
     <tr><th>内容</th><th>说明</th></tr>
@@ -57,11 +61,12 @@ permissions.ensure("camera", "microphone")</pre>
   <h2>成品日志在哪</h2>
   <p>每个成品独立一个目录，包名即目录名：</p>
 
-<pre>/storage/emulated/0/LuaXPlus/products/你的包名/logs
+<pre>/storage/emulated/0/LuaXPlus/APP_Logs/你的包名
     app_日期.log                  当天运行日志
     warn_日期_时分秒_毫秒_进程.log   警告快照
     luaerror_日期_时分秒_毫秒.log    脚本错误快照
-    crash_日期_时分秒_毫秒_进程.log   崩溃快照</pre>
+    crash_ledger_日期_时分秒_毫秒_来源.log   崩溃账本
+    native_crash_日期_进程_线程.log      原生崩溃现场</pre>
 
   <p>未获得存储授权时，日志先写在成品自己的私有目录，授权后 30 秒内自动切换。</p>
 

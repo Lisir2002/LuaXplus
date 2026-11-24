@@ -218,7 +218,7 @@
     <uses-permission android:name="android.permission.NFC" />
 
     <application
-        android:name="com.androlua.LuaApplication"
+        android:name="com.mini.luaxplus.MiniApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -230,6 +230,12 @@
         android:theme="@style/Theme.MiniLuaXPLUS.Material3"
         android:usesCleartextTraffic="true"
         tools:targetApi="n">
+
+        <provider
+            android:name=".CrashBootstrapProvider"
+            android:authorities="${applicationId}.crashbootstrap"
+            android:exported="false"
+            android:initOrder="1000" />
 
         <uses-library
             android:name="org.apache.http.legacy"
@@ -326,6 +332,13 @@
             android:documentLaunchMode="intoExisting"
             android:excludeFromRecents="false"
             android:exported="true"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <activity
+            android:name="com.mini.luaxplus.java.JavaHostActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:exported="false"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar"
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity

@@ -15,3 +15,13 @@ local.properties
 /keystore/
 *.jks
 *.keystore
+
+# 编译产物与安装包（仅保留在本地）
+/dist/
+*.apk
+*.aab
+
+# 编译器插件：构建产物和受 SDK 许可约束的 android.jar 不入库
+/tools/compiler-plugin/compiler.dex
+/tools/compiler-plugin/android.jar
+/tools/compiler-plugin/source/android.jar
