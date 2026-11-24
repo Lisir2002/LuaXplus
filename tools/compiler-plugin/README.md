@@ -21,6 +21,10 @@
 - `version.txt`
 - `resources/`，其中包含 `licenses/ECLIPSE-PUBLIC-LICENSE-2.0.txt`、`licenses/R8-D8-LICENSE.txt` 和 `NOTICE.txt`
 
+## 下载源
+
+主源是 `https://raw.githubusercontent.com/Lisir2002/LuaXplus/main/dist/compiler-plugin-1.2.zip`。GitHub raw 不可达时，客户端依次尝试 `ghfast.top`、`gh-proxy.com`、`ghproxy.net` 三个 GitHub 传输镜像；所有来源下载后都校验同一个 SHA-256，镜像无法替换包内容。
+
 ## 构建约束
 
 - 只使用官方构件，不修改编译器算法。

@@ -107,10 +107,41 @@ public final class CompilerPlugin {
     }
 
     /**
-     * 下载并安装插件。方法会阻塞，调用方必须在后台线程执行。
-     * expectedSha256 为空时不校验哈希，但仍会校验 ZIP 结构和文件大小。
+     * 下载并安装插件。GitHub 直链不可达时自动切换镜像，每个源都做同一 SHA-256 校验。
+     * 方法会阻塞，调用方必须在后台线程执行。
      */
     public static boolean downloadAndInstall(Context context, String url, String expectedSha256) {
+        lastError = "";
+        String[] candidates = downloadCandidates(url);
+        String firstError = "";
+        for (String candidate : candidates) {
+            if (downloadOnce(context, candidate, expectedSha256)) {
+                return true;
+            }
+            if (firstError.isEmpty()) {
+                firstError = lastError;
+            }
+            Log.w(TAG, "下载源失败: " + candidate + " - " + lastError);
+        }
+        lastError = "下载失败，已尝试 " + candidates.length + " 个源"
+                + (firstError.isEmpty() ? "" : "：" + firstError);
+        return false;
+    }
+
+    /** GitHub raw 在国内网络下可能被重置，镜像只负责传输，最终仍按同一哈希校验。 */
+    private static String[] downloadCandidates(String url) {
+        if (url == null || !url.startsWith("https://raw.githubusercontent.com/")) {
+            return new String[]{url};
+        }
+        return new String[]{
+                url,
+                "https://ghfast.top/" + url,
+                "https://gh-proxy.com/" + url,
+                "https://ghproxy.net/" + url
+        };
+    }
+
+    private static boolean downloadOnce(Context context, String url, String expectedSha256) {
         lastError = "";
         File target = root(context);
         File part = new File(target, "compiler-plugin.zip.part");
@@ -119,11 +150,12 @@ public final class CompilerPlugin {
         try {
             URL address = new URL(url);
             connection = (HttpURLConnection) address.openConnection();
-            connection.setConnectTimeout(20000);
+            connection.setConnectTimeout(15000);
             connection.setReadTimeout(90000);
             connection.setInstanceFollowRedirects(true);
             connection.setUseCaches(false);
             connection.setRequestProperty("User-Agent", "Mini-LuaXPLUS/CompilerPlugin");
+            connection.setRequestProperty("Accept-Encoding", "identity");
             int code = connection.getResponseCode();
             if (code < 200 || code >= 300) {
                 throw new IOException("下载失败，HTTP " + code);

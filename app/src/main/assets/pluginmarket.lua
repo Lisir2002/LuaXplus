@@ -285,6 +285,7 @@ content.addView(noteCard, noteParams)
 noteCard.addView(label("说明", 14, INK, true))
 local lines = {
   "下载完成后会核对 SHA-256，并校验编译器 DEX 与 android.jar 的完整性。",
+  "优先使用 GitHub 直链；网络受限时会自动切换镜像，所有来源都使用同一个 SHA-256。",
   "插件只加载 ECJ 与 D8 编译类，不会改动你的工程文件。",
   "开源许可：ECJ 采用 EPL-2.0，D8 采用 BSD-3-Clause；完整许可见插件 resources/licenses。",
   "插件安装在应用内部存储，不申请存储权限；清理应用数据或卸载应用后会提示重新安装。",

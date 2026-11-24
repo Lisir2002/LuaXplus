@@ -119,7 +119,7 @@ Java 能力放在 `app/src/main/java/com/mini/luaxplus/java/`，由四层组成�
 
 编译器插件：
 
-- 插件包约 29 MB，从 GitHub `main` 分支下载，包含 ECJ 3.26.0、D8 3.3.20、`android.jar` 和许可证说明。
+- 插件包约 29 MB，从 GitHub `main` 分支下载，包含 ECJ 3.26.0、D8 3.3.20、`android.jar` 和许可证说明；GitHub 直链不可达时自动切换镜像，最终仍按同一 SHA-256 校验。
 - 插件默认安装到应用内部存储 `files/compiler-plugin`，下载后校验 SHA-256，再通过 `DexClassLoader` 加载；不依赖外部存储，也不需要存储权限。
 - 未安装插件时，Java 编译入口会提示去插件市场；安装后编译、预览和打包仍可正常使用。
 
